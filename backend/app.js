@@ -20,10 +20,12 @@ if (isServerless) {
     app.use(async (req, res, next) => {
         try {
             await store.reload();
-            res.on('finish', () => { store.flush().catch(console.error); });
-            res.on('close', () => { store.flush().catch(console.error); });
+            const flushData = () => { store.flush().catch((e) => console.error('[store] flush error:', e)); };
+            res.on('finish', flushData);
+            res.on('close', flushData);
             next();
         } catch (err) {
+            console.error('[store] reload error:', err);
             next(err);
         }
     });
@@ -54,8 +56,9 @@ if (!isServerless) {
 }
 
 app.use((err, _req, res, _next) => {
-    console.error(err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error('[api error]', err);
+    const message = process.env.NETLIFY ? 'Error del servidor. Reintenta en unos segundos.' : (err.message || 'Error interno del servidor');
+    res.status(500).json({ error: message });
 });
 
 module.exports = app;

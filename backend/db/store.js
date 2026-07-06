@@ -3,7 +3,13 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 
 const DB_FILE = path.join(__dirname, 'data.json');
-const isServerless = !!(process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const TMP_DB = path.join('/tmp', 'winpot-data.json');
+
+const isServerless = !!(
+    process.env.NETLIFY ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.LAMBDA_TASK_ROOT
+);
 
 function emptyData() {
     return {
@@ -19,26 +25,48 @@ function emptyData() {
 let data = emptyData();
 let dirty = false;
 
-function loadFromFile() {
-    if (!fs.existsSync(DB_FILE)) return emptyData();
+function loadFromFile(filePath) {
+    if (!fs.existsSync(filePath)) return emptyData();
     try {
-        return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     } catch {
         return emptyData();
     }
 }
 
+function saveToFile(filePath) {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+}
+
 async function loadFromBlob() {
     const { getStore } = require('@netlify/blobs');
-    const blobStore = getStore({ name: 'winpot-db', consistency: 'strong' });
+    const blobStore = getStore('winpot-db');
     const stored = await blobStore.get('data', { type: 'json' });
     return stored || emptyData();
 }
 
 async function saveToBlob() {
     const { getStore } = require('@netlify/blobs');
-    const blobStore = getStore({ name: 'winpot-db', consistency: 'strong' });
+    const blobStore = getStore('winpot-db');
     await blobStore.setJSON('data', data);
+}
+
+async function loadFromServerless() {
+    try {
+        return await loadFromBlob();
+    } catch (err) {
+        console.warn('[store] Blob load fallback /tmp:', err.message);
+        return loadFromFile(TMP_DB);
+    }
+}
+
+async function saveToServerless() {
+    try {
+        await saveToBlob();
+    } catch (err) {
+        console.warn('[store] Blob save fallback /tmp:', err.message);
+        saveToFile(TMP_DB);
+    }
 }
 
 function persist() {
@@ -46,23 +74,23 @@ function persist() {
         dirty = true;
         return;
     }
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+    saveToFile(DB_FILE);
 }
 
 function initLocal() {
-    data = loadFromFile();
+    data = loadFromFile(DB_FILE);
     seedDefaults();
 }
 
 async function reload() {
-    data = isServerless ? await loadFromBlob() : loadFromFile();
+    data = isServerless ? await loadFromServerless() : loadFromFile(DB_FILE);
     seedDefaults();
 }
 
 async function flush() {
     if (!dirty) return;
     if (isServerless) {
-        await saveToBlob();
+        await saveToServerless();
         dirty = false;
     }
 }

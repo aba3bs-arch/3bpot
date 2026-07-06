@@ -5,9 +5,11 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  NETLIFY = "true"
 
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["@netlify/blobs"]
   included_files = ["backend/**"]
 
 [[redirects]]
