@@ -20,14 +20,17 @@ function recordTransaction(userId, type, amount, balanceAfter, opts = {}) {
         game: opts.game || null,
         note: opts.note || null,
         admin_id: opts.adminId || null,
+        cash_cents: opts.cashCents ?? null,
+        payment_method: opts.paymentMethod || null,
+        package_id: opts.packageId ?? null,
     });
 }
 
-function credit(userId, amount, type, note, adminId) {
+function credit(userId, amount, type, note, adminId, extra = {}) {
     if (amount <= 0) throw new Error('El monto debe ser positivo');
     const newBalance = getBalance(userId) + amount;
     store.setBalance(userId, newBalance);
-    recordTransaction(userId, type, amount, newBalance, { note, adminId });
+    recordTransaction(userId, type, amount, newBalance, { note, adminId, ...extra });
     return newBalance;
 }
 
@@ -84,11 +87,33 @@ function purchasePackage(userId, packageId) {
         userId,
         pkg.coins,
         'purchase',
-        `Compra: ${pkg.name} (${pkg.coins} WC)`,
-        null
+        `Compra online: ${pkg.name} (${pkg.coins} WC)`,
+        null,
+        { cashCents: pkg.price_cents, packageId: pkg.id, paymentMethod: 'online_demo' }
     );
 
     return { package: pkg, balance };
+}
+
+function sellForCash(userId, coins, cashCents, adminId, opts = {}) {
+    if (!Number.isInteger(coins) || coins <= 0) throw new Error('Cantidad de WinCoins inválida');
+    if (!Number.isInteger(cashCents) || cashCents < 0) throw new Error('Monto en efectivo inválido');
+
+    const user = store.findUserById(userId);
+    if (!user) throw new Error('Usuario no encontrado');
+    if (user.role === 'admin') throw new Error('No se venden WinCoins a cuentas admin');
+
+    const method = opts.paymentMethod || 'efectivo';
+    const pkgLabel = opts.packageName ? ` · ${opts.packageName}` : '';
+    const note = opts.note || `Venta ${method}: ${coins} WC por $${(cashCents / 100).toFixed(2)}${pkgLabel}`;
+
+    const balance = credit(userId, coins, 'cash_sale', note, adminId, {
+        cashCents,
+        paymentMethod: method,
+        packageId: opts.packageId || null,
+    });
+
+    return { balance, coins, cashCents, note };
 }
 
 module.exports = {
@@ -101,4 +126,5 @@ module.exports = {
     playRound,
     getTransactions,
     purchasePackage,
+    sellForCash,
 };

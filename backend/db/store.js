@@ -200,6 +200,13 @@ function getStats() {
     const betsToday = roundsToday.reduce((s, r) => s + r.bet, 0);
     const payoutsToday = roundsToday.reduce((s, r) => s + r.payout, 0);
 
+    const cashSales = data.transactions.filter((t) => t.type === 'cash_sale');
+    const cashSalesToday = cashSales.filter((t) => t.created_at.startsWith(today));
+    const cashRevenueToday = cashSalesToday.reduce((s, t) => s + (t.cash_cents || 0), 0);
+    const wcSoldToday = cashSalesToday.reduce((s, t) => s + t.amount, 0);
+    const totalCashRevenue = cashSales.reduce((s, t) => s + (t.cash_cents || 0), 0);
+    const totalWcSold = cashSales.reduce((s, t) => s + t.amount, 0);
+
     return {
         users,
         totalBalance,
@@ -208,7 +215,44 @@ function getStats() {
         payoutsToday,
         houseProfitToday: betsToday - payoutsToday,
         roundsTotal: data.game_rounds.length,
+        cashSalesToday: cashSalesToday.length,
+        cashRevenueToday,
+        wcSoldToday,
+        totalCashRevenue,
+        totalWcSold,
     };
+}
+
+function getCashSales(limit = 30) {
+    return data.transactions
+        .filter((t) => t.type === 'cash_sale')
+        .sort((a, b) => b.id - a.id)
+        .slice(0, limit)
+        .map((t) => {
+            const u = findUserById(t.user_id);
+            return {
+                id: t.id,
+                created_at: t.created_at,
+                user_id: t.user_id,
+                name: u?.name,
+                email: u?.email,
+                coins: t.amount,
+                cash_cents: t.cash_cents,
+                payment_method: t.payment_method,
+                note: t.note,
+            };
+        });
+}
+
+function updatePackage(id, updates) {
+    const pkg = findPackage(id);
+    if (!pkg) return null;
+    if (updates.name != null) pkg.name = String(updates.name).trim();
+    if (updates.coins != null) pkg.coins = parseInt(updates.coins, 10);
+    if (updates.price_cents != null) pkg.price_cents = parseInt(updates.price_cents, 10);
+    if (updates.active != null) pkg.active = updates.active ? 1 : 0;
+    persist();
+    return pkg;
 }
 
 function getUserRounds(userId, limit = 20) {
@@ -270,7 +314,9 @@ module.exports = {
     getAllTransactions,
     addGameRound,
     getStats,
+    getCashSales,
     getUserRounds,
     getPackages,
     findPackage,
+    updatePackage,
 };

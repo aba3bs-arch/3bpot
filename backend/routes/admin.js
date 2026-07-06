@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const store = require('../db/store');
 const { adminRequired } = require('../middleware/auth');
 const wallet = require('../services/wallet');
@@ -8,6 +9,72 @@ router.use(adminRequired);
 
 router.get('/stats', (_req, res) => {
     res.json({ stats: store.getStats() });
+});
+
+router.get('/cash-sales', (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 30, 100);
+    res.json({ sales: store.getCashSales(limit) });
+});
+
+router.post('/users', (req, res) => {
+    const { name, email, password } = req.body;
+    if (!name || !email) {
+        return res.status(400).json({ error: 'Nombre y email son requeridos' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (store.findUserByEmail(normalizedEmail)) {
+        return res.status(409).json({ error: 'Este email ya está registrado' });
+    }
+
+    const pwd = password && String(password).length >= 6 ? password : 'winpot123';
+    const hash = bcrypt.hashSync(pwd, 10);
+    const user = store.createUser(normalizedEmail, hash, String(name).trim());
+    store.createWallet(user.id, 0);
+
+    res.status(201).json({
+        message: 'Cliente creado',
+        user: { id: user.id, email: user.email, name: user.name, balance: 0 },
+        tempPassword: password ? null : pwd,
+    });
+});
+
+router.post('/sell-coins', (req, res) => {
+    const userId = parseInt(req.body.userId, 10);
+    const packageId = req.body.packageId ? parseInt(req.body.packageId, 10) : null;
+    let coins = req.body.coins != null ? parseInt(req.body.coins, 10) : null;
+    let cashCents = req.body.cashCents != null ? parseInt(req.body.cashCents, 10) : null;
+    const paymentMethod = req.body.paymentMethod || 'efectivo';
+    const note = req.body.note || '';
+
+    if (!userId) return res.status(400).json({ error: 'Selecciona un cliente' });
+
+    let packageName = null;
+    if (packageId) {
+        const pkg = store.findPackage(packageId);
+        if (!pkg) return res.status(404).json({ error: 'Paquete no encontrado' });
+        if (coins == null) coins = pkg.coins;
+        if (cashCents == null) cashCents = pkg.price_cents;
+        packageName = pkg.name;
+    }
+
+    if (!coins || coins <= 0) return res.status(400).json({ error: 'Cantidad de WinCoins inválida' });
+    if (cashCents == null || cashCents < 0) return res.status(400).json({ error: 'Monto en efectivo inválido' });
+
+    try {
+        const result = wallet.sellForCash(userId, coins, cashCents, req.user.id, {
+            paymentMethod,
+            note,
+            packageId,
+            packageName,
+        });
+        res.json({
+            message: `Venta registrada: ${coins} WC → $${(cashCents / 100).toFixed(2)} ${paymentMethod}`,
+            ...result,
+        });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
 });
 
 router.get('/users', (req, res) => {
@@ -94,6 +161,13 @@ router.get('/transactions', (req, res) => {
 
 router.get('/packages', (_req, res) => {
     res.json({ packages: store.getPackages() });
+});
+
+router.patch('/packages/:id', (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const pkg = store.updatePackage(id, req.body);
+    if (!pkg) return res.status(404).json({ error: 'Paquete no encontrado' });
+    res.json({ message: 'Paquete actualizado', package: pkg });
 });
 
 module.exports = router;
