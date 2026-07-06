@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinPot Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="layout" id="app">
+        <!-- Login -->
+        <div class="login-wrap" id="loginWrap">
+            <form class="login-card" id="loginForm">
+                <h1>WinPot Admin</h1>
+                <p>Acceso restringido a administradores</p>
+                <label>Email<input type="email" name="email" required value="admin@winpot.local"></label>
+                <label>Contraseña<input type="password" name="password" required value="admin123"></label>
+                <button type="submit">Entrar</button>
+                <p class="login-error" id="loginError" hidden></p>
+            </form>
+        </div>
+
+        <!-- Panel -->
+        <div class="panel" id="panel" hidden>
+            <aside class="sidebar">
+                <div class="sidebar__brand">WIN<span>POT</span> Admin</div>
+                <nav>
+                    <button type="button" class="nav-btn is-active" data-view="dashboard">Dashboard</button>
+                    <button type="button" class="nav-btn" data-view="users">Usuarios</button>
+                    <button type="button" class="nav-btn" data-view="transactions">Transacciones</button>
+                </nav>
+                <div class="sidebar__foot">
+                    <a href="/portal/">← Portal</a>
+                    <button type="button" id="logoutBtn">Salir</button>
+                </div>
+            </aside>
+
+            <main class="content">
+                <header class="content__head">
+                    <h1 id="viewTitle">Dashboard</h1>
+                    <span class="admin-badge" id="adminName"></span>
+                </header>
+
+                <!-- Dashboard -->
+                <section class="view" id="view-dashboard">
+                    <div class="stats-grid" id="statsGrid"></div>
+                </section>
+
+                <!-- Users -->
+                <section class="view" id="view-users" hidden>
+                    <div class="toolbar">
+                        <input type="search" id="userSearch" placeholder="Buscar por email o nombre...">
+                        <button type="button" class="btn" id="searchBtn">Buscar</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="table" id="usersTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Usuario</th>
+                                    <th>Saldo</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Transactions -->
+                <section class="view" id="view-transactions" hidden>
+                    <div class="table-wrap">
+                        <table class="table" id="txTable">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Usuario</th>
+                                    <th>Tipo</th>
+                                    <th>Monto</th>
+                                    <th>Saldo</th>
+                                    <th>Nota</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal recarga -->
+    <div class="modal" id="creditModal" hidden>
+        <div class="modal__box">
+            <h2 id="creditModalTitle">Recargar créditos</h2>
+            <p id="creditModalUser"></p>
+            <label>Monto (WC)<input type="number" id="creditAmount" min="1" step="1" value="500"></label>
+            <label>Nota<input type="text" id="creditNote" placeholder="Motivo de la recarga"></label>
+            <div class="modal__actions">
+                <button type="button" class="btn btn--ghost" id="creditCancel">Cancelar</button>
+                <button type="button" class="btn btn--green" id="creditConfirm">Acreditar</button>
+                <button type="button" class="btn btn--red" id="debitConfirm">Debitar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="/shared/wallet-client.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Winpot Spin — Ruleta Premium</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/spin.css">
+</head>
+<body>
+    <div class="bg-effects" aria-hidden="true">
+        <div class="bg-effects__orb bg-effects__orb--1"></div>
+        <div class="bg-effects__orb bg-effects__orb--2"></div>
+        <div class="bg-effects__grid"></div>
+    </div>
+
+    <div class="app">
+        <header class="header">
+            <div class="header__brand">
+                <div class="header__logo-mark">
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="20" cy="20" r="19" stroke="url(#logoGrad)" stroke-width="2"/>
+                        <path d="M20 8L22 16H30L23.5 20.5L26 28L20 24L14 28L16.5 20.5L10 16H18L20 8Z" fill="url(#logoGrad)"/>
+                        <defs>
+                            <linearGradient id="logoGrad" x1="10" y1="8" x2="30" y2="32">
+                                <stop stop-color="#FF6B6B"/>
+                                <stop offset="1" stop-color="#E73843"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div class="header__brand-text">
+                    <span class="header__logo">WIN<span>POT</span></span>
+                    <span class="header__tagline">Spin Premium</span>
+                </div>
+                <span class="header__badge">DEMO</span>
+            </div>
+            <div class="header__stats">
+                <div class="stat-pill">
+                    <span class="stat-pill__label">Giros</span>
+                    <span class="stat-pill__value" id="totalSpins">0</span>
+                </div>
+                <div class="stat-pill stat-pill--gold">
+                    <span class="stat-pill__label">WinCoins</span>
+                    <span class="stat-pill__value" id="balance">0 WC</span>
+                </div>
+                <a href="/portal/" class="header__portal">← Portal</a>
+            </div>
+        </header>
+
+        <main class="main">
+            <section class="game-panel">
+                <div class="game-panel__header">
+                    <div class="game-panel__badge">Casino en vivo</div>
+                    <h1 class="game-title">Ruleta de la fortuna</h1>
+                    <p class="game-subtitle">Apuesta, gira y multiplica tus fichas con premios de hasta <strong>20×</strong></p>
+                </div>
+
+                <div class="wheel-stage">
+                    <div class="wheel-stage__glow"></div>
+                    <div class="wheel-frame">
+                        <div class="wheel-frame__ring wheel-frame__ring--outer"></div>
+                        <div class="wheel-frame__ring wheel-frame__ring--inner"></div>
+                        <div class="wheel-frame__lights" id="wheelLights"></div>
+                        <div class="wheel-pointer">
+                            <div class="wheel-pointer__body"></div>
+                            <div class="wheel-pointer__shine"></div>
+                        </div>
+                        <div class="wheel-wrap">
+                            <canvas id="wheel" width="480" height="480" aria-label="Ruleta de premios"></canvas>
+                            <button class="wheel-center" id="spinBtn" type="button">
+                                <span class="wheel-center__ring"></span>
+                                <span class="wheel-center__label">GIRAR</span>
+                                <span class="wheel-center__sub" id="spinBtnSub">$50</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bet-panel">
+                    <div class="bet-panel__top">
+                        <p class="bet-panel__label">Selecciona tu apuesta</p>
+                        <div class="bet-panel__actions">
+                            <button type="button" class="btn-ghost" id="halfBetBtn">½</button>
+                            <button type="button" class="btn-ghost" id="doubleBetBtn">2×</button>
+                            <button type="button" class="btn-ghost btn-ghost--max" id="maxBetBtn">MAX</button>
+                        </div>
+                    </div>
+                    <div class="bet-chips" id="betChips">
+                        <button type="button" class="bet-chip" data-bet="10"><span class="bet-chip__inner">10</span></button>
+                        <button type="button" class="bet-chip" data-bet="25"><span class="bet-chip__inner">25</span></button>
+                        <button type="button" class="bet-chip is-active" data-bet="50"><span class="bet-chip__inner">50</span></button>
+                        <button type="button" class="bet-chip" data-bet="100"><span class="bet-chip__inner">100</span></button>
+                        <button type="button" class="bet-chip" data-bet="250"><span class="bet-chip__inner">250</span></button>
+                    </div>
+                    <div class="bet-custom">
+                        <div class="input-group">
+                            <label for="customBet">Monto personalizado</label>
+                            <div class="input-group__field">
+                                <span class="input-group__prefix">$</span>
+                                <input type="number" id="customBet" min="5" max="500" step="5" placeholder="75">
+                            </div>
+                        </div>
+                        <div class="bet-summary">
+                            <span class="bet-summary__label">Apuesta activa</span>
+                            <span class="bet-summary__value" id="currentBet">50 WC</span>
+                            <span class="bet-summary__potential">Ganancia potencial: <strong id="potentialWin">$1,000</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="paytable">
+                    <h3 class="paytable__title">Tabla de premios</h3>
+                    <div class="segments-legend" id="legend"></div>
+                </div>
+            </section>
+
+            <aside class="sidebar">
+                <div class="card card--highlight">
+                    <div class="card__head">
+                        <h2>Resultado</h2>
+                        <span class="live-dot">En vivo</span>
+                    </div>
+                    <div class="result-box" id="lastResult">
+                        <div class="result-box__empty">
+                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4" opacity="0.3"/>
+                                <path d="M24 14V26M24 30V34" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                            </svg>
+                            <span>Gira la ruleta para comenzar</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <span class="metric__value" id="totalWins">0</span>
+                        <span class="metric__label">Victorias</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric__value" id="bestWin">—</span>
+                        <span class="metric__label">Mejor premio</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric__value" id="netProfit">$0</span>
+                        <span class="metric__label">Balance neto</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card__head">
+                        <h2>Historial</h2>
+                        <span class="card__count" id="historyCount">0 jugadas</span>
+                    </div>
+                    <ul class="history" id="history">
+                        <li class="history__empty">Sin jugadas recientes</li>
+                    </ul>
+                </div>
+
+                <div class="card card--info">
+                    <h2>Información</h2>
+                    <ul class="rules">
+                        <li>Fichas virtuales — WinCoins compartidos en todos los juegos.</li>
+                        <li>Premio = apuesta × multiplicador del segmento.</li>
+                        <li>Segmento <strong>0×</strong> = pérdida total de la apuesta.</li>
+                        <li>RTP estimado ~92% en modo demo.</li>
+                    </ul>
+                    <button type="button" class="btn-reset" id="resetBtn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 14 8h-2a6 6 0 1 1-1.76-4.24L9 6H2V1l1.65 1.65z" fill="currentColor"/></svg>
+                        Reiniciar sesión
+                    </button>
+                </div>
+            </aside>
+        </main>
+
+        <footer class="footer">
+            <p>Juego de demostración · Sin dinero real · Juega responsablemente · 18+</p>
+        </footer>
+    </div>
+
+    <canvas id="confetti" class="confetti-canvas" aria-hidden="true"></canvas>
+
+    <div class="toast" id="toast" hidden>
+        <span class="toast__icon" id="toastIcon"></span>
+        <span class="toast__msg" id="toastMsg"></span>
+    </div>
+
+    <div class="modal" id="modal" hidden>
+        <div class="modal__backdrop"></div>
+        <div class="modal__content" id="modalContent">
+            <div class="modal__glow"></div>
+            <div class="modal__icon" id="modalIcon"></div>
+            <h2 class="modal__title" id="modalTitle"></h2>
+            <p class="modal__amount" id="modalAmount"></p>
+            <p class="modal__text" id="modalText"></p>
+            <button type="button" class="modal__btn" id="modalClose">Seguir jugando</button>
+        </div>
+    </div>
+
+    <script src="/shared/wallet-client.js"></script>
+    <script src="js/spin.js"></script>
+</body>
+</html>

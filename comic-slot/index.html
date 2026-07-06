@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Loco — Tragamonedas Cómicas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/slot.css">
+</head>
+<body>
+    <div class="halftone" aria-hidden="true"></div>
+    <div class="comic-bursts" aria-hidden="true">
+        <span class="burst burst--1">POW!</span>
+        <span class="burst burst--2">ZAP!</span>
+        <span class="burst burst--3">BOING!</span>
+    </div>
+
+    <div class="app">
+        <header class="header">
+            <div class="header__brand">
+                <div class="header__logo">🎰</div>
+                <div class="header__brand-text">
+                    <h1 class="header__title">SLOT LOCO</h1>
+                    <span class="header__tagline">¡Tragamonedas 100% ridículas!</span>
+                </div>
+                <span class="header__badge">DEMO</span>
+            </div>
+            <div class="header__stats">
+                <div class="stat-pill">
+                    <span class="stat-pill__label">Giros</span>
+                    <span class="stat-pill__value" id="totalSpins">0</span>
+                </div>
+                <div class="stat-pill stat-pill--gold">
+                    <span class="stat-pill__label">WinCoins</span>
+                    <span class="stat-pill__value" id="balance">0 WC</span>
+                </div>
+                <a href="/portal/" class="header__portal">← Portal</a>
+            </div>
+        </header>
+
+        <main class="main">
+            <section class="game-panel">
+                <div class="game-panel__header">
+                    <div class="speech-bubble speech-bubble--host">
+                        <span id="hostMessage">¡Apuesta y gira, campeón! 🎪</span>
+                    </div>
+                    <h2 class="game-title">Las 3 Líneas del Caos</h2>
+                    <p class="game-subtitle">3 iguales en fila = premio · Comodín 🎭 sustituye todo · Jackpot hasta <strong>25×</strong></p>
+                </div>
+
+                <div class="slot-machine">
+                    <div class="slot-machine__top">
+                        <div class="slot-machine__marquee">
+                            <span class="marquee-dot"></span>
+                            <span>JACKPOT: <strong id="jackpotDisplay">$12,500</strong></span>
+                            <span class="marquee-dot"></span>
+                        </div>
+                    </div>
+                    <div class="slot-machine__frame">
+                        <div class="slot-machine__lights" id="slotLights"></div>
+                        <div class="reels-wrap">
+                            <div class="payline payline--top" aria-hidden="true"></div>
+                            <div class="payline payline--mid" aria-hidden="true"></div>
+                            <div class="payline payline--bot" aria-hidden="true"></div>
+                            <div class="reels" id="reels">
+                                <div class="reel" data-reel="0"><div class="reel__strip"></div></div>
+                                <div class="reel" data-reel="1"><div class="reel__strip"></div></div>
+                                <div class="reel" data-reel="2"><div class="reel__strip"></div></div>
+                            </div>
+                        </div>
+                        <div class="win-lines" id="winLines" hidden>
+                            <span class="win-lines__label" id="winLinesLabel"></span>
+                        </div>
+                    </div>
+                    <button class="spin-btn" id="spinBtn" type="button">
+                        <span class="spin-btn__burst">¡GIRAR!</span>
+                        <span class="spin-btn__cost" id="spinBtnCost">$50</span>
+                    </button>
+                </div>
+
+                <div class="bet-panel">
+                    <div class="bet-panel__top">
+                        <p class="bet-panel__label">¿Cuánto te la juegas?</p>
+                        <div class="bet-panel__actions">
+                            <button type="button" class="btn-ghost" id="halfBetBtn">½</button>
+                            <button type="button" class="btn-ghost" id="doubleBetBtn">2×</button>
+                            <button type="button" class="btn-ghost btn-ghost--max" id="maxBetBtn">MAX</button>
+                        </div>
+                    </div>
+                    <div class="bet-chips" id="betChips">
+                        <button type="button" class="bet-chip" data-bet="10"><span class="bet-chip__inner">10</span></button>
+                        <button type="button" class="bet-chip" data-bet="25"><span class="bet-chip__inner">25</span></button>
+                        <button type="button" class="bet-chip is-active" data-bet="50"><span class="bet-chip__inner">50</span></button>
+                        <button type="button" class="bet-chip" data-bet="100"><span class="bet-chip__inner">100</span></button>
+                        <button type="button" class="bet-chip" data-bet="250"><span class="bet-chip__inner">250</span></button>
+                    </div>
+                    <div class="bet-custom">
+                        <div class="input-group">
+                            <label for="customBet">Apuesta rara</label>
+                            <div class="input-group__field">
+                                <span class="input-group__prefix">$</span>
+                                <input type="number" id="customBet" min="5" max="500" step="5" placeholder="75">
+                            </div>
+                        </div>
+                        <div class="bet-summary">
+                            <span class="bet-summary__label">Apuesta activa</span>
+                            <span class="bet-summary__value" id="currentBet">50 WC</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="paytable">
+                    <h3 class="paytable__title">Tabla de premios (× apuesta)</h3>
+                    <div class="symbols-legend" id="legend"></div>
+                </div>
+            </section>
+
+            <aside class="sidebar">
+                <div class="card card--highlight">
+                    <div class="card__head">
+                        <h2>Último giro</h2>
+                        <span class="live-dot">En vivo</span>
+                    </div>
+                    <div class="result-box" id="lastResult">
+                        <div class="result-box__empty">
+                            <span class="result-box__emoji">🎰</span>
+                            <span>¡Dale al botón gigante!</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <span class="metric__value" id="totalWins">0</span>
+                        <span class="metric__label">Victorias</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric__value" id="bestWin">—</span>
+                        <span class="metric__label">Mejor premio</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric__value" id="netProfit">$0</span>
+                        <span class="metric__label">Balance neto</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card__head">
+                        <h2>Historial</h2>
+                        <span class="card__count" id="historyCount">0 jugadas</span>
+                    </div>
+                    <ul class="history" id="history">
+                        <li class="history__empty">Sin jugadas recientes</li>
+                    </ul>
+                </div>
+
+                <div class="card card--info">
+                    <h2>Reglas locas</h2>
+                    <ul class="rules">
+                        <li>3 símbolos iguales en una fila = premio.</li>
+                        <li>El comodín 🎭 cuenta como cualquier símbolo.</li>
+                        <li>Puedes ganar en varias líneas a la vez.</li>
+                        <li>WinCoins compartidos — compra más en el portal.</li>
+                    </ul>
+                    <button type="button" class="btn-reset" id="resetBtn">🔄 Reiniciar sesión</button>
+                </div>
+            </aside>
+        </main>
+
+        <footer class="footer">
+            <p>Juego de demostración · Sin dinero real · Juega responsablemente · 18+</p>
+        </footer>
+    </div>
+
+    <canvas id="confetti" class="confetti-canvas" aria-hidden="true"></canvas>
+
+    <div class="toast" id="toast" hidden>
+        <span class="toast__icon" id="toastIcon"></span>
+        <span class="toast__msg" id="toastMsg"></span>
+    </div>
+
+    <div class="modal" id="modal" hidden>
+        <div class="modal__backdrop"></div>
+        <div class="modal__content" id="modalContent">
+            <div class="modal__burst">¡KABOOM!</div>
+            <div class="modal__icon" id="modalIcon"></div>
+            <h2 class="modal__title" id="modalTitle"></h2>
+            <p class="modal__amount" id="modalAmount"></p>
+            <p class="modal__text" id="modalText"></p>
+            <button type="button" class="modal__btn" id="modalClose">¡Seguir de locos!</button>
+        </div>
+    </div>
+
+    <script src="/shared/wallet-client.js"></script>
+    <script src="js/slot.js"></script>
+</body>
+</html>
