@@ -293,22 +293,60 @@ function getStats() {
     };
 }
 
+function ensureAdminUser() {
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@winpot.local').toLowerCase();
+    const desiredPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    let admin = findUserByEmail(adminEmail);
+
+    if (!admin) {
+        createUser(adminEmail, bcrypt.hashSync(desiredPassword, 10), 'Administrador', 'admin');
+        data.settings.admin_password_seed = desiredPassword;
+        persist();
+        return;
+    }
+
+    admin.role = 'admin';
+    admin.active = 1;
+
+    if (data.settings.admin_password_seed !== desiredPassword) {
+        admin.password_hash = bcrypt.hashSync(desiredPassword, 10);
+        data.settings.admin_password_seed = desiredPassword;
+        persist();
+    }
+}
+
+function ensureCashierUser() {
+    const demoCashier = (process.env.CASHIER_EMAIL || 'cajero@winpot.local').toLowerCase();
+    const desiredPassword = process.env.CASHIER_PASSWORD || 'cajero123';
+    let cashier = findUserByEmail(demoCashier);
+
+    if (!cashier) {
+        const c = createUser(demoCashier, bcrypt.hashSync(desiredPassword, 10), 'Cajero Demo', 'cashier');
+        c.float_balance = 5000;
+        data.settings.cashier_password_seed = desiredPassword;
+        persist();
+        return;
+    }
+
+    cashier.role = 'cashier';
+    cashier.active = 1;
+    if ((cashier.float_balance || 0) === 0 && data.transactions.length === 0) {
+        cashier.float_balance = 5000;
+    }
+
+    if (data.settings.cashier_password_seed !== desiredPassword) {
+        cashier.password_hash = bcrypt.hashSync(desiredPassword, 10);
+        data.settings.cashier_password_seed = desiredPassword;
+        persist();
+    }
+}
+
 function seedDefaults() {
     if (data.machines.length === 0) {
         for (let n = 1; n <= 3; n++) createMachine(n, `Máquina ${n}`);
     }
-    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@winpot.local').toLowerCase();
-    if (!findUserByEmail(adminEmail)) {
-        const hash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'admin123', 10);
-        createUser(adminEmail, hash, 'Administrador', 'admin');
-    }
-    const demoCashier = (process.env.CASHIER_EMAIL || 'cajero@winpot.local').toLowerCase();
-    if (!findUserByEmail(demoCashier)) {
-        const hash = bcrypt.hashSync(process.env.CASHIER_PASSWORD || 'cajero123', 10);
-        const c = createUser(demoCashier, hash, 'Cajero Demo', 'cashier');
-        c.float_balance = 5000;
-        persist();
-    }
+    ensureAdminUser();
+    ensureCashierUser();
 }
 
 module.exports = {

@@ -6,10 +6,11 @@ const { signToken, authRequired } = require('../middleware/auth');
 const router = express.Router();
 
 router.post('/login', (req, res) => {
-    const { email, password } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = req.body.password;
     if (!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' });
 
-    const user = store.findUserByEmail(String(email).trim());
+    const user = store.findUserByEmail(email);
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
         return res.status(401).json({ error: 'Credenciales incorrectas' });
     }
