@@ -14,12 +14,13 @@
             <p>Vende crédito en efectivo a las máquinas</p>
             <label>Email<input type="email" name="email" value="cajero@winpot.local" required></label>
             <label>Contraseña<input type="password" name="password" value="cajero123" required></label>
+            <p class="hint-login">Si no pusiste contraseña al crear el cajero, usa <strong>cajero123</strong></p>
             <button type="submit">Entrar</button>
             <p class="error" id="loginError" hidden></p>
         </form>
     </div>
 
-    <div id="app" class="app" hidden>
+    <div id="app" class="app">
         <header class="header">
             <div>
                 <h1>Caja — <span id="cashierName">Cajero</span></h1>

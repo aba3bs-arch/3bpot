@@ -35,9 +35,9 @@
     }
 
     function showApp() {
-        loginScreen.hidden = true;
-        app.hidden = false;
-        refresh();
+        loginScreen.classList.add('is-hidden');
+        app.classList.add('is-visible');
+        refresh().catch((err) => showToast(err.message, true));
     }
 
     document.querySelectorAll('[data-amt]').forEach((btn) => {
@@ -64,14 +64,19 @@
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const errEl = document.getElementById('loginError');
+        errEl.hidden = true;
         const fd = new FormData(e.target);
         try {
             const data = await StaffAuth.login(fd.get('email'), fd.get('password'));
-            if (data.user.role !== 'cashier') { StaffAuth.logout(); throw new Error('Solo cajeros'); }
+            if (data.user.role !== 'cashier') {
+                StaffAuth.clearSession();
+                throw new Error('Esta cuenta no es cajero. Usa el email que creaste en Admin');
+            }
             showApp();
         } catch (err) {
-            document.getElementById('loginError').textContent = err.message;
-            document.getElementById('loginError').hidden = false;
+            errEl.textContent = err.message || 'No se pudo entrar';
+            errEl.hidden = false;
         }
     });
 

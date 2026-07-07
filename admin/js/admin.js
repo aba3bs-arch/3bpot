@@ -67,12 +67,12 @@
         return map;
     }
 
-    function showToast(msg, err) {
+    function showToast(msg, err, ms) {
         toast.textContent = msg;
         toast.className = 'toast' + (err ? ' error' : '');
         toast.hidden = false;
         clearTimeout(showToast._t);
-        showToast._t = setTimeout(() => { toast.hidden = true; }, 3000);
+        showToast._t = setTimeout(() => { toast.hidden = true; }, ms || 3000);
     }
 
     function api(path, opts) { return StaffAuth.request('/api/admin' + path, opts); }
@@ -238,7 +238,7 @@
                     password: document.getElementById('cashierPass').value || undefined,
                 }),
             });
-            showToast(data.message + (data.tempPassword ? ' · Pass: ' + data.tempPassword : ''));
+            showToast(`${data.message} · Email: ${data.email} · Pass: ${data.password}`, false, 8000);
             e.target.reset();
             loadCashiers();
         } catch (err) { showToast(err.message, true); }

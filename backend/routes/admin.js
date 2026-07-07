@@ -43,15 +43,21 @@ router.post('/machines/:id/adjust', (req, res) => {
 router.get('/cashiers', (_req, res) => res.json({ cashiers: store.listCashiers() }));
 
 router.post('/cashiers', (req, res) => {
-    const { name, email, password } = req.body;
+    const name = String(req.body.name || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '').trim();
     if (!name || !email) return res.status(400).json({ error: 'Nombre y email requeridos' });
+    if (password && password.length < 6) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
     if (store.findUserByEmail(email)) return res.status(409).json({ error: 'Email ya registrado' });
-    const pwd = password && password.length >= 6 ? password : 'cajero123';
+    const pwd = password || 'cajero123';
     const user = store.createUser(email, bcrypt.hashSync(pwd, 10), name, 'cashier');
     res.status(201).json({
         cashier: store.sanitizeUser(user),
-        tempPassword: password ? null : pwd,
-        message: 'Cajero creado',
+        email: user.email,
+        password: pwd,
+        message: `Cajero ${name} creado`,
     });
 });
 
