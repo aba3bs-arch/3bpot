@@ -8,9 +8,7 @@ const MachineAPI = (function () {
 
     function apiBase() {
         if (window.MACHINE_API) return window.MACHINE_API;
-        const host = location.hostname;
-        if (!location.port || location.port === '3000' || host.endsWith('.netlify.app')) return '';
-        return 'http://localhost:3000';
+        return '';
     }
 
     function getMachineNumber() {

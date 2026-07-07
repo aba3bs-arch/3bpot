@@ -308,7 +308,9 @@ function ensureAdminUser() {
     admin.role = 'admin';
     admin.active = 1;
 
-    if (data.settings.admin_password_seed !== desiredPassword) {
+    if (data.settings.admin_password_seed !== desiredPassword
+        || !admin.password_hash
+        || !bcrypt.compareSync(desiredPassword, admin.password_hash)) {
         admin.password_hash = bcrypt.hashSync(desiredPassword, 10);
         data.settings.admin_password_seed = desiredPassword;
         persist();
@@ -351,7 +353,7 @@ function seedDefaults() {
 
 module.exports = {
     isServerless, initLocal, reload, flush,
-    getSettings, setSettings,
+    getSettings, setSettings, ensureAdminUser,
     findUserByEmail, findUserById, createUser, listCashiers, sanitizeUser, setUserActive, topUpCashier,
     findMachineByNumber, findMachineById, listMachines, createMachine, setMachineActive,
     creditMachine, adjustMachineBalance, playMachine,

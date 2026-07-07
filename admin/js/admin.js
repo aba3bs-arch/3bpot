@@ -78,8 +78,8 @@
     function api(path, opts) { return StaffAuth.request('/api/admin' + path, opts); }
 
     function showApp() {
-        loginScreen.hidden = true;
-        app.hidden = false;
+        loginScreen.classList.add('is-hidden');
+        app.classList.add('is-visible');
         loadStats();
         loadSettings();
     }
@@ -276,14 +276,19 @@
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const errEl = document.getElementById('loginError');
+        errEl.hidden = true;
         const fd = new FormData(e.target);
         try {
             const data = await StaffAuth.login(fd.get('email'), fd.get('password'));
-            if (data.user.role !== 'admin') { StaffAuth.logout(); throw new Error('Solo administradores'); }
+            if (data.user.role !== 'admin') {
+                StaffAuth.clearSession();
+                throw new Error('Esta cuenta no es administrador. Usa admin@winpot.local');
+            }
             showApp();
         } catch (err) {
-            document.getElementById('loginError').textContent = err.message;
-            document.getElementById('loginError').hidden = false;
+            errEl.textContent = err.message || 'No se pudo entrar';
+            errEl.hidden = false;
         }
     });
 

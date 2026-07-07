@@ -9,9 +9,7 @@ const StaffAuth = (function () {
 
     function apiBase() {
         if (window.MACHINE_API) return window.MACHINE_API;
-        const host = location.hostname;
-        if (!location.port || location.port === '3000' || host.endsWith('.netlify.app')) return '';
-        return 'http://localhost:3000';
+        return '';
     }
 
     function getToken() { return localStorage.getItem(TOKEN_KEY); }
@@ -38,7 +36,7 @@ const StaffAuth = (function () {
         if (token) headers.Authorization = 'Bearer ' + token;
         const res = await fetch(apiBase() + path, { ...options, headers });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Error');
+        if (!res.ok) throw new Error(data.error || 'Error de conexión con el servidor');
         return data;
     }
 
@@ -60,5 +58,5 @@ const StaffAuth = (function () {
         return '$' + Math.abs(n).toLocaleString('es-MX', { maximumFractionDigits: 0 });
     }
 
-    return { login, logout, request, getUser, isLoggedIn, formatPesos };
+    return { login, logout, request, getUser, isLoggedIn, clearSession, formatPesos };
 })();
