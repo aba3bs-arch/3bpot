@@ -4,7 +4,20 @@
     const loginScreen = document.getElementById('loginScreen');
     const app = document.getElementById('app');
     const toast = document.getElementById('toast');
+    const floatModal = document.getElementById('floatModal');
     let floatCashierId = null;
+
+    function openFloatModal(id, name) {
+        floatCashierId = id;
+        document.getElementById('floatCashierName').textContent = name;
+        document.getElementById('floatAmount').value = 1000;
+        floatModal.classList.add('is-open');
+    }
+
+    function closeFloatModal() {
+        floatModal.classList.remove('is-open');
+        floatCashierId = null;
+    }
 
     const txLabels = {
         cash_sale: 'Venta efectivo', float_topup: 'Recarga cajero',
@@ -125,22 +138,25 @@
             </tr>`).join('');
 
         document.querySelectorAll('[data-float]').forEach((b) => {
-            b.addEventListener('click', () => {
-                floatCashierId = b.dataset.float;
-                document.getElementById('floatCashierName').textContent = b.dataset.name;
-                document.getElementById('floatModal').hidden = false;
-            });
+            b.addEventListener('click', () => openFloatModal(b.dataset.float, b.dataset.name));
         });
     }
 
-    document.getElementById('floatCancel').addEventListener('click', () => { document.getElementById('floatModal').hidden = true; });
+    floatModal.addEventListener('click', (e) => {
+        if (e.target === floatModal) closeFloatModal();
+    });
+
+    document.getElementById('floatCancel').addEventListener('click', closeFloatModal);
     document.getElementById('floatConfirm').addEventListener('click', async () => {
         const amount = parseInt(document.getElementById('floatAmount').value, 10);
-        await api('/cashiers/' + floatCashierId + '/float', { method: 'POST', body: JSON.stringify({ amount }) });
-        document.getElementById('floatModal').hidden = true;
-        showToast(StaffAuth.formatPesos(amount) + ' agregados al cajero');
-        loadCashiers();
-        loadStats();
+        if (!amount || amount <= 0) return showToast('Ingresa un monto válido', true);
+        try {
+            await api('/cashiers/' + floatCashierId + '/float', { method: 'POST', body: JSON.stringify({ amount }) });
+            closeFloatModal();
+            showToast(StaffAuth.formatPesos(amount) + ' agregados al cajero');
+            loadCashiers();
+            loadStats();
+        } catch (err) { showToast(err.message, true); }
     });
 
     document.getElementById('createCashierForm').addEventListener('submit', async (e) => {
@@ -208,6 +224,10 @@
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => StaffAuth.logout());
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeFloatModal();
+    });
 
     if (StaffAuth.isLoggedIn() && StaffAuth.getUser()?.role === 'admin') showApp();
 })();
