@@ -1,4 +1,6 @@
-const SEGMENTS = [
+const { buildWeights, pickWeighted } = require('./retention');
+
+const BASE_SEGMENTS = [
     { label: '0×', multiplier: 0, weight: 28 },
     { label: '0.5×', multiplier: 0.5, weight: 18 },
     { label: '1×', multiplier: 1, weight: 16 },
@@ -9,31 +11,15 @@ const SEGMENTS = [
     { label: '20×', multiplier: 20, weight: 3 },
 ];
 
-const totalWeight = SEGMENTS.reduce((s, seg) => s + seg.weight, 0);
-
-function pickSegment() {
-    let roll = Math.random() * totalWeight;
-    for (let i = 0; i < SEGMENTS.length; i++) {
-        roll -= SEGMENTS[i].weight;
-        if (roll <= 0) return { ...SEGMENTS[i], index: i };
-    }
-    const last = SEGMENTS.length - 1;
-    return { ...SEGMENTS[last], index: last };
-}
-
-function play(bet) {
-    const segment = pickSegment();
-    const payout = Math.floor(bet * segment.multiplier);
-    const net = payout - bet;
+function play(bet, retentionPercent = 15) {
+    const { segments, totalWeight } = buildWeights(BASE_SEGMENTS, retentionPercent);
+    const { item, index } = pickWeighted(segments, totalWeight);
+    const payout = Math.floor(bet * item.multiplier);
     return {
-        segment: {
-            label: segment.label,
-            multiplier: segment.multiplier,
-            index: segment.index,
-        },
+        segment: { label: item.label, multiplier: item.multiplier, index },
         payout,
-        net,
+        net: payout - bet,
     };
 }
 
-module.exports = { SEGMENTS, play };
+module.exports = { BASE_SEGMENTS, play };

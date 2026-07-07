@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3B Pot — Cajero</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/cajero.css">
+</head>
+<body>
+    <div id="loginScreen" class="login-screen">
+        <form id="loginForm" class="login-box">
+            <h1>Caja 3B Pot</h1>
+            <p>Vende crédito en efectivo a las máquinas</p>
+            <label>Email<input type="email" name="email" value="cajero@winpot.local" required></label>
+            <label>Contraseña<input type="password" name="password" value="cajero123" required></label>
+            <button type="submit">Entrar</button>
+            <p class="error" id="loginError" hidden></p>
+        </form>
+    </div>
+
+    <div id="app" class="app" hidden>
+        <header class="header">
+            <div>
+                <h1>Caja — <span id="cashierName">Cajero</span></h1>
+                <p>Tu saldo para vender</p>
+            </div>
+            <div class="float-box">
+                <span class="float-label">Saldo en caja</span>
+                <span class="float-val" id="floatBalance">$0</span>
+            </div>
+            <button type="button" id="logoutBtn" class="btn-logout">Salir</button>
+        </header>
+
+        <main class="main">
+            <section class="sell-section">
+                <h2>Vender crédito</h2>
+                <p class="hint">El cliente paga en efectivo. Selecciona la máquina y el monto.</p>
+                <form id="sellForm" class="sell-form">
+                    <label>
+                        Número de máquina
+                        <select id="machineSelect" required></select>
+                    </label>
+                    <label>
+                        Pesos a cargar
+                        <input type="number" id="sellAmount" min="1" step="1" placeholder="50, 100, 200..." required>
+                    </label>
+                    <div class="quick-btns">
+                        <button type="button" data-amt="50">$50</button>
+                        <button type="button" data-amt="100">$100</button>
+                        <button type="button" data-amt="200">$200</button>
+                        <button type="button" data-amt="500">$500</button>
+                    </div>
+                    <button type="submit" class="btn-sell">Cobrar y cargar máquina</button>
+                </form>
+            </section>
+
+            <section class="history-section">
+                <h2>Mis ventas recientes</h2>
+                <div id="salesList" class="sales-list"></div>
+            </section>
+        </main>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="/shared/staff-auth.js"></script>
+    <script src="js/cajero.js"></script>
+</body>
+</html>

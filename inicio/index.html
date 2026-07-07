@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3B Pot — Máquinas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/inicio.css">
+</head>
+<body>
+    <div class="wrap">
+        <header class="hero">
+            <h1>3B<span>POT</span></h1>
+            <p>Salón de máquinas — paga en caja, juega aquí</p>
+        </header>
+
+        <section class="machine-card">
+            <h2>Tu máquina</h2>
+            <p class="hint">Paga en efectivo al cajero. El crédito se carga al número de tu máquina.</p>
+            <form id="machineForm">
+                <label>Número de máquina<input type="number" id="machineNum" min="1" placeholder="1, 2, 3..." required autofocus></label>
+                <button type="submit">Continuar</button>
+            </form>
+            <p class="balance" id="balanceInfo" hidden></p>
+        </section>
+
+        <section class="games" id="gamesSection" hidden>
+            <h2>Elige tu juego</h2>
+            <div class="game-grid">
+                <a href="/spin-game/" class="game-card" id="linkSpin">
+                    <span class="icon">🎡</span>
+                    <span class="name">Ruleta</span>
+                </a>
+                <a href="/comic-slot/" class="game-card" id="linkSlot">
+                    <span class="icon">🎰</span>
+                    <span class="name">Comic Slot</span>
+                </a>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <a href="/cajero/">Soy cajero</a>
+            <span>·</span>
+            <a href="/admin/">Administración</a>
+        </footer>
+    </div>
+
+    <script src="/shared/machine-client.js"></script>
+    <script>
+        const params = new URLSearchParams(location.search);
+        const saved = MachineAPI.getMachineNumber();
+        if (saved) {
+            document.getElementById('machineNum').value = saved;
+            loadMachine(saved);
+        }
+
+        async function loadMachine(num) {
+            try {
+                const data = await MachineAPI.getMachine(num);
+                MachineAPI.setMachineNumber(num);
+                document.getElementById('balanceInfo').hidden = false;
+                document.getElementById('balanceInfo').textContent =
+                    'Máquina #' + num + ' — Saldo: ' + MachineAPI.formatPesos(data.balance);
+                document.getElementById('gamesSection').hidden = false;
+                const q = '?m=' + num;
+                document.getElementById('linkSpin').href = '/spin-game/' + q;
+                document.getElementById('linkSlot').href = '/comic-slot/' + q;
+            } catch (e) {
+                document.getElementById('balanceInfo').hidden = false;
+                document.getElementById('balanceInfo').textContent = e.message;
+                document.getElementById('balanceInfo').className = 'balance error';
+            }
+        }
+
+        document.getElementById('machineForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            loadMachine(parseInt(document.getElementById('machineNum').value, 10));
+        });
+    </script>
+</body>
+</html>

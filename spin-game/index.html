@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Winpot Spin — Ruleta Premium</title>
+    <title>3B Pot — Ruleta</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/spin.css">
@@ -41,11 +41,15 @@
                     <span class="stat-pill__label">Giros</span>
                     <span class="stat-pill__value" id="totalSpins">0</span>
                 </div>
-                <div class="stat-pill stat-pill--gold">
-                    <span class="stat-pill__label">WinCoins</span>
-                    <span class="stat-pill__value" id="balance">0 WC</span>
+                <div class="stat-pill">
+                    <span class="stat-pill__label">Máquina</span>
+                    <span class="stat-pill__value" id="machineNum">—</span>
                 </div>
-                <a href="/portal/" class="header__portal">← Portal</a>
+                <div class="stat-pill stat-pill--gold">
+                    <span class="stat-pill__label">Saldo</span>
+                    <span class="stat-pill__value" id="balance">$0</span>
+                </div>
+                <a href="/inicio/" class="header__portal">← Inicio</a>
             </div>
         </header>
 
@@ -161,10 +165,10 @@
                 <div class="card card--info">
                     <h2>Información</h2>
                     <ul class="rules">
-                        <li>Fichas virtuales — WinCoins compartidos en todos los juegos.</li>
+                        <li>Paga en efectivo al cajero — el crédito se carga a tu máquina.</li>
                         <li>Premio = apuesta × multiplicador del segmento.</li>
                         <li>Segmento <strong>0×</strong> = pérdida total de la apuesta.</li>
-                        <li>RTP estimado ~92% en modo demo.</li>
+                        <li>Solo pesos mexicanos (MXN).</li>
                     </ul>
                     <button type="button" class="btn-reset" id="resetBtn">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 14 8h-2a6 6 0 1 1-1.76-4.24L9 6H2V1l1.65 1.65z" fill="currentColor"/></svg>
@@ -175,7 +179,7 @@
         </main>
 
         <footer class="footer">
-            <p>Juego de demostración · Sin dinero real · Juega responsablemente · 18+</p>
+            <p>3B Pot · Salón de máquinas · Paga en caja · Juega responsablemente</p>
         </footer>
     </div>
 
@@ -198,7 +202,7 @@
         </div>
     </div>
 
-    <script src="/shared/wallet-client.js"></script>
+    <script src="/shared/machine-client.js"></script>
     <script src="js/spin.js"></script>
 </body>
 </html>

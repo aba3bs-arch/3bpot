@@ -19,5 +19,5 @@
 
 [[redirects]]
   from = "/"
-  to = "/portal/"
+  to = "/inicio/"
   status = 302

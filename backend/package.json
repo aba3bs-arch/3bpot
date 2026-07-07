@@ -1,7 +1,7 @@
 {
   "name": "winpot-backend",
   "version": "1.0.0",
-  "description": "API WinCoins — wallet, auth y motor de juegos",
+  "description": "API 3B Pot — máquinas arcade, cajeros y juegos en pesos",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -3,189 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WinPot Admin</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>3B Pot — Panel Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
-    <div class="layout" id="app">
-        <!-- Login -->
-        <div class="login-wrap" id="loginWrap">
-            <form class="login-card" id="loginForm">
-                <h1>WinPot Admin</h1>
-                <p>Acceso restringido a administradores</p>
-                <label>Email<input type="email" name="email" required value="admin@winpot.local"></label>
-                <label>Contraseña<input type="password" name="password" required value="admin123"></label>
-                <button type="submit">Entrar</button>
-                <p class="login-error" id="loginError" hidden></p>
-            </form>
-        </div>
-
-        <!-- Panel -->
-        <div class="panel" id="panel" hidden>
-            <aside class="sidebar">
-                <div class="sidebar__brand">WIN<span>POT</span> Admin</div>
-                <nav>
-                    <button type="button" class="nav-btn is-active" data-view="dashboard">Dashboard</button>
-                    <button type="button" class="nav-btn" data-view="sell">Vender WinCoins</button>
-                    <button type="button" class="nav-btn" data-view="packages">Paquetes</button>
-                    <button type="button" class="nav-btn" data-view="users">Usuarios</button>
-                    <button type="button" class="nav-btn" data-view="transactions">Transacciones</button>
-                </nav>
-                <div class="sidebar__foot">
-                    <a href="/portal/">← Portal</a>
-                    <button type="button" id="logoutBtn">Salir</button>
-                </div>
-            </aside>
-
-            <main class="content">
-                <header class="content__head">
-                    <h1 id="viewTitle">Dashboard</h1>
-                    <span class="admin-badge" id="adminName"></span>
-                </header>
-
-                <!-- Dashboard -->
-                <section class="view" id="view-dashboard">
-                    <p class="view-intro">Resumen de tu negocio WinPot y WinCoins en circulación.</p>
-                    <div class="stats-grid" id="statsGrid"></div>
-                </section>
-
-                <!-- Vender WinCoins -->
-                <section class="view" id="view-sell" hidden>
-                    <p class="view-intro">Emite WinCoins al cliente cuando te paga en efectivo. Queda registrado en tu contabilidad.</p>
-                    <div class="sell-grid">
-                        <div class="sell-card">
-                            <h2>Nueva venta</h2>
-                            <form id="sellForm" class="sell-form">
-                                <label>Cliente
-                                    <select id="sellUserId" required>
-                                        <option value="">— Selecciona cliente —</option>
-                                    </select>
-                                </label>
-                                <label>Paquete (opcional)
-                                    <select id="sellPackage">
-                                        <option value="">— Personalizado —</option>
-                                    </select>
-                                </label>
-                                <div class="form-row">
-                                    <label>WinCoins a entregar
-                                        <input type="number" id="sellCoins" min="1" step="1" placeholder="500" required>
-                                    </label>
-                                    <label>Cobras ($ MXN)
-                                        <input type="number" id="sellCash" min="0" step="0.01" placeholder="50.00" required>
-                                    </label>
-                                </div>
-                                <label>Forma de pago
-                                    <select id="sellPayment">
-                                        <option value="efectivo">Efectivo</option>
-                                        <option value="transferencia">Transferencia</option>
-                                        <option value="tarjeta">Tarjeta</option>
-                                        <option value="otro">Otro</option>
-                                    </select>
-                                </label>
-                                <label>Nota (opcional)
-                                    <input type="text" id="sellNote" placeholder="Ej. Cliente frecuente, promoción...">
-                                </label>
-                                <button type="submit" class="btn btn--gold btn--wide">✓ Vender y acreditar WinCoins</button>
-                            </form>
-                        </div>
-                        <div class="sell-card">
-                            <h2>Nuevo cliente</h2>
-                            <p class="sell-hint">Si el cliente aún no tiene cuenta, créala aquí y luego véndele WinCoins.</p>
-                            <form id="createUserForm" class="sell-form">
-                                <label>Nombre<input type="text" id="newUserName" required placeholder="Juan Pérez"></label>
-                                <label>Email<input type="email" id="newUserEmail" required placeholder="cliente@email.com"></label>
-                                <label>Contraseña temporal<input type="text" id="newUserPassword" placeholder="Opcional (default: winpot123)"></label>
-                                <button type="submit" class="btn btn--wide">Crear cliente</button>
-                            </form>
-                        </div>
-                    </div>
-                    <h3 class="section-subtitle">Ventas recientes</h3>
-                    <div class="table-wrap">
-                        <table class="table" id="salesTable">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Cliente</th>
-                                    <th>WinCoins</th>
-                                    <th>Cobrado</th>
-                                    <th>Pago</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- Paquetes -->
-                <section class="view" id="view-packages" hidden>
-                    <p class="view-intro">Define cuántos WinCoins vendes y a qué precio. Usa estos paquetes al vender en efectivo.</p>
-                    <div class="packages-admin" id="packagesAdmin"></div>
-                </section>
-
-                <!-- Users -->
-                <section class="view" id="view-users" hidden>
-                    <div class="toolbar">
-                        <input type="search" id="userSearch" placeholder="Buscar por email o nombre...">
-                        <button type="button" class="btn" id="searchBtn">Buscar</button>
-                    </div>
-                    <div class="table-wrap">
-                        <table class="table" id="usersTable">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Usuario</th>
-                                    <th>Saldo</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- Transactions -->
-                <section class="view" id="view-transactions" hidden>
-                    <div class="table-wrap">
-                        <table class="table" id="txTable">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Usuario</th>
-                                    <th>Tipo</th>
-                                    <th>WinCoins</th>
-                                    <th>Efectivo</th>
-                                    <th>Saldo WC</th>
-                                    <th>Nota</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </section>
-            </main>
-        </div>
+    <div id="loginScreen" class="login-screen">
+        <form id="loginForm" class="login-box">
+            <h1>3B Pot Admin</h1>
+            <p>Panel del dueño del negocio</p>
+            <label>Email<input type="email" name="email" value="admin@winpot.local" required></label>
+            <label>Contraseña<input type="password" name="password" value="admin123" required></label>
+            <button type="submit">Entrar</button>
+            <p class="error" id="loginError" hidden></p>
+        </form>
     </div>
 
-    <!-- Modal recarga -->
-    <div class="modal" id="creditModal" hidden>
-        <div class="modal__box">
-            <h2 id="creditModalTitle">Recargar créditos</h2>
-            <p id="creditModalUser"></p>
-            <label>Monto (WC)<input type="number" id="creditAmount" min="1" step="1" value="500"></label>
-            <label>Nota<input type="text" id="creditNote" placeholder="Motivo de la recarga"></label>
-            <div class="modal__actions">
-                <button type="button" class="btn btn--ghost" id="creditCancel">Cancelar</button>
-                <button type="button" class="btn btn--green" id="creditConfirm">Acreditar</button>
-                <button type="button" class="btn btn--red" id="debitConfirm">Debitar</button>
+    <div id="app" class="app" hidden>
+        <aside class="sidebar">
+            <div class="brand">3B<span>POT</span></div>
+            <nav>
+                <button type="button" class="nav active" data-tab="inicio">🏠 Inicio</button>
+                <button type="button" class="nav" data-tab="retencion">🎯 Retención</button>
+                <button type="button" class="nav" data-tab="maquinas">🎰 Máquinas</button>
+                <button type="button" class="nav" data-tab="cajeros">👤 Cajeros</button>
+                <button type="button" class="nav" data-tab="ventas">💵 Ventas</button>
+            </nav>
+            <div class="sidebar-foot">
+                <a href="/inicio/">Ver máquinas</a>
+                <a href="/cajero/">Panel cajero</a>
+                <button type="button" id="logoutBtn">Salir</button>
             </div>
-        </div>
+        </aside>
+
+        <main class="main">
+            <!-- INICIO -->
+            <section class="tab" id="tab-inicio">
+                <h1>Resumen del negocio</h1>
+                <p class="hint">Todo en pesos mexicanos (MXN). Solo ventas en efectivo en caja.</p>
+                <div class="stats" id="statsGrid"></div>
+            </section>
+
+            <!-- RETENCIÓN -->
+            <section class="tab" id="tab-retencion" hidden>
+                <h1>Retención de premios</h1>
+                <p class="hint">Controla cuánto paga la casa. Más retención = menos premios para el jugador.</p>
+                <div class="card card--wide">
+                    <label class="slider-label">
+                        Retención de la casa: <strong id="retentionVal">15%</strong>
+                    </label>
+                    <input type="range" id="retentionSlider" min="5" max="45" value="15">
+                    <div class="slider-hints"><span>5% más premios</span><span>45% más ganancia casa</span></div>
+                    <button type="button" class="btn btn--primary" id="saveRetention">Guardar retención</button>
+                </div>
+            </section>
+
+            <!-- MÁQUINAS -->
+            <section class="tab" id="tab-maquinas" hidden>
+                <h1>Máquinas</h1>
+                <div class="toolbar">
+                    <input type="number" id="newMachineNum" placeholder="Número" min="1">
+                    <input type="text" id="newMachineName" placeholder="Nombre (opcional)">
+                    <button type="button" class="btn btn--primary" id="addMachineBtn">+ Agregar máquina</button>
+                </div>
+                <div class="table-wrap">
+                    <table class="table" id="machinesTable">
+                        <thead><tr><th>#</th><th>Nombre</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- CAJEROS -->
+            <section class="tab" id="tab-cajeros" hidden>
+                <h1>Cajeros</h1>
+                <p class="hint">Recarga saldo a la caja del cajero para que pueda vender crédito a las máquinas.</p>
+                <div class="card">
+                    <h3>Crear cajero</h3>
+                    <form id="createCashierForm" class="form-row-wrap">
+                        <input type="text" id="cashierName" placeholder="Nombre" required>
+                        <input type="email" id="cashierEmail" placeholder="Email" required>
+                        <input type="text" id="cashierPass" placeholder="Contraseña (opcional)">
+                        <button type="submit" class="btn btn--primary">Crear</button>
+                    </form>
+                </div>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="cashiersTable">
+                        <thead><tr><th>Nombre</th><th>Email</th><th>Saldo en caja</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VENTAS -->
+            <section class="tab" id="tab-ventas" hidden>
+                <h1>Venta directa (admin)</h1>
+                <div class="card sell-card">
+                    <form id="adminSellForm" class="form-grid">
+                        <label>Máquina<select id="sellMachine" required></select></label>
+                        <label>Pesos a cargar<input type="number" id="sellAmount" min="1" step="1" placeholder="100" required></label>
+                        <button type="submit" class="btn btn--gold">Cobrar y cargar</button>
+                    </form>
+                </div>
+                <h3 style="margin-top:24px">Historial reciente</h3>
+                <div class="table-wrap">
+                    <table class="table" id="txTable">
+                        <thead><tr><th>Fecha</th><th>Tipo</th><th>Máquina</th><th>Cajero</th><th>Monto</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
     </div>
 
     <div class="toast" id="toast" hidden></div>
 
-    <script src="/shared/wallet-client.js"></script>
+    <!-- Modal recarga cajero -->
+    <div class="modal" id="floatModal" hidden>
+        <div class="modal-box">
+            <h3>Recargar caja del cajero</h3>
+            <p id="floatCashierName"></p>
+            <label>Pesos a agregar<input type="number" id="floatAmount" min="1" value="1000"></label>
+            <div class="modal-actions">
+                <button type="button" class="btn btn--ghost" id="floatCancel">Cancelar</button>
+                <button type="button" class="btn btn--primary" id="floatConfirm">Recargar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/shared/staff-auth.js"></script>
     <script src="js/admin.js"></script>
 </body>
 </html>

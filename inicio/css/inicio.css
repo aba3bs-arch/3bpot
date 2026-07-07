@@ -1,0 +1,52 @@
+:root {
+    --bg: #0d0d12;
+    --card: #18181f;
+    --gold: #f5c518;
+    --text: #f0f0f5;
+    --muted: #888;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: Inter, system-ui, sans-serif;
+    background: radial-gradient(ellipse at top, #1a1025 0%, var(--bg) 60%);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+.wrap { max-width: 480px; margin: 0 auto; padding: 40px 20px 60px; text-align: center; }
+.hero h1 { font-size: 2.8rem; font-weight: 800; letter-spacing: 3px; margin-bottom: 8px; }
+.hero h1 span { color: var(--gold); }
+.hero p { color: var(--muted); margin-bottom: 40px; }
+
+.machine-card, .games { background: var(--card); border-radius: 20px; padding: 28px 24px; margin-bottom: 24px; text-align: left; }
+.machine-card h2, .games h2 { font-size: 1.1rem; margin-bottom: 8px; }
+.hint { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; line-height: 1.5; }
+
+.machine-card label { display: block; font-size: 0.85rem; color: var(--muted); }
+.machine-card input {
+    display: block; width: 100%; margin: 8px 0 16px; padding: 16px;
+    font-size: 1.8rem; text-align: center; font-weight: 800;
+    border-radius: 12px; border: 2px solid #333; background: #111; color: var(--gold);
+}
+.machine-card button {
+    width: 100%; padding: 16px; border: none; border-radius: 12px;
+    background: var(--gold); color: #111; font-weight: 800; font-size: 1rem; cursor: pointer;
+}
+.balance { margin-top: 16px; font-size: 1.1rem; font-weight: 700; color: var(--gold); text-align: center; }
+.balance.error { color: #f44; }
+
+.game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.game-card {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 24px 16px; background: #111; border-radius: 14px;
+    text-decoration: none; color: var(--text); border: 1px solid #333;
+    transition: border-color 0.2s;
+}
+.game-card:hover { border-color: var(--gold); }
+.game-card .icon { font-size: 2.5rem; }
+.game-card .name { font-weight: 700; }
+
+.footer { margin-top: 32px; font-size: 0.85rem; color: var(--muted); }
+.footer a { color: var(--muted); text-decoration: none; }
+.footer a:hover { color: var(--gold); }

@@ -20,6 +20,9 @@
 
     let balance = INITIAL_BALANCE;
     let currentBet = 50;
+    let machineNumber = null;
+    let minBet = MIN_BET;
+    let maxBet = MAX_BET;
     let isSpinning = false;
     let rotation = 0;
     let totalSpins = 0;
@@ -66,13 +69,19 @@
     let confettiParticles = [];
 
     function formatMoney(n) {
-        return WinPot.formatCoins(n);
+        return MachineAPI.formatPesos(n);
     }
 
     async function loadBalance() {
+        machineNumber = MachineAPI.requireMachine();
+        if (!machineNumber) return;
+        const machineNumEl = document.getElementById('machineNum');
+        if (machineNumEl) machineNumEl.textContent = '#' + machineNumber;
         try {
-            const data = await WinPot.getBalance();
+            const data = await MachineAPI.getMachine(machineNumber);
             balance = data.balance;
+            minBet = data.minBet || MIN_BET;
+            maxBet = data.maxBet || MAX_BET;
             sessionStartBalance = balance;
             updateBalanceUI();
             setBet(currentBet);
@@ -86,7 +95,7 @@
     }
 
     function clampBet(val) {
-        return Math.max(MIN_BET, Math.min(MAX_BET, Math.min(val, balance || MAX_BET)));
+        return Math.max(minBet, Math.min(maxBet, Math.min(val, balance || maxBet)));
     }
 
     function setBet(val) {
@@ -257,13 +266,13 @@
 
         const bet = getActiveBet();
 
-        if (isNaN(bet) || bet < MIN_BET || bet > MAX_BET) {
-            showToast('Apuesta entre ' + formatMoney(MIN_BET) + ' y ' + formatMoney(MAX_BET), 'lose', '⚠️');
+        if (isNaN(bet) || bet < minBet || bet > maxBet) {
+            showToast('Apuesta entre ' + formatMoney(minBet) + ' y ' + formatMoney(maxBet), 'lose', '⚠️');
             return;
         }
 
         if (bet > balance) {
-            showToast('Saldo insuficiente — compra WinCoins en el portal', 'lose', '💳');
+            showToast('Saldo insuficiente — paga en caja para recargar', 'lose', '💳');
             return;
         }
 
@@ -272,7 +281,7 @@
         spinBtn.classList.add('is-spinning');
         canvas.classList.add('spinning');
 
-        WinPot.spinWheel(bet).then((apiResult) => {
+        MachineAPI.spinWheel(bet, machineNumber).then((apiResult) => {
             totalSpins++;
             updateStatsUI();
 
@@ -339,7 +348,7 @@
 
         if (balance <= 0) {
             setTimeout(() => {
-                showModal(null, 0, 'Sin WinCoins. Ve al portal para comprar más.', 'gameover');
+                showModal(null, 0, 'Sin saldo. Paga en caja para seguir jugando.', 'gameover');
             }, 800);
         }
     }
@@ -487,7 +496,7 @@
 
     halfBetBtn.addEventListener('click', () => setBet(Math.floor(getActiveBet() / 2)));
     doubleBetBtn.addEventListener('click', () => setBet(getActiveBet() * 2));
-    maxBetBtn.addEventListener('click', () => setBet(Math.min(MAX_BET, balance)));
+    maxBetBtn.addEventListener('click', () => setBet(Math.min(maxBet, balance)));
 
     spinBtn.addEventListener('click', spinWheel);
     modalClose.addEventListener('click', () => { modal.hidden = true; });
@@ -520,7 +529,10 @@
     });
 
     /* Init */
-    if (!WinPot.requireAuth()) return;
+    if (!MachineAPI.getMachineNumber()) {
+        MachineAPI.requireMachine();
+        return;
+    }
 
     buildWheelLights();
     buildLegend();
