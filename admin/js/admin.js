@@ -21,8 +21,51 @@
 
     const txLabels = {
         cash_sale: 'Venta efectivo', float_topup: 'Recarga cajero',
-        bet: 'Apuesta', win: 'Premio', admin_credit: 'Ajuste +', admin_debit: 'Ajuste -',
+        bet: 'Apuesta', win: 'Premio', admin_credit: 'Depósito', admin_debit: 'Retiro',
     };
+
+    function splitDateTime(iso) {
+        if (!iso) return { date: '—', time: '—' };
+        const d = new Date(iso);
+        return {
+            date: d.toLocaleDateString('es-MX'),
+            time: d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        };
+    }
+
+    function creditStatus(m) {
+        if (!m.active) return { label: 'Inactiva', cls: 'credit-off' };
+        if (m.balance > 0) return { label: StaffAuth.formatPesos(m.balance), cls: 'credit-ok' };
+        return { label: 'Sin crédito', cls: 'credit-empty' };
+    }
+
+    function renderMovementRow(t) {
+        const dt = splitDateTime(t.created_at);
+        const isPlus = t.amount > 0;
+        const isMinus = t.amount < 0;
+        const estado = t.balance_after != null
+            ? StaffAuth.formatPesos(t.balance_after)
+            : (txLabels[t.type] || t.type);
+        return `
+            <tr>
+                <td>${t.id}</td>
+                <td>${t.machine_number ? '#' + t.machine_number : '—'}</td>
+                <td class="${t.balance_after > 0 ? 'credit-ok' : 'credit-empty'}">${estado}</td>
+                <td class="gold">${StaffAuth.formatPesos(Math.abs(t.amount))}</td>
+                <td class="col-action">${isPlus ? '<span class="sign-plus">+</span>' : '<span class="sign-none">·</span>'}</td>
+                <td class="col-action">${isMinus ? '<span class="sign-minus">−</span>' : '<span class="sign-none">·</span>'}</td>
+                <td>${dt.date}</td>
+                <td>${dt.time}</td>
+            </tr>`;
+    }
+
+    function lastTxByMachine(transactions) {
+        const map = {};
+        transactions.forEach((t) => {
+            if (t.machine_id && !map[t.machine_id]) map[t.machine_id] = t;
+        });
+        return map;
+    }
 
     function showToast(msg, err) {
         toast.textContent = msg;
@@ -84,36 +127,61 @@
     });
 
     async function loadMachines() {
-        const { machines } = await api('/machines');
-        document.querySelector('#machinesTable tbody').innerHTML = machines.map((m) => `
-            <tr>
-                <td><strong>#${m.number}</strong></td>
-                <td>${m.name}</td>
-                <td class="gold">${StaffAuth.formatPesos(m.balance)}</td>
-                <td><span class="badge ${m.active ? 'ok' : 'off'}">${m.active ? 'Activa' : 'Apagada'}</span></td>
-                <td>
-                    <button class="btn-xs" data-adj="${m.id}">±$</button>
-                    <button class="btn-xs" data-toggle="${m.id}" data-active="${m.active}">${m.active ? 'Apagar' : 'Prender'}</button>
-                </td>
-            </tr>`).join('');
+        const [{ machines }, { transactions }] = await Promise.all([
+            api('/machines'),
+            api('/transactions?limit=200'),
+        ]);
+        const lastTx = lastTxByMachine(transactions);
+        const machineTxs = transactions.filter((t) => t.machine_id);
 
-        document.querySelectorAll('[data-adj]').forEach((b) => {
-            b.addEventListener('click', async () => {
-                const amt = parseInt(prompt('Monto en pesos (+ cargar, - quitar):', '100'), 10);
-                if (!amt) return;
-                await api('/machines/' + b.dataset.adj + '/adjust', { method: 'POST', body: JSON.stringify({ amount: amt }) });
-                showToast('Saldo actualizado');
-                loadMachines();
-            });
-        });
-        document.querySelectorAll('[data-toggle]').forEach((b) => {
-            b.addEventListener('click', async () => {
-                const active = b.dataset.active === '1' || b.dataset.active === 'true';
-                await api('/machines/' + b.dataset.toggle + '/status', { method: 'PATCH', body: JSON.stringify({ active: !active }) });
-                loadMachines();
-            });
-        });
+        document.querySelector('#machinesTable tbody').innerHTML = machines.map((m) => {
+            const status = creditStatus(m);
+            const tx = lastTx[m.id];
+            const dt = splitDateTime(tx?.created_at);
+            return `
+            <tr data-machine-id="${m.id}">
+                <td>${m.id}</td>
+                <td><strong>#${m.number}</strong><br><span class="muted-xs">${m.name}</span></td>
+                <td class="${status.cls}">${status.label}</td>
+                <td>
+                    <input type="number" class="deposit-input" min="1" step="1" value="100" placeholder="100">
+                </td>
+                <td class="col-action">
+                    <button type="button" class="btn-icon btn-icon--plus" data-action="add" title="Agregar crédito">+</button>
+                </td>
+                <td class="col-action">
+                    <button type="button" class="btn-icon btn-icon--minus" data-action="sub" title="Retirar crédito" ${m.balance <= 0 ? 'disabled' : ''}>−</button>
+                </td>
+                <td>${dt.date}</td>
+                <td>${dt.time}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="8">Sin máquinas registradas</td></tr>';
+
+        document.querySelector('#movementsTable tbody').innerHTML = machineTxs.length
+            ? machineTxs.map(renderMovementRow).join('')
+            : '<tr><td colspan="8">Sin movimientos aún</td></tr>';
     }
+
+    document.getElementById('machinesTable').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn || btn.disabled) return;
+        const row = btn.closest('[data-machine-id]');
+        if (!row) return;
+        const machineId = row.dataset.machineId;
+        const input = row.querySelector('.deposit-input');
+        const amount = parseInt(input?.value, 10);
+        if (!amount || amount <= 0) return showToast('Ingresa una cantidad válida', true);
+        const signed = btn.dataset.action === 'sub' ? -amount : amount;
+        try {
+            await api('/machines/' + machineId + '/adjust', {
+                method: 'POST',
+                body: JSON.stringify({ amount: signed }),
+            });
+            showToast(btn.dataset.action === 'sub' ? 'Crédito retirado' : 'Crédito agregado');
+            loadMachines();
+            loadStats();
+        } catch (err) { showToast(err.message, true); }
+    });
 
     document.getElementById('addMachineBtn').addEventListener('click', async () => {
         const number = document.getElementById('newMachineNum').value;
@@ -200,14 +268,10 @@
 
     async function loadTransactions() {
         const { transactions } = await api('/transactions?limit=50');
-        document.querySelector('#txTable tbody').innerHTML = transactions.map((t) => `
-            <tr>
-                <td>${new Date(t.created_at).toLocaleString('es-MX')}</td>
-                <td>${txLabels[t.type] || t.type}</td>
-                <td>${t.machine_number ? '#' + t.machine_number : '—'}</td>
-                <td>${t.user_name || '—'}</td>
-                <td class="gold">${StaffAuth.formatPesos(t.amount)}</td>
-            </tr>`).join('');
+        const machineTxs = transactions.filter((t) => t.machine_id);
+        document.querySelector('#txTable tbody').innerHTML = machineTxs.length
+            ? machineTxs.map(renderMovementRow).join('')
+            : '<tr><td colspan="8">Sin transacciones</td></tr>';
     }
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {

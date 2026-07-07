@@ -58,17 +58,48 @@
                 </div>
             </section>
 
-            <!-- MÁQUINAS -->
+            <!-- MÁQUINAS / CRÉDITO -->
             <section class="tab" id="tab-maquinas" hidden>
-                <h1>Máquinas</h1>
+                <h1>Crédito en máquinas</h1>
+                <p class="hint">Deposita o retira pesos por máquina. El historial muestra fecha y hora de cada movimiento.</p>
                 <div class="toolbar">
                     <input type="number" id="newMachineNum" placeholder="Número" min="1">
                     <input type="text" id="newMachineName" placeholder="Nombre (opcional)">
                     <button type="button" class="btn btn--primary" id="addMachineBtn">+ Agregar máquina</button>
                 </div>
                 <div class="table-wrap">
-                    <table class="table" id="machinesTable">
-                        <thead><tr><th>#</th><th>Nombre</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
+                    <table class="table table--credit" id="machinesTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Máquina</th>
+                                <th>Estado del crédito</th>
+                                <th>Cantidad a depositar</th>
+                                <th class="col-action">+</th>
+                                <th class="col-action">−</th>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <h3 class="section-sub">Historial de transacciones</h3>
+                <div class="table-wrap">
+                    <table class="table" id="movementsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Máquina</th>
+                                <th>Estado del crédito</th>
+                                <th>Cantidad</th>
+                                <th class="col-action">+</th>
+                                <th class="col-action">−</th>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -108,7 +139,18 @@
                 <h3 style="margin-top:24px">Historial reciente</h3>
                 <div class="table-wrap">
                     <table class="table" id="txTable">
-                        <thead><tr><th>Fecha</th><th>Tipo</th><th>Máquina</th><th>Cajero</th><th>Monto</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Máquina</th>
+                                <th>Estado del crédito</th>
+                                <th>Cantidad</th>
+                                <th class="col-action">+</th>
+                                <th class="col-action">−</th>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
