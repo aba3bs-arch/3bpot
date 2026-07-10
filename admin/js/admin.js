@@ -5,7 +5,9 @@
     const app = document.getElementById('app');
     const toast = document.getElementById('toast');
     const floatModal = document.getElementById('floatModal');
+    const branchModal = document.getElementById('branchModal');
     let floatCashierId = null;
+    let editBranchId = null;
 
     function openFloatModal(id, name) {
         floatCashierId = id;
@@ -90,8 +92,9 @@
             btn.classList.add('active');
             document.querySelectorAll('.tab').forEach((t) => t.hidden = true);
             document.getElementById('tab-' + btn.dataset.tab).hidden = false;
-            if (btn.dataset.tab === 'maquinas') loadMachines();
-            if (btn.dataset.tab === 'cajeros') loadCashiers();
+            if (btn.dataset.tab === 'maquinas') { loadBranchOptions(); loadMachines(); }
+            if (btn.dataset.tab === 'cajeros') { loadBranchOptions(); loadCashiers(); }
+            if (btn.dataset.tab === 'sucursales') loadBranches();
             if (btn.dataset.tab === 'ventas') { loadSellMachines(); loadTransactions(); }
         });
     });
@@ -127,8 +130,10 @@
     });
 
     async function loadMachines() {
+        const branchId = document.getElementById('machineBranchFilter')?.value || '';
+        const q = branchId ? ('?branch_id=' + encodeURIComponent(branchId)) : '';
         const [{ machines }, { transactions }] = await Promise.all([
-            api('/machines'),
+            api('/machines' + q),
             api('/transactions?limit=200'),
         ]);
         const lastTx = lastTxByMachine(transactions);
@@ -141,6 +146,7 @@
             return `
             <tr data-machine-id="${m.id}">
                 <td>${m.id}</td>
+                <td>${m.branch_name || '—'}</td>
                 <td><strong>#${m.number}</strong><br><span class="muted-xs">${m.name}</span></td>
                 <td class="${status.cls}">${status.label}</td>
                 <td>
@@ -155,7 +161,7 @@
                 <td>${dt.date}</td>
                 <td>${dt.time}</td>
             </tr>`;
-        }).join('') || '<tr><td colspan="8">Sin máquinas registradas</td></tr>';
+        }).join('') || '<tr><td colspan="9">Sin máquinas registradas</td></tr>';
 
         document.querySelector('#movementsTable tbody').innerHTML = machineTxs.length
             ? machineTxs.map(renderMovementRow).join('')
@@ -186,13 +192,123 @@
     document.getElementById('addMachineBtn').addEventListener('click', async () => {
         const number = document.getElementById('newMachineNum').value;
         const name = document.getElementById('newMachineName').value;
+        const branch_id = document.getElementById('newMachineBranch').value;
+        if (!branch_id) return showToast('Selecciona una sucursal', true);
         if (!number) return showToast('Ingresa número de máquina', true);
         try {
-            await api('/machines', { method: 'POST', body: JSON.stringify({ number, name }) });
+            await api('/machines', { method: 'POST', body: JSON.stringify({ number, name, branch_id }) });
             showToast('Máquina agregada');
             document.getElementById('newMachineNum').value = '';
             loadMachines();
+            loadBranches();
         } catch (e) { showToast(e.message, true); }
+    });
+
+    document.getElementById('machineBranchFilter')?.addEventListener('change', loadMachines);
+
+    async function loadBranchOptions() {
+        const { branches } = await api('/branches');
+        const opts = branches.map((b) => `<option value="${b.id}">${b.name}</option>`).join('');
+        const base = '<option value="">Sucursal</option>';
+        const all = '<option value="">Todas las sucursales</option>' + opts;
+        if (document.getElementById('cashierBranch')) {
+            document.getElementById('cashierBranch').innerHTML = base + opts;
+        }
+        if (document.getElementById('newMachineBranch')) {
+            document.getElementById('newMachineBranch').innerHTML = base + opts;
+        }
+        if (document.getElementById('machineBranchFilter')) {
+            const current = document.getElementById('machineBranchFilter').value;
+            document.getElementById('machineBranchFilter').innerHTML = all;
+            document.getElementById('machineBranchFilter').value = current;
+        }
+    }
+
+    async function loadBranches() {
+        const { branches } = await api('/branches');
+        document.querySelector('#branchesTable tbody').innerHTML = branches.map((b) => `
+            <tr>
+                <td><code>${b.id}</code></td>
+                <td><strong>${b.name}</strong></td>
+                <td>${b.stats?.cashiers || 0}</td>
+                <td>${b.stats?.machines || 0}</td>
+                <td>
+                    <button class="btn-xs" data-edit-branch="${b.id}" data-name="${b.name}">Editar</button>
+                    <button class="btn-xs" data-del-branch="${b.id}" data-name="${b.name}">Eliminar</button>
+                </td>
+            </tr>`).join('') || '<tr><td colspan="5">Sin sucursales</td></tr>';
+
+        document.querySelectorAll('[data-edit-branch]').forEach((btn) => {
+            btn.addEventListener('click', () => openBranchModal(btn.dataset.editBranch, btn.dataset.name));
+        });
+        document.querySelectorAll('[data-del-branch]').forEach((btn) => {
+            btn.addEventListener('click', () => deleteBranch(btn.dataset.delBranch, btn.dataset.name));
+        });
+    }
+
+    function openBranchModal(id, name) {
+        editBranchId = id;
+        document.getElementById('branchEditId').textContent = 'ID: ' + id;
+        document.getElementById('branchEditName').value = name;
+        branchModal.classList.add('is-open');
+    }
+
+    function closeBranchModal() {
+        branchModal.classList.remove('is-open');
+        editBranchId = null;
+    }
+
+    async function deleteBranch(id, name) {
+        if (!confirm(`¿Eliminar sucursal ${name}?`)) return;
+        try {
+            await api('/branches/' + id, { method: 'DELETE' });
+            showToast('Sucursal eliminada');
+            loadBranches();
+            loadBranchOptions();
+        } catch (err) { showToast(err.message, true); }
+    }
+
+    document.getElementById('createBranchForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            await api('/branches', {
+                method: 'POST',
+                body: JSON.stringify({
+                    id: document.getElementById('branchId').value,
+                    name: document.getElementById('branchName').value,
+                }),
+            });
+            showToast('Sucursal agregada');
+            e.target.reset();
+            loadBranches();
+            loadBranchOptions();
+        } catch (err) { showToast(err.message, true); }
+    });
+
+    document.getElementById('seedBranchesBtn').addEventListener('click', async () => {
+        try {
+            const data = await api('/branches/seed', { method: 'POST' });
+            showToast(data.message);
+            loadBranches();
+            loadBranchOptions();
+        } catch (err) { showToast(err.message, true); }
+    });
+
+    branchModal.addEventListener('click', (e) => {
+        if (e.target === branchModal) closeBranchModal();
+    });
+    document.getElementById('branchCancel').addEventListener('click', closeBranchModal);
+    document.getElementById('branchSave').addEventListener('click', async () => {
+        const name = document.getElementById('branchEditName').value.trim();
+        if (!name) return showToast('Escribe un nombre', true);
+        try {
+            await api('/branches/' + editBranchId, { method: 'PATCH', body: JSON.stringify({ name }) });
+            closeBranchModal();
+            showToast('Sucursal actualizada');
+            loadBranches();
+            loadBranchOptions();
+            loadCashiers();
+        } catch (err) { showToast(err.message, true); }
     });
 
     async function loadCashiers() {
@@ -201,6 +317,7 @@
             <tr>
                 <td><strong>${c.name}</strong></td>
                 <td>${c.email}</td>
+                <td>${c.branch_name || '—'}</td>
                 <td class="gold">${StaffAuth.formatPesos(c.float_balance)}</td>
                 <td><button class="btn-xs btn--gold" data-float="${c.id}" data-name="${c.name}">Recargar caja</button></td>
             </tr>`).join('');
@@ -235,6 +352,7 @@
                 body: JSON.stringify({
                     name: document.getElementById('cashierName').value,
                     email: document.getElementById('cashierEmail').value,
+                    branch_id: document.getElementById('cashierBranch').value,
                     password: document.getElementById('cashierPass').value || undefined,
                 }),
             });
@@ -247,7 +365,7 @@
     async function loadSellMachines() {
         const { machines } = await api('/machines');
         document.getElementById('sellMachine').innerHTML = machines.filter((m) => m.active)
-            .map((m) => `<option value="${m.id}">#${m.number} — ${m.name} (${StaffAuth.formatPesos(m.balance)})</option>`).join('');
+            .map((m) => `<option value="${m.id}">#${m.number} — ${m.branch_name || ''} ${m.name} (${StaffAuth.formatPesos(m.balance)})</option>`).join('');
     }
 
     document.getElementById('adminSellForm').addEventListener('submit', async (e) => {
@@ -295,7 +413,7 @@
     document.getElementById('logoutBtn').addEventListener('click', () => StaffAuth.logout());
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeFloatModal();
+        if (e.key === 'Escape') { closeFloatModal(); closeBranchModal(); }
     });
 
     if (StaffAuth.isLoggedIn() && StaffAuth.getUser()?.role === 'admin') showApp();

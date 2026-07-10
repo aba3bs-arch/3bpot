@@ -15,5 +15,8 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "serverless-http": "^3.2.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^26.2.0"
   }
 }

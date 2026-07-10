@@ -19,13 +19,13 @@ router.get('/me', (req, res) => {
     const user = store.findUserById(req.user.id);
     res.json({
         user: store.sanitizeUser(user),
-        machines: store.listMachines().filter((m) => m.active),
+        machines: store.listMachinesForCashier(req.user.id),
         recentSales: store.getTransactions(20, { cashierId: req.user.id, type: 'cash_sale' }),
     });
 });
 
-router.get('/machines', (_req, res) => {
-    res.json({ machines: store.listMachines().filter((m) => m.active) });
+router.get('/machines', (req, res) => {
+    res.json({ machines: store.listMachinesForCashier(req.user.id) });
 });
 
 router.post('/sell', (req, res) => {

@@ -9,11 +9,12 @@ const isServerless = !!(process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_N
 function emptyData() {
     return {
         settings: { retention_percent: 15, min_bet: 5, max_bet: 500 },
+        branches: [],
         machines: [],
         users: [],
         transactions: [],
         game_rounds: [],
-        counters: { users: 0, machines: 0, transactions: 0, game_rounds: 0 },
+        counters: { users: 0, machines: 0, transactions: 0, game_rounds: 0, branches: 0 },
     };
 }
 
@@ -25,6 +26,7 @@ function loadFromFile(filePath) {
     try {
         const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
         if (!raw.settings) raw.settings = emptyData().settings;
+        if (!raw.branches) raw.branches = [];
         if (!raw.machines) raw.machines = [];
         return raw;
     } catch {
@@ -38,6 +40,7 @@ async function loadFromBlob() {
     const stored = await blobStore.get('data', { type: 'json' });
     if (!stored) return emptyData();
     if (!stored.settings) stored.settings = emptyData().settings;
+    if (!stored.branches) stored.branches = [];
     if (!stored.machines) stored.machines = [];
     return stored;
 }
@@ -92,13 +95,14 @@ function findUserByEmail(email) {
 }
 function findUserById(id) { return data.users.find((u) => u.id === id) || null; }
 
-function createUser(email, passwordHash, name, role = 'cashier') {
+function createUser(email, passwordHash, name, role = 'cashier', branchId = null) {
     const user = {
         id: nextId('users'),
         email: email.toLowerCase(),
         password_hash: passwordHash,
         name: String(name).trim(),
         role,
+        branch_id: branchId || null,
         float_balance: role === 'cashier' ? 0 : 0,
         active: 1,
         created_at: now(),
@@ -113,8 +117,11 @@ function listCashiers() {
 }
 
 function sanitizeUser(u) {
+    const branch = u.branch_id ? findBranchById(u.branch_id) : null;
     return {
         id: u.id, email: u.email, name: u.name, role: u.role,
+        branch_id: u.branch_id || null,
+        branch_name: branch?.name || null,
         float_balance: u.float_balance || 0, active: u.active, created_at: u.created_at,
     };
 }
@@ -141,22 +148,37 @@ function topUpCashier(cashierId, amount, adminId, note) {
 }
 
 /* Machines */
-function findMachineByNumber(num) {
-    return data.machines.find((m) => m.number === parseInt(num, 10)) || null;
+function findMachineByNumber(num, branchId = null) {
+    const n = parseInt(num, 10);
+    const matches = data.machines.filter((m) => m.number === n);
+    if (branchId) return matches.find((m) => m.branch_id === branchId) || null;
+    if (matches.length === 1) return matches[0];
+    return matches.find((m) => m.branch_id) || matches[0] || null;
 }
 function findMachineById(id) { return data.machines.find((m) => m.id === id) || null; }
 
-function listMachines() {
-    return [...data.machines].sort((a, b) => a.number - b.number);
+function listMachines(branchId = null) {
+    let list = [...data.machines];
+    if (branchId) list = list.filter((m) => m.branch_id === branchId);
+    return list.sort((a, b) => a.number - b.number).map(enrichMachine);
 }
 
-function createMachine(number, name) {
+function enrichMachine(m) {
+    const branch = m.branch_id ? findBranchById(m.branch_id) : null;
+    return { ...m, branch_name: branch?.name || 'Sin sucursal' };
+}
+
+function createMachine(number, name, branchId = null) {
     const num = parseInt(number, 10);
-    if (findMachineByNumber(num)) throw new Error(`Máquina #${num} ya existe`);
+    if (!branchId) throw new Error('Selecciona una sucursal');
+    if (!findBranchById(branchId)) throw new Error('Sucursal no válida');
+    if (findMachineByNumber(num, branchId)) throw new Error(`Máquina #${num} ya existe en esta sucursal`);
+    const branch = findBranchById(branchId);
     const machine = {
         id: nextId('machines'),
         number: num,
-        name: name || `Máquina ${num}`,
+        name: name || `${branch.name} #${num}`,
+        branch_id: branchId,
         balance: 0,
         active: 1,
         created_at: now(),
@@ -184,6 +206,9 @@ function creditMachine(machineId, amount, opts = {}) {
         const c = findUserById(opts.cashierId);
         if (!c || c.role !== 'cashier') throw new Error('Cajero inválido');
         if ((c.float_balance || 0) < amount) throw new Error('El cajero no tiene saldo suficiente en caja');
+        if (c.branch_id && m.branch_id && c.branch_id !== m.branch_id) {
+            throw new Error('Esta máquina no pertenece a la sucursal del cajero');
+        }
         c.float_balance -= amount;
     }
 
@@ -344,18 +369,111 @@ function ensureCashierUser() {
 }
 
 function seedDefaults() {
-    if (data.machines.length === 0) {
-        for (let n = 1; n <= 3; n++) createMachine(n, `Máquina ${n}`);
+    seedBranches();
+    if (data.machines.length === 0 && data.branches.length > 0) {
+        const first = data.branches[0];
+        for (let n = 1; n <= 3; n++) createMachine(n, `${first.name} #${n}`, first.id);
     }
     ensureAdminUser();
     ensureCashierUser();
+}
+
+const DEFAULT_BRANCHES = [
+    { id: 'fusion', name: 'Fusion' },
+    { id: '3b2', name: '3B2' },
+    { id: '3b5', name: '3B5' },
+    { id: '3b6', name: '3B6' },
+    { id: '3b7', name: '3B7' },
+    { id: '3b9', name: '3B9' },
+    { id: '3b10', name: '3B10' },
+];
+
+function listBranches() {
+    return [...data.branches].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function findBranchById(id) {
+    return data.branches.find((b) => b.id === id) || null;
+}
+
+function createBranch(id, name) {
+    const cleanId = String(id || '').trim().toLowerCase();
+    const cleanName = String(name || '').trim();
+    if (!cleanId || !cleanName) throw new Error('ID y nombre requeridos');
+    if (!/^[a-z0-9_]+$/.test(cleanId)) throw new Error('ID inválido (solo letras minúsculas, números y _)');
+    if (findBranchById(cleanId)) throw new Error('Esa sucursal ya existe');
+    const branch = { id: cleanId, name: cleanName, active: 1, created_at: now() };
+    data.branches.push(branch);
+    persist();
+    return branch;
+}
+
+function updateBranch(id, name) {
+    const branch = findBranchById(id);
+    if (!branch) throw new Error('Sucursal no encontrada');
+    const cleanName = String(name || '').trim();
+    if (!cleanName) throw new Error('Nombre requerido');
+    branch.name = cleanName;
+    persist();
+    return branch;
+}
+
+function deleteBranch(id) {
+    const branch = findBranchById(id);
+    if (!branch) throw new Error('Sucursal no encontrada');
+    const linkedUsers = data.users.filter((u) => u.branch_id === id);
+    const linkedMachines = data.machines.filter((m) => m.branch_id === id);
+    if (linkedUsers.length || linkedMachines.length) {
+        throw new Error('No se puede eliminar: hay cajeros o máquinas vinculados');
+    }
+    data.branches = data.branches.filter((b) => b.id !== id);
+    persist();
+    return true;
+}
+
+function seedBranches() {
+    if (!data.branches) data.branches = [];
+    if (data.branches.length > 0) return;
+    ensureDefaultBranches();
+}
+
+function ensureDefaultBranches() {
+    if (!data.branches) data.branches = [];
+    let added = 0;
+    DEFAULT_BRANCHES.forEach((b) => {
+        if (!findBranchById(b.id)) {
+            data.branches.push({ id: b.id, name: b.name, active: 1, created_at: now() });
+            added += 1;
+        }
+    });
+    if (added) persist();
+    return added;
+}
+
+function listMachinesForCashier(cashierId) {
+    const c = findUserById(cashierId);
+    if (!c) return [];
+    if (!c.branch_id) return listMachines().filter((m) => m.active);
+    return listMachines(c.branch_id).filter((m) => m.active);
+}
+
+function branchStats(branchId) {
+    const cashiers = data.users.filter((u) => u.role === 'cashier' && u.branch_id === branchId);
+    const machines = data.machines.filter((m) => m.branch_id === branchId);
+    return {
+        cashiers: cashiers.length,
+        cashierFloat: cashiers.reduce((s, u) => s + (u.float_balance || 0), 0),
+        machines: machines.length,
+        machineBalance: machines.reduce((s, m) => s + m.balance, 0),
+    };
 }
 
 module.exports = {
     isServerless, initLocal, reload, flush,
     getSettings, setSettings, ensureAdminUser,
     findUserByEmail, findUserById, createUser, listCashiers, sanitizeUser, setUserActive, topUpCashier,
-    findMachineByNumber, findMachineById, listMachines, createMachine, setMachineActive,
+    findMachineByNumber, findMachineById, listMachines, listMachinesForCashier, createMachine, setMachineActive,
     creditMachine, adjustMachineBalance, playMachine,
     getTransactions, getStats,
+    listBranches, findBranchById, createBranch, updateBranch, deleteBranch, seedBranches, ensureDefaultBranches, branchStats,
 };

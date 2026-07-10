@@ -4,20 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3B Pot — Máquinas</title>
+    <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/inicio.css">
 </head>
 <body>
     <div class="wrap">
         <header class="hero">
-            <h1>3B<span>POT</span></h1>
+            <img src="/shared/assets/logo_3b.png" alt="Abarrotes Las 3B" class="hero-logo">
             <p>Salón de máquinas — paga en caja, juega aquí</p>
         </header>
 
         <section class="machine-card">
             <h2>Tu máquina</h2>
-            <p class="hint">Paga en efectivo al cajero. El crédito se carga al número de tu máquina.</p>
+            <p class="hint">Selecciona sucursal y número. El crédito se carga en caja.</p>
             <form id="machineForm">
+                <label>Sucursal
+                    <select id="branchSelect" required>
+                        <option value="">Cargando...</option>
+                    </select>
+                </label>
                 <label>Número de máquina<input type="number" id="machineNum" min="1" placeholder="1, 2, 3..." required autofocus></label>
                 <button type="submit">Continuar</button>
             </form>
@@ -35,6 +41,10 @@
                     <span class="icon">🎰</span>
                     <span class="name">Comic Slot</span>
                 </a>
+                <a href="/rancho-lazo/" class="game-card" id="linkRancho">
+                    <span class="icon">🤠</span>
+                    <span class="name">Rancho Lazo</span>
+                </a>
             </div>
         </section>
 
@@ -47,24 +57,31 @@
 
     <script src="/shared/machine-client.js"></script>
     <script>
-        const params = new URLSearchParams(location.search);
-        const saved = MachineAPI.getMachineNumber();
-        if (saved) {
-            document.getElementById('machineNum').value = saved;
-            loadMachine(saved);
+        async function loadBranches() {
+            const data = await fetch('/api/play/branches').then((r) => r.json());
+            const sel = document.getElementById('branchSelect');
+            sel.innerHTML = '<option value="">Selecciona sucursal</option>' +
+                data.branches.map((b) => `<option value="${b.id}">${b.name}</option>`).join('');
+            const savedBranch = MachineAPI.getBranchId();
+            if (savedBranch) sel.value = savedBranch;
         }
 
-        async function loadMachine(num) {
+        const saved = MachineAPI.getMachineNumber();
+        if (saved) document.getElementById('machineNum').value = saved;
+
+        async function loadMachine(num, branchId) {
             try {
-                const data = await MachineAPI.getMachine(num);
+                const data = await MachineAPI.getMachine(num, branchId);
                 MachineAPI.setMachineNumber(num);
+                MachineAPI.setBranchId(branchId);
                 document.getElementById('balanceInfo').hidden = false;
                 document.getElementById('balanceInfo').textContent =
-                    'Máquina #' + num + ' — Saldo: ' + MachineAPI.formatPesos(data.balance);
+                    data.branch_name + ' · Máquina #' + num + ' — Saldo: ' + MachineAPI.formatPesos(data.balance);
                 document.getElementById('gamesSection').hidden = false;
-                const q = '?m=' + num;
+                const q = '?m=' + num + '&branch=' + encodeURIComponent(branchId);
                 document.getElementById('linkSpin').href = '/spin-game/' + q;
                 document.getElementById('linkSlot').href = '/comic-slot/' + q;
+                document.getElementById('linkRancho').href = '/rancho-lazo/' + q;
             } catch (e) {
                 document.getElementById('balanceInfo').hidden = false;
                 document.getElementById('balanceInfo').textContent = e.message;
@@ -74,7 +91,15 @@
 
         document.getElementById('machineForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            loadMachine(parseInt(document.getElementById('machineNum').value, 10));
+            const branchId = document.getElementById('branchSelect').value;
+            if (!branchId) return;
+            loadMachine(parseInt(document.getElementById('machineNum').value, 10), branchId);
+        });
+
+        loadBranches().then(() => {
+            const branchId = MachineAPI.getBranchId();
+            const num = MachineAPI.getMachineNumber();
+            if (branchId && num) loadMachine(num, branchId);
         });
     </script>
 </body>

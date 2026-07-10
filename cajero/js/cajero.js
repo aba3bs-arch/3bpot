@@ -17,11 +17,14 @@
     async function refresh() {
         const data = await api('/me');
         document.getElementById('cashierName').textContent = data.user.name;
+        document.getElementById('cashierBranch').textContent = data.user.branch_name
+            ? `Sucursal: ${data.user.branch_name}`
+            : 'Sin sucursal asignada';
         document.getElementById('floatBalance').textContent = StaffAuth.formatPesos(data.user.float_balance);
 
         const sel = document.getElementById('machineSelect');
         sel.innerHTML = data.machines.filter((m) => m.active).map((m) =>
-            `<option value="${m.id}">Máquina #${m.number} — ${m.name} (saldo: ${StaffAuth.formatPesos(m.balance)})</option>`
+            `<option value="${m.id}">#${m.number} — ${m.branch_name || ''} ${m.name} (${StaffAuth.formatPesos(m.balance)})</option>`
         ).join('');
 
         document.getElementById('salesList').innerHTML = data.recentSales.length

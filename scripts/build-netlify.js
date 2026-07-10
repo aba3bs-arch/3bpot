@@ -14,10 +14,10 @@ function copyDir(src, dest) {
     }
 }
 
-if (fs.existsSync(DIST)) fs.rmSync(DIST, { recursive: true });
-fs.mkdirSync(DIST);
+if (fs.existsSync(DIST)) fs.rmSync(DIST, { recursive: true, force: true });
+fs.mkdirSync(DIST, { recursive: true });
 
-for (const dir of ['inicio', 'admin', 'cajero', 'spin-game', 'comic-slot', 'shared']) {
+for (const dir of ['inicio', 'admin', 'cajero', 'spin-game', 'comic-slot', 'rancho-lazo', 'shared']) {
     copyDir(path.join(ROOT, dir), path.join(DIST, dir));
 }
 

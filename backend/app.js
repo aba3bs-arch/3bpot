@@ -43,7 +43,7 @@ app.use('/api/cajero', cajeroRoutes);
 app.use('/api/play', playRoutes);
 
 if (!isServerless) {
-    const staticDirs = ['shared', 'admin', 'cajero', 'inicio', 'spin-game', 'comic-slot'];
+    const staticDirs = ['shared', 'admin', 'cajero', 'inicio', 'spin-game', 'comic-slot', 'rancho-lazo'];
     staticDirs.forEach((dir) => app.use(`/${dir}`, express.static(path.join(ROOT, dir))));
     app.get('/', (_req, res) => res.redirect('/inicio/'));
 }

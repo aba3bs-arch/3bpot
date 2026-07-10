@@ -18,6 +18,7 @@ body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: 
 .app.is-visible { display: block; }
 .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; width: 100%; max-width: 380px; }
 .login-box h1 { font-size: 1.5rem; margin-bottom: 4px; }
+.brand-logo { display: block; width: 120px; margin: 0 auto 16px; }
 .login-box p { color: var(--muted); margin-bottom: 24px; }
 .login-box label { display: block; margin-bottom: 14px; font-size: 0.85rem; color: var(--muted); }
 .login-box input { display: block; width: 100%; margin-top: 6px; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem; }
@@ -27,6 +28,7 @@ body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: 
 .hint-login strong { color: var(--gold); }
 
 .header { display: flex; align-items: center; gap: 20px; padding: 20px 28px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.header-logo { width: 64px; height: auto; }
 .header h1 { font-size: 1.3rem; }
 .header p { color: var(--muted); font-size: 0.85rem; }
 .float-box { margin-left: auto; text-align: right; }

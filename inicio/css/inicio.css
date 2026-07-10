@@ -15,15 +15,18 @@ body {
 }
 
 .wrap { max-width: 480px; margin: 0 auto; padding: 40px 20px 60px; text-align: center; }
-.hero h1 { font-size: 2.8rem; font-weight: 800; letter-spacing: 3px; margin-bottom: 8px; }
-.hero h1 span { color: var(--gold); }
+.hero-logo { width: min(220px, 80vw); margin: 0 auto 12px; display: block; }
 .hero p { color: var(--muted); margin-bottom: 40px; }
 
 .machine-card, .games { background: var(--card); border-radius: 20px; padding: 28px 24px; margin-bottom: 24px; text-align: left; }
 .machine-card h2, .games h2 { font-size: 1.1rem; margin-bottom: 8px; }
 .hint { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; line-height: 1.5; }
 
-.machine-card label { display: block; font-size: 0.85rem; color: var(--muted); }
+.machine-card label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 14px; }
+.machine-card select {
+    display: block; width: 100%; margin: 8px 0 0; padding: 12px;
+    border-radius: 12px; border: 2px solid #333; background: #111; color: var(--text);
+}
 .machine-card input {
     display: block; width: 100%; margin: 8px 0 16px; padding: 16px;
     font-size: 1.8rem; text-align: center; font-weight: 800;

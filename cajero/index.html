@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3B Pot — Cajero</title>
+    <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/cajero.css">
 </head>
 <body>
     <div id="loginScreen" class="login-screen">
         <form id="loginForm" class="login-box">
+            <img src="/shared/assets/logo_3b.png" alt="Abarrotes Las 3B" class="brand-logo">
             <h1>Caja 3B Pot</h1>
             <p>Vende crédito en efectivo a las máquinas</p>
             <label>Email<input type="email" name="email" value="cajero@winpot.local" required></label>
@@ -22,9 +24,10 @@
 
     <div id="app" class="app">
         <header class="header">
+            <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="header-logo">
             <div>
                 <h1>Caja — <span id="cashierName">Cajero</span></h1>
-                <p>Tu saldo para vender</p>
+                <p id="cashierBranch">Sucursal</p>
             </div>
             <div class="float-box">
                 <span class="float-label">Saldo en caja</span>

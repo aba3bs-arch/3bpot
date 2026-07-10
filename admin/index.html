@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3B Pot — Panel Admin</title>
+    <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
     <div id="loginScreen" class="login-screen">
         <form id="loginForm" class="login-box">
+            <img src="/shared/assets/logo_3b.png" alt="Abarrotes Las 3B" class="brand-logo">
             <h1>3B Pot Admin</h1>
             <p>Panel del dueño del negocio</p>
             <label>Email<input type="email" name="email" value="admin@winpot.local" required></label>
@@ -22,9 +24,10 @@
 
     <div id="app" class="app">
         <aside class="sidebar">
-            <div class="brand">3B<span>POT</span></div>
+            <div class="brand"><img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo-sm"></div>
             <nav>
                 <button type="button" class="nav active" data-tab="inicio">🏠 Inicio</button>
+                <button type="button" class="nav" data-tab="sucursales">🏢 Sucursales</button>
                 <button type="button" class="nav" data-tab="retencion">🎯 Retención</button>
                 <button type="button" class="nav" data-tab="maquinas">🎰 Máquinas</button>
                 <button type="button" class="nav" data-tab="cajeros">👤 Cajeros</button>
@@ -45,6 +48,37 @@
                 <div class="stats" id="statsGrid"></div>
             </section>
 
+            <!-- SUCURSALES -->
+            <section class="tab" id="tab-sucursales" hidden>
+                <h1>Sucursales</h1>
+                <p class="hint">Fusion, 3B2, 3B5, 3B6, 3B7, 3B9, 3B10 y las que agregues.</p>
+                <div class="card" style="margin-bottom:20px">
+                    <h3>Agregar sucursal</h3>
+                    <form id="createBranchForm" class="form-row-wrap">
+                        <input type="text" id="branchId" placeholder="ID (ej: 3b11)" required>
+                        <input type="text" id="branchName" placeholder="Nombre visible (ej: 3B11)" required>
+                        <button type="submit" class="btn btn--primary">Agregar</button>
+                    </form>
+                </div>
+                <div class="toolbar">
+                    <button type="button" class="btn btn--ghost" id="seedBranchesBtn">Cargar sucursales iniciales</button>
+                </div>
+                <div class="table-wrap">
+                    <table class="table" id="branchesTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Cajeros</th>
+                                <th>Máquinas</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- RETENCIÓN -->
             <section class="tab" id="tab-retencion" hidden>
                 <h1>Retención de premios</h1>
@@ -62,8 +96,10 @@
             <!-- MÁQUINAS / CRÉDITO -->
             <section class="tab" id="tab-maquinas" hidden>
                 <h1>Crédito en máquinas</h1>
-                <p class="hint">Deposita o retira pesos por máquina. El historial muestra fecha y hora de cada movimiento.</p>
+                <p class="hint">Cada máquina pertenece a una sucursal. Los cajeros solo venden a máquinas de su sucursal.</p>
                 <div class="toolbar">
+                    <select id="machineBranchFilter"><option value="">Todas las sucursales</option></select>
+                    <select id="newMachineBranch" required><option value="">Sucursal</option></select>
                     <input type="number" id="newMachineNum" placeholder="Número" min="1">
                     <input type="text" id="newMachineName" placeholder="Nombre (opcional)">
                     <button type="button" class="btn btn--primary" id="addMachineBtn">+ Agregar máquina</button>
@@ -73,6 +109,7 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>Sucursal</th>
                                 <th>Máquina</th>
                                 <th>Estado del crédito</th>
                                 <th>Cantidad a depositar</th>
@@ -115,13 +152,14 @@
                     <form id="createCashierForm" class="form-row-wrap">
                         <input type="text" id="cashierName" placeholder="Nombre" required>
                         <input type="email" id="cashierEmail" placeholder="Email" required>
+                        <select id="cashierBranch" required><option value="">Sucursal</option></select>
                         <input type="text" id="cashierPass" placeholder="Contraseña (mín. 6 chars, o vacío = cajero123)">
                         <button type="submit" class="btn btn--primary">Crear</button>
                     </form>
                 </div>
                 <div class="table-wrap" style="margin-top:20px">
                     <table class="table" id="cashiersTable">
-                        <thead><tr><th>Nombre</th><th>Email</th><th>Saldo en caja</th><th>Acciones</th></tr></thead>
+                        <thead><tr><th>Nombre</th><th>Email</th><th>Sucursal</th><th>Saldo en caja</th><th>Acciones</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -170,6 +208,19 @@
             <div class="modal-actions">
                 <button type="button" class="btn btn--ghost" id="floatCancel">Cancelar</button>
                 <button type="button" class="btn btn--primary" id="floatConfirm">Recargar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal editar sucursal -->
+    <div class="modal" id="branchModal">
+        <div class="modal-box">
+            <h3>Editar sucursal</h3>
+            <p id="branchEditId" class="muted-xs"></p>
+            <label>Nombre visible<input type="text" id="branchEditName"></label>
+            <div class="modal-actions">
+                <button type="button" class="btn btn--ghost" id="branchCancel">Cancelar</button>
+                <button type="button" class="btn btn--primary" id="branchSave">Guardar</button>
             </div>
         </div>
     </div>
