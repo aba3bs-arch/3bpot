@@ -5,6 +5,7 @@ const comicSlot = require('../engines/comic-slot');
 const ranchoLazo = require('../engines/rancho-lazo');
 const lagunaAnzuelo = require('../engines/laguna-anzuelo');
 const rascadito = require('../engines/rascadito');
+const desenredaCable = require('../engines/desenreda-cable');
 const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
@@ -156,6 +157,92 @@ router.get('/rascadito/pool', (req, res) => {
 });
 
 router.post('/rascadito', (req, res) => playScratchGame(req, res, 'rascadito'));
+
+const CABLE_BETS = [1, 2, 5, 10, 15, 20];
+
+function validateCableBet(bet) {
+    return CABLE_BETS.includes(bet);
+}
+
+router.post('/desenreda-cable/start', (req, res) => {
+    const machineNumber = parseInt(req.body.machineNumber, 10);
+    const branchId = req.body.branch_id || req.body.branch || null;
+    const bet = parseInt(req.body.bet, 10);
+    const settings = store.getSettings();
+
+    if (!machineNumber) return res.status(400).json({ error: 'Número de máquina requerido' });
+    if (!branchId) return res.status(400).json({ error: 'Sucursal requerida' });
+    if (!validateCableBet(bet)) {
+        return res.status(400).json({ error: 'Apuesta de cable: $1, $2, $5, $10, $15 o $20' });
+    }
+
+    const machine = store.findMachineByNumber(machineNumber, branchId);
+    if (!machine || !machine.active) return res.status(404).json({ error: 'Máquina no disponible' });
+
+    try {
+        const puzzle = desenredaCable.generatePuzzle(bet, settings.retention_percent);
+        const out = store.startCableSessionMachine(machine.id, bet, puzzle.knots);
+        res.json({
+            ...desenredaCable.publicSession(out.session),
+            balance: out.balance,
+            machine_number: out.machine_number,
+        });
+    } catch (e) {
+        const status = e.message.includes('insuficiente') ? 402 : 400;
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/desenreda-cable/pull', (req, res) => {
+    const machineNumber = parseInt(req.body.machineNumber, 10);
+    const branchId = req.body.branch_id || req.body.branch || null;
+    const sessionId = parseInt(req.body.sessionId, 10);
+    const end = req.body.end;
+
+    if (!machineNumber || !sessionId) return res.status(400).json({ error: 'Datos incompletos' });
+    const machine = store.findMachineByNumber(machineNumber, branchId);
+    if (!machine) return res.status(404).json({ error: 'Máquina no encontrada' });
+
+    try {
+        const out = store.pullCableSession(sessionId, end, { machineId: machine.id });
+        res.json(out);
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+router.post('/user/desenreda-cable/start', authRequired, (req, res) => {
+    const bet = parseInt(req.body.bet, 10);
+    const settings = store.getSettings();
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Solo jugadores' });
+    if (!validateCableBet(bet)) {
+        return res.status(400).json({ error: 'Apuesta de cable: $1, $2, $5, $10, $15 o $20' });
+    }
+    try {
+        const puzzle = desenredaCable.generatePuzzle(bet, settings.retention_percent);
+        const out = store.startCableSessionUser(req.user.id, bet, puzzle.knots);
+        res.json({
+            ...desenredaCable.publicSession(out.session),
+            balance: out.balance,
+            user_name: out.user_name,
+        });
+    } catch (e) {
+        const status = e.message.includes('insuficiente') ? 402 : 400;
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/user/desenreda-cable/pull', authRequired, (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    const end = req.body.end;
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const out = store.pullCableSession(sessionId, end, { userId: req.user.id });
+        res.json(out);
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
 
 function playUserGame(req, res, engine, gameName) {
     const bet = parseInt(req.body.bet, 10);

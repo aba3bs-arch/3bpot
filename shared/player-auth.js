@@ -78,8 +78,20 @@ const PlayerAuth = (function () {
         return request('/api/play/user/rascadito', { method: 'POST', body: JSON.stringify({ bet }) });
     }
 
+    async function startDesenredaCable(bet) {
+        return request('/api/play/user/desenreda-cable/start', { method: 'POST', body: JSON.stringify({ bet }) });
+    }
+
+    async function pullDesenredaCable(sessionId, end) {
+        return request('/api/play/user/desenreda-cable/pull', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId, end }),
+        });
+    }
+
     return {
         login, logout, request, getUser, isLoggedIn, clearSession, formatPesos,
         playSpinWheel, playComicSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito,
+        startDesenredaCable, pullDesenredaCable,
     };
 })();

@@ -14,7 +14,8 @@ function emptyData() {
         users: [],
         transactions: [],
         game_rounds: [],
-        counters: { users: 0, machines: 0, transactions: 0, game_rounds: 0, branches: 0 },
+        cable_sessions: [],
+        counters: { users: 0, machines: 0, transactions: 0, game_rounds: 0, branches: 0, cable_sessions: 0 },
     };
 }
 
@@ -583,6 +584,156 @@ function getScratchPrizePool(branchId = null, userId = null) {
     };
 }
 
+    };
+}
+
+function ensureCableSessions() {
+    if (!data.cable_sessions) data.cable_sessions = [];
+    if (!data.counters.cable_sessions) data.counters.cable_sessions = 0;
+}
+
+function pruneCableSessions() {
+    ensureCableSessions();
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    data.cable_sessions = data.cable_sessions.filter((s) => {
+        if (s.status === 'active') return true;
+        const ts = Date.parse(s.created_at || 0);
+        return ts > cutoff;
+    });
+}
+
+function findCableSession(id) {
+    ensureCableSessions();
+    return data.cable_sessions.find((s) => s.id === parseInt(id, 10)) || null;
+}
+
+function startCableSessionMachine(machineId, bet, knots) {
+    const m = findMachineById(machineId);
+    if (!m || !m.active) throw new Error('Máquina no disponible');
+    if (m.balance < bet) throw new Error('Saldo insuficiente en la máquina');
+
+    pruneCableSessions();
+    const active = data.cable_sessions.find((s) => s.machine_id === machineId && s.status === 'active');
+    if (active) throw new Error('Ya tienes un cable en progreso — termínalo primero');
+
+    m.balance -= bet;
+    addTransaction({ machine_id: machineId, type: 'bet', amount: -bet, balance_after: m.balance, game: 'desenreda-cable' });
+
+    const session = {
+        id: nextId('cable_sessions'),
+        machine_id: machineId,
+        user_id: null,
+        bet,
+        knots,
+        accumulated: 0,
+        wrongPulls: 0,
+        status: 'active',
+        created_at: now(),
+    };
+    data.cable_sessions.push(session);
+    persist();
+    return { session, balance: m.balance, machine_number: m.number };
+}
+
+function startCableSessionUser(userId, bet, knots) {
+    const u = findUserById(userId);
+    if (!u || u.role !== 'user' || !u.active) throw new Error('Usuario no disponible');
+    if ((u.game_balance || 0) < bet) throw new Error('Saldo insuficiente');
+
+    ensureCableSessions();
+    pruneCableSessions();
+    const active = data.cable_sessions.find((s) => s.user_id === userId && s.status === 'active');
+    if (active) throw new Error('Ya tienes un cable en progreso — termínalo primero');
+
+    u.game_balance -= bet;
+    addTransaction({ user_id: userId, type: 'bet', amount: -bet, balance_after: u.game_balance, game: 'desenreda-cable' });
+
+    const session = {
+        id: nextId('cable_sessions'),
+        machine_id: null,
+        user_id: userId,
+        bet,
+        knots,
+        accumulated: 0,
+        wrongPulls: 0,
+        status: 'active',
+        created_at: now(),
+    };
+    data.cable_sessions.push(session);
+    persist();
+    return { session, balance: u.game_balance, user_name: u.name };
+}
+
+function finalizeCableSession(session, pullResult) {
+    const payout = session.accumulated;
+    const bet = session.bet;
+    const game = 'desenreda-cable';
+    const result = {
+        payout,
+        net: payout - bet,
+        jackpot: pullResult.jackpot || 0,
+        failed: !!pullResult.failed,
+        wrongPulls: session.wrongPulls,
+        knotsTotal: session.knots.length,
+        knotsUntied: session.knots.filter((k) => k.untied).length,
+    };
+
+    if (session.machine_id) {
+        const m = findMachineById(session.machine_id);
+        if (payout > 0) {
+            m.balance += payout;
+            addTransaction({ machine_id: session.machine_id, type: 'win', amount: payout, balance_after: m.balance, game });
+        }
+        addGameRound({ machine_id: session.machine_id, game, bet, payout, net: result.net, result_json: JSON.stringify(result) });
+        persist();
+        return { ...result, balance: m.balance, machine_number: m.number };
+    }
+
+    const u = findUserById(session.user_id);
+    if (payout > 0) {
+        u.game_balance += payout;
+        addTransaction({ user_id: session.user_id, type: 'win', amount: payout, balance_after: u.game_balance, game });
+    }
+    addGameRound({ user_id: session.user_id, game, bet, payout, net: result.net, result_json: JSON.stringify(result) });
+    persist();
+    return { ...result, balance: u.game_balance, user_name: u.name };
+}
+
+function pullCableSession(sessionId, end, owner) {
+    const session = findCableSession(sessionId);
+    if (!session || session.status !== 'active') throw new Error('Partida no encontrada o ya terminada');
+
+    if (owner.machineId && session.machine_id !== owner.machineId) throw new Error('Partida no válida');
+    if (owner.userId && session.user_id !== owner.userId) throw new Error('Partida no válida');
+
+    const cable = require('../engines/desenreda-cable');
+    const pullResult = cable.resolvePull(session, end);
+
+    if (pullResult.finished && session.status === 'active') {
+        session.status = 'done';
+    }
+
+    let finalize = null;
+    if (session.status === 'done') {
+        finalize = finalizeCableSession(session, pullResult);
+    } else {
+        persist();
+    }
+
+    const balance = finalize?.balance ?? (session.machine_id
+        ? findMachineById(session.machine_id)?.balance
+        : findUserById(session.user_id)?.game_balance);
+
+    return {
+        ...pullResult,
+        session: cable.publicSession(session),
+        accumulated: session.accumulated,
+        balance,
+        payout: finalize?.payout ?? session.accumulated,
+        net: finalize?.net,
+    };
+}
+
 /* Transactions */
 function addTransaction(row) {
     const tx = { id: nextId('transactions'), created_at: now(), ...row };
@@ -698,6 +849,7 @@ function migrateUsernames() {
 }
 
 function seedDefaults() {
+    ensureCableSessions();
     seedBranches();
     ensureDefaultBranches();
     migrateUsernames();
@@ -742,7 +894,7 @@ function createBranch(id, name, password) {
         password_hash: bcrypt.hashSync(finalPwd, 10),
         password_seed: finalPwd === 'sucursal123' ? 'sucursal123' : null,
         password_custom: finalPwd === 'sucursal123' ? 0 : 1,
-        games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'],
+        games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable'],
         created_at: now(),
     };
     data.branches.push(branch);
@@ -868,7 +1020,7 @@ function unassignCashier(cashierId) {
 
 function getBranchGames(branchId) {
     const branch = findBranchById(branchId);
-    const defaults = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'];
+    const defaults = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable'];
     if (!branch) return defaults;
     if (!Array.isArray(branch.games) || !branch.games.length) {
         branch.games = defaults;
@@ -880,7 +1032,7 @@ function getBranchGames(branchId) {
 function setBranchGames(branchId, games) {
     const branch = findBranchById(branchId);
     if (!branch) throw new Error('Sucursal no encontrada');
-    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'];
+    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable'];
     const list = (games || []).filter((g) => allowed.includes(g));
     if (!list.length) throw new Error('Selecciona al menos un juego');
     branch.games = list;
@@ -931,7 +1083,7 @@ function ensureDefaultBranches() {
                 active: 1,
                 float_balance: 5000,
                 password_hash: bcrypt.hashSync('sucursal123', 10),
-                games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'],
+                games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable'],
                 created_at: now(),
             });
             added += 1;
@@ -940,9 +1092,9 @@ function ensureDefaultBranches() {
     data.branches.forEach((b) => {
         ensureBranchAuth(b);
         if (!Array.isArray(b.games) || !b.games.length) {
-            b.games = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
-        } else if (!b.games.includes('rascadito')) {
-            b.games = [...b.games, 'rascadito'];
+            b.games = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable'];
+        } else if (!b.games.includes('desenreda-cable')) {
+            b.games = [...b.games, 'desenreda-cable'];
         }
         ensureMachinesForBranch(b.id, 3);
     });
@@ -978,6 +1130,7 @@ module.exports = {
     createMachine, updateMachine, deleteMachine, setMachineActive, assertCashierMachineAccess,
     creditMachine, creditUser, adjustMachineBalance, playMachine, playUser,
     getTransactions, getStats, getScratchPrizePool,
+    startCableSessionMachine, startCableSessionUser, pullCableSession, findCableSession,
     listBranches, findBranchById, createBranch, updateBranch, deleteBranch, seedBranches, ensureDefaultBranches, branchStats,
     sanitizeBranch, setBranchPassword, topUpBranch, transferAgentToBranch, ensureBranchAuth, assertBranchMachineAccess,
     ensureMachinesForBranch, assignCashierToBranch, unassignCashier, getBranchGames, setBranchGames,

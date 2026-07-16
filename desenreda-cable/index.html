@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Desenreda Cable — 3B Pot</title>
+  <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="hud">
+      <div class="brand">Desenreda Cable</div>
+      <div class="stats">
+        <span>Máq. <strong id="machineLabel">—</strong></span>
+        <span>Saldo <strong id="credits">$0</strong></span>
+        <span>Apuesta <strong id="bet">$1</strong></span>
+        <span>Acumulado <strong id="win">$0</strong></span>
+      </div>
+    </header>
+
+    <div class="paytable">
+      <span class="pay easy">Fácil ×0.5</span>
+      <span class="pay med">Medio ×1.5</span>
+      <span class="pay hard">Difícil ×3</span>
+      <span class="pay expert">Experto ×5</span>
+      <span class="pay jackpot">Jackpot ×10</span>
+    </div>
+
+    <canvas id="game" width="960" height="480" aria-label="Cable con nudos"></canvas>
+
+    <div class="pull-actions hidden" id="pullActions">
+      <button type="button" id="pullLeft" class="pull-btn left">← Tirar izquierda</button>
+      <button type="button" id="pullRight" class="pull-btn right">Tirar derecha →</button>
+    </div>
+
+    <div class="mobile-actions">
+      <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
+      <button type="button" id="actionBtn" class="mobile-btn action">JUGAR</button>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="betDown" class="ctrl">−</button>
+      <button type="button" id="betUp" class="ctrl">+</button>
+      <p class="hint" id="hint">Elige hacia qué lado tirar el cable</p>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="panel">
+        <h1 id="title">Desenreda Cable</h1>
+        <p id="subtitle">
+          Juego de inteligencia en MXN. Cada nudo tiene premio según dificultad.
+          Tira del lado correcto para desenredar; un mal jalón puede crear otro nudo.
+          ¡Desenreda todo para el jackpot!
+        </p>
+        <div class="panel-actions">
+          <a class="btn-link" href="/inicio/" data-inicio-link>Elegir máquina</a>
+          <button type="button" id="startBtn">Comenzar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast hidden" id="toast">
+      <strong id="toastTitle">—</strong>
+      <span id="toastText">—</span>
+    </div>
+  </div>
+  <script src="/shared/machine-client.js"></script>
+  <script src="/shared/player-auth.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

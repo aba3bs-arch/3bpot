@@ -139,6 +139,29 @@ const MachineAPI = (function () {
         return request('/api/play/rascadito/pool?branch=' + encodeURIComponent(id));
     }
 
+    async function startDesenredaCable(bet, machineNumber, branchId) {
+        return request('/api/play/desenreda-cable/start', {
+            method: 'POST',
+            body: JSON.stringify({
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+                bet,
+            }),
+        });
+    }
+
+    async function pullDesenredaCable(sessionId, end, machineNumber, branchId) {
+        return request('/api/play/desenreda-cable/pull', {
+            method: 'POST',
+            body: JSON.stringify({
+                sessionId,
+                end,
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+            }),
+        });
+    }
+
     function formatPesos(n) {
         const sign = n < 0 ? '-' : '';
         return sign + '$' + Math.abs(n).toLocaleString('es-MX', { maximumFractionDigits: 0 });
@@ -167,6 +190,7 @@ const MachineAPI = (function () {
     return {
         getMachineNumber, setMachineNumber, getBranchId, setBranchId, inicioUrl, machinePortalUrl,
         getPortal, getMachine, spinWheel, spinSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito, getScratchPool,
+        startDesenredaCable, pullDesenredaCable,
         formatPesos, requireMachine, wireInicioLinks, apiBase,
     };
 })();
