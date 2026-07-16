@@ -409,6 +409,7 @@
     hintEl.textContent = `Toca para lanzar (cuesta ${mxn(bet())})`;
     spawnAnimal();
     AudioFX && AudioFX.crowdCheer && AudioFX.crowdCheer();
+    requestAnimationFrame(loop);
   }
 
   function update(dt) {
@@ -1362,8 +1363,7 @@
     drawCowboyFacingCows({ celebrate: state.playerPose === "celebrate" });
   }
 
-  function drawFx()
- {
+  function drawFx() {
     for (const d of state.dust) {
       ctx.globalAlpha = Math.max(0, d.life);
       ctx.fillStyle = "#c4a574";
@@ -1478,5 +1478,6 @@
 
   refreshHud();
   draw();
+  requestAnimationFrame(loop);
   loadBalance();
 })();

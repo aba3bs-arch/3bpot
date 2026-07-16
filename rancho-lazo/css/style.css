@@ -156,7 +156,7 @@ body {
 }
 
 .overlay.hidden {
-  display: none;
+  display: none !important;
 }
 
 .panel {
