@@ -74,8 +74,12 @@ const PlayerAuth = (function () {
         return request('/api/play/user/laguna-anzuelo', { method: 'POST', body: JSON.stringify({ bet }) });
     }
 
+    async function playRascadito(bet) {
+        return request('/api/play/user/rascadito', { method: 'POST', body: JSON.stringify({ bet }) });
+    }
+
     return {
         login, logout, request, getUser, isLoggedIn, clearSession, formatPesos,
-        playSpinWheel, playComicSlot, playRanchoLazo, playLagunaAnzuelo,
+        playSpinWheel, playComicSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito,
     };
 })();

@@ -113,6 +113,59 @@ body {
   background: #0a5a6e;
 }
 
+.mobile-actions {
+  width: min(960px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 0.65rem;
+}
+
+.mobile-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0.85rem 1rem;
+  border: none;
+  border-radius: 10px;
+  font-family: "Outfit", sans-serif;
+  font-weight: 800;
+  font-size: clamp(1rem, 3.8vw, 1.15rem);
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.22);
+}
+
+.mobile-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+}
+
+.mobile-btn.menu {
+  color: var(--foam);
+  background: rgba(15, 40, 55, 0.85);
+  border: 2px solid rgba(46, 196, 182, 0.45);
+}
+
+.mobile-btn.action {
+  color: var(--ink);
+  background: linear-gradient(180deg, #3dd6c6, #1a9a8c);
+  box-shadow: 0 4px 0 #0d5c54;
+}
+
+.mobile-btn.action:active {
+  box-shadow: 0 2px 0 #0d5c54;
+}
+
+.mobile-btn.action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .controls {
   width: min(960px, 100%);
   display: flex;
@@ -164,7 +217,7 @@ body {
 }
 
 .overlay.hidden {
-  display: none;
+  display: none !important;
 }
 
 .panel {
@@ -249,4 +302,29 @@ body {
 .btn-link:hover {
   border-color: var(--aqua);
   color: var(--aqua);
+}
+
+@media (max-width: 640px) {
+  #app {
+    justify-content: flex-start;
+    padding: 0.5rem;
+    gap: 0.45rem;
+    overflow-y: auto;
+  }
+
+  .controls .back-link {
+    display: none;
+  }
+
+  .mobile-actions {
+    position: sticky;
+    bottom: 0.35rem;
+    z-index: 5;
+    padding-top: 0.15rem;
+  }
+
+  .mobile-btn {
+    min-height: 3.6rem;
+    font-size: 1.05rem;
+  }
 }

@@ -13,6 +13,8 @@
   const betDown = document.getElementById("betDown");
   const betUp = document.getElementById("betUp");
   const muteBtn = document.getElementById("muteBtn");
+  const actionBtn = document.getElementById("actionBtn");
+  const menuBtn = document.getElementById("menuBtn");
   const machineLabel = document.getElementById("machineLabel");
   const AudioFX = window.LagunaAudio;
 
@@ -67,6 +69,18 @@
     betEl.textContent = mxn(bet());
     winEl.textContent = mxn(state.lastWin);
     if (machineLabel) machineLabel.textContent = machineNumber ? "#" + machineNumber : "—";
+    refreshActionBtn();
+  }
+
+  function refreshActionBtn() {
+    if (!actionBtn) return;
+    if (!state.running) {
+      actionBtn.textContent = "JUGAR";
+      actionBtn.disabled = false;
+      return;
+    }
+    actionBtn.textContent = activeStruggle() ? "¡JALA!" : "LANZAR";
+    actionBtn.disabled = busy;
   }
 
   function rand(a, b) { return a + Math.random() * (b - a); }
@@ -129,6 +143,10 @@
 
   async function loadBalance() {
     if (isPlayerMode) {
+      if (menuBtn) {
+        menuBtn.href = "/portal/";
+        menuBtn.textContent = "← Portal";
+      }
       if (!PlayerAuth.isLoggedIn()) {
         window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
         return;
@@ -138,7 +156,7 @@
         const data = await PlayerAuth.request('/api/auth/me');
         credits = data.user.game_balance || 0;
         refreshHud();
-        hintEl.textContent = "Saldo de jugador · Toca para lanzar";
+        hintEl.textContent = "Saldo de jugador · Usa el botón LANZAR";
       } catch (err) {
         hintEl.textContent = err.message || "Error al cargar saldo";
         titleEl.textContent = "Sin sesión";
@@ -154,7 +172,7 @@
       const data = await MachineAPI.getMachine(machineNumber);
       credits = data.balance;
       refreshHud();
-      hintEl.textContent = "Saldo de máquina · Toca para lanzar";
+      hintEl.textContent = "Saldo de máquina · Usa el botón LANZAR";
     } catch (err) {
       hintEl.textContent = err.message || "Error al cargar saldo";
       titleEl.textContent = "Sin máquina";
@@ -226,6 +244,7 @@
       AudioFX && AudioFX.miss();
     } finally {
       busy = false;
+      refreshActionBtn();
     }
   }
 
@@ -243,7 +262,8 @@
     hook.ropeStretch = 0;
     state.shake = 3;
     AudioFX && AudioFX.bite();
-    hintEl.textContent = "¡Mordió! Toca rápido para jalar";
+    hintEl.textContent = "¡Mordió! Pulsa ¡JALA! rápido para jalar";
+    refreshActionBtn();
     state.pops.push({ x: fish.x + fish.w / 2, y: fish.y - 10, text: "¡Forcejeo!", life: 0.9 });
     for (let i = 0; i < 6; i++) spawnBubble(fish.x + fish.w / 2, fish.y);
   }
@@ -334,7 +354,7 @@
     state.wavePhase = 0;
     refreshHud();
     overlay.classList.add("hidden");
-    hintEl.textContent = `Toca para lanzar (cuesta ${mxn(bet())})`;
+    hintEl.textContent = `Pulsa LANZAR (cuesta ${mxn(bet())})`;
     for (let i = 0; i < 18; i++) {
       spawnBubble(rand(40, W - 40), rand(H * 0.35, H - 40));
     }
@@ -796,6 +816,7 @@
     const dt = Math.min(0.033, (ts - state.lastTs) / 1000);
     state.lastTs = ts;
     update(dt);
+    refreshActionBtn();
     draw();
     requestAnimationFrame(loop);
   }
@@ -804,6 +825,18 @@
     e.preventDefault();
     castHook();
   });
+
+  if (actionBtn) {
+    actionBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      AudioFX && AudioFX.unlock();
+      if (!state.running) {
+        startGame();
+        return;
+      }
+      castHook();
+    });
+  }
 
   startBtn.addEventListener("click", startGame);
 

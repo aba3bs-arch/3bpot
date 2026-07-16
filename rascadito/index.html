@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Rascadito — 3B Pot</title>
+  <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Rubik:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="hud">
+      <div class="brand">Rascadito</div>
+      <div class="stats">
+        <span>Máq. <strong id="machineLabel">—</strong></span>
+        <span>Saldo <strong id="credits">$0</strong></span>
+        <span>Carta <strong id="bet">$5</strong></span>
+        <span>Premio <strong id="win">$0</strong></span>
+      </div>
+    </header>
+
+    <div class="pool-bar">
+      <span>Fondo de premios (depósitos): <strong id="poolAvailable">$0</strong></span>
+      <span class="pool-note">La casa retiene el resto · premios grandes limitados al fondo</span>
+    </div>
+
+    <div class="paytable">
+      <span class="pay">🍒 ×0.5</span>
+      <span class="pay">🍋 ×1</span>
+      <span class="pay">🔔 ×2</span>
+      <span class="pay">⭐ ×5</span>
+      <span class="pay">💎 ×10</span>
+      <span class="pay jackpot">7️⃣ ×25</span>
+    </div>
+
+    <div class="card-stage">
+      <div class="card" id="card">
+        <div class="grid" id="grid" aria-hidden="true"></div>
+        <canvas id="scratch" class="scratch-layer" aria-label="Rasca la tarjeta"></canvas>
+        <div class="card-idle" id="cardIdle">
+          <p>Compra un rascadito y rasca para revelar</p>
+          <p class="small">3 iguales en fila = premio</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-actions">
+      <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
+      <button type="button" id="actionBtn" class="mobile-btn action">COMPRAR</button>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="betDown" class="ctrl">−</button>
+      <button type="button" id="betUp" class="ctrl">+</button>
+      <button type="button" id="revealBtn" class="ctrl reveal" title="Revelar todo">👁</button>
+      <p class="hint" id="hint">Rasca con el dedo o pulsa COMPRAR</p>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="panel">
+        <h1 id="title">Rascadito 3B</h1>
+        <p id="subtitle">
+          Rasca y gana en pesos MXN. Muchos reintegros, pocos jackpots.
+          Los premios grandes salen del fondo acumulado por depósitos de clientes.
+        </p>
+        <div class="panel-actions">
+          <a class="btn-link" href="/inicio/" data-inicio-link>Elegir máquina</a>
+          <button type="button" id="startBtn">Jugar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-toast hidden" id="resultToast">
+      <strong id="resultTitle">—</strong>
+      <span id="resultText">—</span>
+    </div>
+  </div>
+  <script src="/shared/machine-client.js"></script>
+  <script src="/shared/player-auth.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

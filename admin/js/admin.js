@@ -11,8 +11,8 @@
     let branchesCache = [];
     let agentsCache = [];
 
-    const GAME_LABELS = { 'spin-wheel': 'Ruleta', 'comic-slot': 'Slot', 'rancho-lazo': 'Rancho', 'laguna-anzuelo': 'Laguna Anzuelo' };
-    const ALL_GAMES = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
+    const GAME_LABELS = { 'spin-wheel': 'Ruleta', 'comic-slot': 'Slot', 'rancho-lazo': 'Rancho', 'laguna-anzuelo': 'Laguna Anzuelo', 'rascadito': 'Rascadito' };
+    const ALL_GAMES = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'];
 
     function showToast(msg, err, ms) {
         toast.textContent = msg;

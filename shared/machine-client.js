@@ -123,6 +123,22 @@ const MachineAPI = (function () {
         });
     }
 
+    async function playRascadito(bet, machineNumber, branchId) {
+        return request('/api/play/rascadito', {
+            method: 'POST',
+            body: JSON.stringify({
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+                bet,
+            }),
+        });
+    }
+
+    async function getScratchPool(branchId) {
+        const id = branchId || getBranchId();
+        return request('/api/play/rascadito/pool?branch=' + encodeURIComponent(id));
+    }
+
     function formatPesos(n) {
         const sign = n < 0 ? '-' : '';
         return sign + '$' + Math.abs(n).toLocaleString('es-MX', { maximumFractionDigits: 0 });
@@ -150,7 +166,7 @@ const MachineAPI = (function () {
 
     return {
         getMachineNumber, setMachineNumber, getBranchId, setBranchId, inicioUrl, machinePortalUrl,
-        getPortal, getMachine, spinWheel, spinSlot, playRanchoLazo, playLagunaAnzuelo,
+        getPortal, getMachine, spinWheel, spinSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito, getScratchPool,
         formatPesos, requireMachine, wireInicioLinks, apiBase,
     };
 })();

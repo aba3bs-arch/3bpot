@@ -547,6 +547,42 @@ function playMachine(machineId, bet, game, result) {
     return { ...result, balance: m.balance, machine_number: m.number };
 }
 
+function getScratchPrizePool(branchId = null, userId = null) {
+    const retention = (data.settings.retention_percent || 15) / 100;
+    let deposits = 0;
+    let scratchPaid = 0;
+
+    if (userId) {
+        for (const t of data.transactions) {
+            if (t.user_id === userId && t.type === 'cash_sale') deposits += t.amount || 0;
+        }
+        for (const g of data.game_rounds) {
+            if (g.game === 'rascadito' && g.user_id === userId) scratchPaid += g.payout || 0;
+        }
+    } else if (branchId) {
+        const machineIds = new Set(listMachines(branchId).map((m) => m.id));
+        for (const t of data.transactions) {
+            if (t.type !== 'cash_sale') continue;
+            if (t.machine_id && machineIds.has(t.machine_id)) deposits += t.amount || 0;
+            else if (t.branch_id === branchId && t.user_id && !t.machine_id) deposits += t.amount || 0;
+        }
+        for (const g of data.game_rounds) {
+            if (g.game !== 'rascadito') continue;
+            if (g.machine_id && machineIds.has(g.machine_id)) scratchPaid += g.payout || 0;
+        }
+    }
+
+    const poolCap = Math.floor(deposits * (1 - retention));
+    const available = Math.max(0, poolCap - scratchPaid);
+    return {
+        deposits,
+        scratchPaid,
+        poolCap,
+        available,
+        retentionPercent: data.settings.retention_percent || 15,
+    };
+}
+
 /* Transactions */
 function addTransaction(row) {
     const tx = { id: nextId('transactions'), created_at: now(), ...row };
@@ -706,7 +742,7 @@ function createBranch(id, name, password) {
         password_hash: bcrypt.hashSync(finalPwd, 10),
         password_seed: finalPwd === 'sucursal123' ? 'sucursal123' : null,
         password_custom: finalPwd === 'sucursal123' ? 0 : 1,
-        games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'],
+        games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'],
         created_at: now(),
     };
     data.branches.push(branch);
@@ -832,7 +868,7 @@ function unassignCashier(cashierId) {
 
 function getBranchGames(branchId) {
     const branch = findBranchById(branchId);
-    const defaults = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
+    const defaults = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'];
     if (!branch) return defaults;
     if (!Array.isArray(branch.games) || !branch.games.length) {
         branch.games = defaults;
@@ -844,7 +880,7 @@ function getBranchGames(branchId) {
 function setBranchGames(branchId, games) {
     const branch = findBranchById(branchId);
     if (!branch) throw new Error('Sucursal no encontrada');
-    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
+    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'];
     const list = (games || []).filter((g) => allowed.includes(g));
     if (!list.length) throw new Error('Selecciona al menos un juego');
     branch.games = list;
@@ -895,7 +931,7 @@ function ensureDefaultBranches() {
                 active: 1,
                 float_balance: 5000,
                 password_hash: bcrypt.hashSync('sucursal123', 10),
-                games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'],
+                games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito'],
                 created_at: now(),
             });
             added += 1;
@@ -905,8 +941,8 @@ function ensureDefaultBranches() {
         ensureBranchAuth(b);
         if (!Array.isArray(b.games) || !b.games.length) {
             b.games = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
-        } else if (!b.games.includes('laguna-anzuelo')) {
-            b.games = [...b.games, 'laguna-anzuelo'];
+        } else if (!b.games.includes('rascadito')) {
+            b.games = [...b.games, 'rascadito'];
         }
         ensureMachinesForBranch(b.id, 3);
     });
@@ -941,7 +977,7 @@ module.exports = {
     findMachineByNumber, findMachineById, listMachines, listMachinesForCashier,
     createMachine, updateMachine, deleteMachine, setMachineActive, assertCashierMachineAccess,
     creditMachine, creditUser, adjustMachineBalance, playMachine, playUser,
-    getTransactions, getStats,
+    getTransactions, getStats, getScratchPrizePool,
     listBranches, findBranchById, createBranch, updateBranch, deleteBranch, seedBranches, ensureDefaultBranches, branchStats,
     sanitizeBranch, setBranchPassword, topUpBranch, transferAgentToBranch, ensureBranchAuth, assertBranchMachineAccess,
     ensureMachinesForBranch, assignCashierToBranch, unassignCashier, getBranchGames, setBranchGames,
