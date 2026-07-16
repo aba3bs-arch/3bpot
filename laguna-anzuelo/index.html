@@ -3,51 +3,55 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Rancho Lazo — 3B Pot</title>
+  <title>Laguna Anzuelo — 3B Pot</title>
   <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Rye&family=Nunito:wght@600;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <div id="app">
     <header class="hud">
-      <div class="brand">Rancho Lazo</div>
+      <div class="brand">Laguna Anzuelo</div>
       <div class="stats">
         <span>Máq. <strong id="machineLabel">—</strong></span>
         <span>Saldo <strong id="credits">$0</strong></span>
-        <span>Apuesta <strong id="bet">$5</strong></span>
+        <span>Lance <strong id="bet">$5</strong></span>
         <span>Premio <strong id="win">$0</strong></span>
       </div>
     </header>
 
     <div class="paytable">
-      <span class="pay pig">Cerdo ×0.5</span>
-      <span class="pay cow">Vaca ×1.5</span>
-      <span class="pay bull">Toro ×8</span>
+      <span class="pay c25">$0.25</span>
+      <span class="pay c50">$0.50</span>
+      <span class="pay c1">$1</span>
+      <span class="pay c3">$3</span>
+      <span class="pay c5">$5</span>
+      <span class="pay c10">$10</span>
+      <span class="pay piranha">¡Piraña!</span>
     </div>
 
-    <canvas id="game" width="960" height="540" aria-label="Rancho Lazo"></canvas>
+    <canvas id="game" width="960" height="540" aria-label="Laguna Anzuelo"></canvas>
 
     <div class="controls">
       <button type="button" id="betDown" class="ctrl">−</button>
       <button type="button" id="betUp" class="ctrl">+</button>
       <button type="button" id="muteBtn" class="ctrl mute">🔊</button>
       <a class="back-link" href="/inicio/" data-inicio-link>← Máquinas</a>
-      <p class="hint" id="hint">Saldo de máquina · MXN · Toca para lanzar</p>
+      <p class="hint" id="hint">Saldo de máquina · MXN · Toca para lanzar el anzuelo</p>
     </div>
 
     <div class="overlay" id="overlay">
       <div class="panel">
-        <h1 id="title">Rancho Lazo</h1>
+        <h1 id="title">Laguna Anzuelo</h1>
         <p id="subtitle">
-          Tragamonedas de lazo en pesos mexicanos (3B Pot).
-          Cerdo poco · Vaca más · Toro jackpot. Forcejea tocando rápido.
+          Lanza el anzuelo y atrapa peces de colores en pesos MXN (3B Pot).
+          Entre más valioso, más grande y más se resiste. ¡Cuidado con las pirañas: rompen la cuerda y pierdes el lance!
         </p>
         <div class="panel-actions">
           <a class="btn-link" href="/inicio/" data-inicio-link>Elegir máquina</a>
-          <button type="button" id="startBtn">Jugar</button>
+          <button type="button" id="startBtn">Pescar</button>
         </div>
       </div>
     </div>
@@ -55,6 +59,6 @@
   <script src="/shared/machine-client.js"></script>
   <script src="/shared/player-auth.js"></script>
   <script src="js/audio.js"></script>
-  <script src="js/game.js?v=cartoon7"></script>
+  <script src="js/game.js"></script>
 </body>
 </html>

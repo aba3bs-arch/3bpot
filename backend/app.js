@@ -6,6 +6,7 @@ const store = require('./db/store');
 
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const agenteRoutes = require('./routes/agente');
 const cajeroRoutes = require('./routes/cajero');
 const playRoutes = require('./routes/play');
 
@@ -39,13 +40,14 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/agente', agenteRoutes);
 app.use('/api/cajero', cajeroRoutes);
 app.use('/api/play', playRoutes);
 
 if (!isServerless) {
-    const staticDirs = ['shared', 'admin', 'cajero', 'inicio', 'spin-game', 'comic-slot', 'rancho-lazo'];
+    const staticDirs = ['shared', 'admin', 'agente', 'cajero', 'portal', 'inicio', 'spin-game', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
     staticDirs.forEach((dir) => app.use(`/${dir}`, express.static(path.join(ROOT, dir))));
-    app.get('/', (_req, res) => res.redirect('/inicio/'));
+    app.get('/', (_req, res) => res.redirect('/portal/'));
 }
 
 app.use((err, _req, res, _next) => {

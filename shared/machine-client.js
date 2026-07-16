@@ -1,5 +1,5 @@
 /**
- * Cliente para máquinas arcade — sucursal + número de máquina.
+ * Cliente para máquinas arcade — un portal por sucursal (?branch=), número de máquina local.
  */
 const MachineAPI = (function () {
     'use strict';
@@ -24,6 +24,22 @@ const MachineAPI = (function () {
 
     function setBranchId(branchId) {
         localStorage.setItem(BRANCH_KEY, String(branchId));
+    }
+
+    function inicioUrl() {
+        const branch = getBranchId();
+        const num = getMachineNumber();
+        if (!branch) return '/inicio/';
+        let url = '/inicio/?branch=' + encodeURIComponent(branch);
+        if (num) url += '&m=' + encodeURIComponent(num);
+        return url;
+    }
+
+    function machinePortalUrl(branchId, machineNumber) {
+        const branch = branchId || getBranchId();
+        const num = machineNumber || getMachineNumber();
+        if (!branch || !num) return inicioUrl();
+        return '/inicio/?branch=' + encodeURIComponent(branch) + '&m=' + encodeURIComponent(num);
     }
 
     function getMachineNumber() {
@@ -51,9 +67,15 @@ const MachineAPI = (function () {
         return data;
     }
 
+    async function getPortal(branchId) {
+        const branch = branchId || getBranchId();
+        if (!branch) throw new Error('Enlace de sucursal requerido');
+        return request('/api/play/portal?branch=' + encodeURIComponent(branch));
+    }
+
     async function getMachine(number, branchId) {
         const branch = branchId || getBranchId();
-        if (!branch) throw new Error('Selecciona una sucursal');
+        if (!branch) throw new Error('Enlace de sucursal requerido');
         return request('/api/play/machine/' + number + '?branch=' + encodeURIComponent(branch));
     }
 
@@ -90,6 +112,17 @@ const MachineAPI = (function () {
         });
     }
 
+    async function playLagunaAnzuelo(bet, machineNumber, branchId) {
+        return request('/api/play/laguna-anzuelo', {
+            method: 'POST',
+            body: JSON.stringify({
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+                bet,
+            }),
+        });
+    }
+
     function formatPesos(n) {
         const sign = n < 0 ? '-' : '';
         return sign + '$' + Math.abs(n).toLocaleString('es-MX', { maximumFractionDigits: 0 });
@@ -98,15 +131,26 @@ const MachineAPI = (function () {
     function requireMachine() {
         const num = getMachineNumber();
         const branch = getBranchId();
-        if (!num || !branch) {
-            window.location.href = '/inicio/?redirect=' + encodeURIComponent(location.pathname);
+        if (!branch) {
+            window.location.href = '/inicio/';
+            return null;
+        }
+        if (!num) {
+            window.location.href = inicioUrl();
             return null;
         }
         return num;
     }
 
+    function wireInicioLinks() {
+        document.querySelectorAll('[data-inicio-link]').forEach((el) => {
+            el.href = inicioUrl();
+        });
+    }
+
     return {
-        getMachineNumber, setMachineNumber, getBranchId, setBranchId, getMachine,
-        spinWheel, spinSlot, playRanchoLazo, formatPesos, requireMachine, apiBase,
+        getMachineNumber, setMachineNumber, getBranchId, setBranchId, inicioUrl, machinePortalUrl,
+        getPortal, getMachine, spinWheel, spinSlot, playRanchoLazo, playLagunaAnzuelo,
+        formatPesos, requireMachine, wireInicioLinks, apiBase,
     };
 })();

@@ -28,6 +28,11 @@ body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: 
 .hint-login strong { color: var(--gold); }
 
 .header { display: flex; align-items: center; gap: 20px; padding: 20px 28px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.tabs { display: flex; gap: 4px; padding: 12px 28px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.tab { padding: 10px 16px; border: none; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.85rem; }
+.tab.active, .tab:hover { background: rgba(255,213,79,0.12); color: var(--text); }
+.panel .hint { color: var(--muted); margin-bottom: 16px; font-size: 0.9rem; }
+.panel .hint a { color: var(--gold); }
 .header-logo { width: 64px; height: auto; }
 .header h1 { font-size: 1.3rem; }
 .header p { color: var(--muted); font-size: 0.85rem; }

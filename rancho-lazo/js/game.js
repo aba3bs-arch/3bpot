@@ -1,4 +1,5 @@
 (() => {
+  const isPlayerMode = new URLSearchParams(location.search).has('player');
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const creditsEl = document.getElementById("credits");
@@ -20,14 +21,15 @@
   const BETS = [5, 10, 20, 50, 100, 200];
 
   function mxn(n) {
+    if (isPlayerMode) return PlayerAuth.formatPesos(n);
     return MachineAPI.formatPesos(n);
   }
 
   const ANIMAL_TYPES = [
-    { kind: "pig", label: "Cerdo", mult: 0.5, speed: 100, scale: 0.78, resist: 1.5, weight: 72, coat: "#f0a8b0", dark: "#c87888", muzzle: "#e89098", pattern: "solid", horns: false, bull: false, pig: true },
-    { kind: "cow", label: "Vaca", mult: 1.5, speed: 120, scale: 1, resist: 3, weight: 14, coat: "#f4f1ea", dark: "#1a1a1a", muzzle: "#e8b4b8", pattern: "spots", horns: false, bull: false, pig: false },
-    { kind: "cow", label: "Vaca", mult: 1.5, speed: 135, scale: 1.02, resist: 3.2, weight: 11, coat: "#c47a3a", dark: "#8a4e22", muzzle: "#d4a090", pattern: "solid", horns: false, bull: false, pig: false },
-    { kind: "bull", label: "Toro", mult: 8, speed: 195, scale: 1.22, resist: 6.5, weight: 3, coat: "#4a1c12", dark: "#2a0e08", muzzle: "#6a3a30", pattern: "solid", horns: true, bull: true, pig: false },
+    { kind: "pig", label: "Cerdo", mult: 0.5, speed: 100, scale: 0.95, resist: 1.5, weight: 72, coat: "#f0a8b0", dark: "#c87888", muzzle: "#e89098", pattern: "solid", horns: false, bull: false, pig: true },
+    { kind: "cow", label: "Vaca", mult: 1.5, speed: 120, scale: 1.28, resist: 3, weight: 14, coat: "#fff8f0", dark: "#1a1a1a", muzzle: "#e8b4b8", pattern: "spots", horns: false, bull: false, pig: false },
+    { kind: "cow", label: "Vaca", mult: 1.5, speed: 135, scale: 1.3, resist: 3.2, weight: 11, coat: "#d4893a", dark: "#6a3a18", muzzle: "#d4a090", pattern: "solid", horns: false, bull: false, pig: false },
+    { kind: "bull", label: "Toro", mult: 8, speed: 195, scale: 1.45, resist: 6.5, weight: 3, coat: "#3a120a", dark: "#1a0804", muzzle: "#6a3a30", pattern: "solid", horns: true, bull: true, pig: false },
   ];
 
   let credits = 0;
@@ -46,6 +48,8 @@
     shake: 0,
     horseBob: 0,
     lastWin: 0,
+    playerPose: "arena",
+    celebrateTimer: 0,
   };
 
   function bet() { return BETS[betIndex]; }
@@ -128,8 +132,28 @@
   }
 
   async function loadBalance() {
+    if (isPlayerMode) {
+      if (!PlayerAuth.isLoggedIn()) {
+        window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
+        return;
+      }
+      if (machineLabel) machineLabel.textContent = PlayerAuth.getUser()?.name || 'Jugador';
+      try {
+        const data = await PlayerAuth.request('/api/auth/me');
+        credits = data.user.game_balance || 0;
+        refreshHud();
+        hintEl.textContent = "Saldo de jugador · Toca para lanzar";
+      } catch (err) {
+        hintEl.textContent = err.message || "Error al cargar saldo";
+        titleEl.textContent = "Sin sesión";
+        subtitleEl.textContent = err.message || "Inicia sesión en el portal";
+        overlay.classList.remove("hidden");
+      }
+      return;
+    }
     machineNumber = MachineAPI.requireMachine();
     if (!machineNumber) return;
+    if (MachineAPI.wireInicioLinks) MachineAPI.wireInicioLinks();
     try {
       const data = await MachineAPI.getMachine(machineNumber);
       credits = data.balance;
@@ -153,15 +177,15 @@
       return;
     }
     if (state.lassos.some((l) => !l.done)) return;
-    if (!machineNumber) {
+    if (!isPlayerMode && !machineNumber) {
       hintEl.textContent = "Selecciona máquina en Inicio";
       return;
     }
     if (credits < bet()) {
-      hintEl.textContent = "Saldo insuficiente — pide recarga al cajero";
+      hintEl.textContent = "Saldo insuficiente — recarga en el panel de sucursal";
       overlay.classList.remove("hidden");
       titleEl.textContent = "Sin saldo";
-      subtitleEl.textContent = "Pide recarga al cajero de tu sucursal.";
+      subtitleEl.textContent = "Pide recarga en la sucursal (panel de caja).";
       startBtn.textContent = "Reintentar";
       return;
     }
@@ -169,7 +193,9 @@
     busy = true;
     const betUsed = bet();
     try {
-      const result = await MachineAPI.playRanchoLazo(betUsed);
+      const result = isPlayerMode
+        ? await PlayerAuth.playRanchoLazo(betUsed)
+        : await MachineAPI.playRanchoLazo(betUsed);
       credits = result.balance;
       state.lastWin = result.payout || 0;
       refreshHud();
@@ -188,6 +214,8 @@
         escape: 0,
         tugFlash: 0,
         ropeStretch: 0,
+        bornAt: performance.now(),
+        snapPieces: null,
         betUsed,
         serverResult: result,
       };
@@ -241,7 +269,7 @@
     lasso.ropeStretch = 0;
     state.shake = 4;
     playAnimalSound(animal);
-    hintEl.textContent = "¡Se resiste! Toca rápido para jalar";
+    hintEl.textContent = "¡Se resiste! Toca rápido — el lazo se rompe a los 5s";
     state.pops.push({ x: animal.x + animal.w / 2, y: animal.y - 8, text: "¡Forcejeo!", life: 0.9 });
     spawnDust(animal, 6);
   }
@@ -282,6 +310,15 @@
       if (animal.bull) AudioFX.winBig();
       else AudioFX.coin();
     }
+    state.playerPose = "celebrate";
+    state.celebrateTimer = 3.2;
+    state.pops.push({
+      x: W * 0.5,
+      y: H - 210,
+      text: "¡OLE!",
+      life: 1.4,
+      cheer: true,
+    });
   }
 
   function breakFree(animal, lasso) {
@@ -307,9 +344,49 @@
     AudioFX && (sr.missed ? AudioFX.miss() : AudioFX.escape());
   }
 
+  const LASSO_TIMEOUT_MS = 5000;
+
+  function snapLasso(lasso, reason) {
+    if (lasso.phase === "snap" || lasso.done) return;
+    const animal = lasso.catchId;
+    const hand = getPlayerHand();
+    const handX = hand.x;
+    const handY = hand.y;
+    const tipX = lasso.x;
+    const tipY = lasso.y;
+    lasso.snapPieces = [
+      { x: handX, y: handY, vx: rand(-40, 40), vy: rand(-120, -40), rot: 0, vr: rand(-4, 4), life: 0.9 },
+      { x: (handX + tipX) / 2, y: (handY + tipY) / 2 - 20, vx: rand(-80, 80), vy: rand(-60, 20), rot: 0, vr: rand(-6, 6), life: 1 },
+      { x: tipX, y: tipY, vx: rand(-100, 100), vy: rand(-40, 60), rot: 0, vr: rand(-5, 5), life: 1.1 },
+    ];
+    if (animal) {
+      animal.caught = false;
+      animal.struggle = false;
+      animal.shakeAmp = 0;
+      animal.vx = (animal.x + animal.w / 2 < W * 0.5 ? -1 : 1) * Math.abs(animal.vx || animal.speed) * 1.8;
+      spawnDust(animal, 10);
+      state.pops.push({
+        x: animal.x + animal.w / 2,
+        y: animal.y - 8,
+        text: "¡Se rompió!",
+        life: 1.1,
+      });
+    } else {
+      state.pops.push({ x: tipX, y: tipY, text: "¡Se rompió!", life: 1 });
+    }
+    lasso.phase = "snap";
+    lasso.progress = 0;
+    lasso.catchId = null;
+    state.lastWin = 0;
+    refreshHud();
+    hintEl.textContent = reason || "¡El lazo se rompió! Apuesta perdida";
+    state.shake = 9;
+    AudioFX && AudioFX.escape();
+  }
+
   function startGame() {
     AudioFX && AudioFX.unlock();
-    if (!machineNumber) {
+    if (!isPlayerMode && !machineNumber) {
       loadBalance();
       return;
     }
@@ -331,13 +408,10 @@
     overlay.classList.add("hidden");
     hintEl.textContent = `Toca para lanzar (cuesta ${mxn(bet())})`;
     spawnAnimal();
-    requestAnimationFrame(loop);
+    AudioFX && AudioFX.crowdCheer && AudioFX.crowdCheer();
   }
 
   function update(dt) {
-    state.horseBob += dt * 4;
-    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 30);
-
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
       spawnAnimal();
@@ -366,6 +440,13 @@
 
     for (const l of state.lassos) {
       if (l.done) continue;
+
+      // Lazo se rompe si no atrapa en 5 segundos
+      if ((l.phase === "throw" || l.phase === "struggle") && l.bornAt && performance.now() - l.bornAt >= LASSO_TIMEOUT_MS) {
+        snapLasso(l, "¡Se acabó el tiempo! El lazo se rompió");
+        continue;
+      }
+
       if (l.phase === "throw") {
         l.progress += dt * 3.2;
         const t = Math.min(1, l.progress);
@@ -428,12 +509,22 @@
         const t = Math.min(1, l.progress);
         l.y = (l.ty || 285) + (H - 70 - (l.ty || 285)) * t;
         if (t >= 1) l.done = true;
+      } else if (l.phase === "snap") {
+        l.progress += dt;
+        if (l.snapPieces) {
+          for (const p of l.snapPieces) {
+            p.life -= dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy += 280 * dt;
+            p.rot += p.vr * dt;
+          }
+        }
+        if (l.progress >= 1.2) l.done = true;
       }
     }
     state.lassos = state.lassos.filter((l) => !l.done);
 
-    for (const p of state.pops) p.life -= dt;
-    state.pops = state.pops.filter((p) => p.life > 0);
     for (const d of state.dust) {
       d.life -= dt;
       d.x += d.vx * dt;
@@ -529,21 +620,133 @@
     ctx.font = "bold 11px Nunito, sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("RANCHO", 92, 118);
-    drawSpectator(280, 155, "#c45c26");
-    drawSpectator(330, 158, "#2f5d8a");
-    drawSpectator(380, 154, "#8b4513");
-    drawSpectator(700, 156, "#4a6741");
+    drawSpectator(275, 152, "#e85d2c", "#f5c518", 0, "cheer");
+    drawSpectator(328, 156, "#3a7bd5", "#fff", 1.1, "clap");
+    drawSpectator(382, 150, "#8b4513", "#e8b84a", 2.2, "wave");
+    drawSpectator(705, 154, "#4a9e4a", "#ff6b6b", 0.6, "cheer");
   }
 
-  function drawSpectator(x, y, shirt) {
-    ctx.fillStyle = "#f0d2b0";
-    ctx.beginPath();
-    ctx.arc(x, y - 18, 9, 0, Math.PI * 2);
+  function fillStrokePath(fill, stroke, lw) {
+    ctx.fillStyle = fill;
     ctx.fill();
-    ctx.fillStyle = shirt;
-    ctx.fillRect(x - 10, y - 8, 20, 28);
-    ctx.fillStyle = "#3d2a1a";
-    ctx.fillRect(x - 12, y - 28, 24, 8);
+    ctx.strokeStyle = stroke || "#2a1810";
+    ctx.lineWidth = lw == null ? 2.2 : lw;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
+
+  function drawSpectator(x, y, shirt, accent, phaseOff, pose) {
+    const bob = Math.sin(state.horseBob * 2.2 + phaseOff) * 4;
+    const clap = Math.sin(state.horseBob * 8 + phaseOff); // aplauso rápido
+    const cy = y + bob;
+    const skin = "#f2c49a";
+    const outline = "#2a1810";
+    const yell = Math.sin(state.horseBob * 3 + phaseOff) > 0.2;
+
+    ctx.fillStyle = "rgba(0,0,0,0.16)";
+    ctx.beginPath();
+    ctx.ellipse(x, y + 24, 18, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    roundRect(x - 12, cy + 14, 10, 12, 3);
+    fillStrokePath("#3d2a1a", outline, 1.8);
+    ctx.beginPath();
+    roundRect(x + 2, cy + 14, 10, 12, 3);
+    fillStrokePath("#3d2a1a", outline, 1.8);
+
+    ctx.beginPath();
+    roundRect(x - 11, cy + 2, 9, 16, 3);
+    fillStrokePath("#4a3424", outline, 1.6);
+    ctx.beginPath();
+    roundRect(x + 2, cy + 2, 9, 16, 3);
+    fillStrokePath("#4a3424", outline, 1.6);
+
+    ctx.beginPath();
+    ctx.ellipse(x, cy - 8, 16, 18, 0, 0, Math.PI * 2);
+    fillStrokePath(shirt, outline, 2);
+
+    // Brazos aplaudiendo / gritando (movimiento grande)
+    let armL; let armR;
+    if (pose === "clap" || pose === "cheer") {
+      armL = -1.1 + clap * 0.55;
+      armR = 1.1 - clap * 0.55;
+    } else if (pose === "wave") {
+      armL = -0.4;
+      armR = -1.4 + Math.sin(state.horseBob * 6 + phaseOff) * 0.6;
+    } else {
+      armL = -0.7 + clap * 0.2;
+      armR = 0.7 - clap * 0.2;
+    }
+
+    ctx.save();
+    ctx.translate(x - 14, cy - 12);
+    ctx.rotate(armL);
+    ctx.beginPath();
+    roundRect(-4, 0, 8, 22, 4);
+    fillStrokePath(shirt, outline, 1.6);
+    ctx.beginPath();
+    ctx.arc(0, 22, 6, 0, Math.PI * 2);
+    fillStrokePath(skin, outline, 1.5);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(x + 14, cy - 12);
+    ctx.rotate(armR);
+    ctx.beginPath();
+    roundRect(-4, 0, 8, 22, 4);
+    fillStrokePath(shirt, outline, 1.6);
+    ctx.beginPath();
+    ctx.arc(0, 22, 6, 0, Math.PI * 2);
+    fillStrokePath(skin, outline, 1.5);
+    ctx.restore();
+
+    const headY = cy - 32;
+    ctx.beginPath();
+    ctx.arc(x, headY, 16, 0, Math.PI * 2);
+    fillStrokePath(skin, outline, 2.2);
+
+    // ojos
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.ellipse(x - 5.5, headY - 2, 5, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 5.5, headY - 2, 5, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = "#1a1008";
+    ctx.beginPath();
+    ctx.arc(x - 4, headY - 1, 2.4, 0, Math.PI * 2);
+    ctx.arc(x + 7, headY - 1, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // boca abierta gritando
+    if (yell) {
+      ctx.beginPath();
+      ctx.ellipse(x, headY + 7, 5, 6, 0, 0, Math.PI * 2);
+      fillStrokePath("#5a2018", outline, 1.5);
+      ctx.fillStyle = "#f5c518";
+      ctx.beginPath();
+      ctx.ellipse(x, headY + 9, 3, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = "#c45c40";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(x, headY + 5, 6, 0.15, Math.PI - 0.15);
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.ellipse(x, headY - 12, 24, 6, 0, 0, Math.PI * 2);
+    fillStrokePath("#3d2a1a", outline, 2);
+    ctx.beginPath();
+    roundRect(x - 11, headY - 30, 22, 18, 4);
+    fillStrokePath("#5c3d28", outline, 2);
+    ctx.fillStyle = accent;
+    ctx.fillRect(x - 11, headY - 16, 22, 3.5);
   }
 
   function drawAnimal(a) {
@@ -679,6 +882,9 @@
     ctx.bezierCurveTo(-52 * s, 8 * s + by, -50 * s, 4 * s + by, -48 * s, by);
     ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = "#2a1810";
+    ctx.lineWidth = 2.4 * s;
+    ctx.stroke();
 
     ctx.fillStyle = "rgba(0,0,0,0.08)";
     ctx.beginPath();
@@ -834,11 +1040,29 @@
   }
 
   function drawLasso(l) {
-    const handX = W * 0.5;
-    const handY = H - 78 + Math.sin(state.horseBob) * 2;
+    if (l.phase === "snap") {
+      drawSnappedRope(l);
+      return;
+    }
+
+    const hand = getPlayerHand();
+    const handX = hand.x;
+    const handY = hand.y;
     const stretch = l.ropeStretch || 0;
     const tense = l.phase === "struggle";
     const flash = (l.tugFlash || 0) > 0;
+
+    // aviso de tiempo restante
+    if ((l.phase === "throw" || l.phase === "struggle") && l.bornAt) {
+      const left = Math.max(0, LASSO_TIMEOUT_MS - (performance.now() - l.bornAt));
+      if (left < 2000) {
+        const secs = (left / 1000).toFixed(1);
+        ctx.fillStyle = left < 1000 ? "#ff4a3a" : "#ffb020";
+        ctx.font = "800 16px Nunito, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(secs + "s", W * 0.5, H - 130);
+      }
+    }
 
     ctx.strokeStyle = flash ? "#ffe08a" : tense ? "#b8860b" : "#d4a017";
     ctx.lineWidth = tense ? 4.5 : 3;
@@ -865,6 +1089,35 @@
     ctx.stroke();
 
     if (tense && l.gripMax) drawStruggleBar(l);
+  }
+
+  function drawSnappedRope(l) {
+    if (!l.snapPieces) return;
+    for (const p of l.snapPieces) {
+      if (p.life <= 0) continue;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.strokeStyle = "#c9922a";
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-14, 0);
+      ctx.quadraticCurveTo(0, -6, 14, 2);
+      ctx.stroke();
+      // punta deshilachada
+      ctx.strokeStyle = "#a87820";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(12, 0);
+      ctx.lineTo(18, -4);
+      ctx.moveTo(12, 2);
+      ctx.lineTo(17, 6);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
   }
 
   function drawStruggleBar(l) {
@@ -895,41 +1148,222 @@
     ctx.fillText("¡JALA!", bx, by - 4);
   }
 
-  function drawPlayer() {
-    const bob = Math.sin(state.horseBob) * 3;
-    const cx = W * 0.5;
-    const cy = H - 20 + bob;
-    ctx.fillStyle = "#6b4226";
-    ctx.beginPath();
-    ctx.ellipse(cx - 55, cy - 30, 42, 28, -0.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#5a351c";
-    ctx.beginPath();
-    ctx.ellipse(cx - 90, cy - 28, 18, 12, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#111";
-    ctx.beginPath();
-    ctx.arc(cx - 78, cy - 34, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#c45c26";
-    ctx.fillRect(cx - 8, cy - 70, 18, 40);
-    ctx.fillStyle = "#e8c4a0";
-    ctx.beginPath();
-    ctx.arc(cx + 8, cy - 78, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#3d2a1a";
-    ctx.fillRect(cx - 18, cy - 100, 40, 8);
-    ctx.fillRect(cx - 6, cy - 118, 18, 20);
-    if (!state.lassos.length) {
-      ctx.strokeStyle = "#d4a017";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.ellipse(cx + 18, cy - 88, 22, 12, 0.3, 0, Math.PI * 2);
-      ctx.stroke();
+  function getPlayerHand() {
+    const bob = Math.sin(state.horseBob) * 2.5;
+    if (state.playerPose === "celebrate") {
+      const waveLift = Math.sin(state.horseBob * 7) * 14;
+      return { x: W * 0.5 - 40, y: H - 168 + bob - waveLift };
     }
+    // Mano del lazo hacia el corral (arriba)
+    return { x: W * 0.5 + 8, y: H - 168 + bob };
   }
 
-  function drawFx() {
+  /** Vaquero de espaldas al público, mirando al corral/vacas. En celebra se gira y saluda. */
+  function drawCowboyFacingCows(opts) {
+    const celebrate = !!(opts && opts.celebrate);
+    const bob = Math.sin(state.horseBob * (celebrate ? 3 : 2.1)) * (celebrate ? 5 : 2.8);
+    const armSway = Math.sin(state.horseBob * 2.2) * 0.18;
+    const wave = Math.sin(state.horseBob * 8) * 0.65;
+    const cx = W * 0.5;
+    const cy = H - 6 + bob;
+    const outline = "#2a1810";
+    const skin = "#f2c49a";
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath();
+    ctx.ellipse(0, 10, 48, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (celebrate) {
+      // Frente al público, ovacionando
+      ctx.beginPath();
+      roundRect(-18, -36, 14, 28, 5);
+      fillStrokePath("#3d2a1a", outline, 2);
+      ctx.beginPath();
+      roundRect(4, -36, 14, 28, 5);
+      fillStrokePath("#3d2a1a", outline, 2);
+      ctx.beginPath();
+      roundRect(-20, -16, 18, 10, 4);
+      fillStrokePath("#1a1008", outline, 1.8);
+      ctx.beginPath();
+      roundRect(2, -16, 18, 10, 4);
+      fillStrokePath("#1a1008", outline, 1.8);
+
+      ctx.beginPath();
+      ctx.ellipse(0, -52, 28, 30, 0, 0, Math.PI * 2);
+      fillStrokePath("#ff7a3a", outline, 2.4);
+      ctx.fillStyle = "#5c3d28";
+      ctx.fillRect(-24, -38, 48, 8);
+      ctx.fillStyle = "#f5c518";
+      ctx.fillRect(-7, -39, 14, 10);
+
+      // Brazos arriba saludando
+      ctx.save();
+      ctx.translate(-26, -68);
+      ctx.rotate(-1.55 + wave);
+      ctx.beginPath();
+      roundRect(-6, -34, 13, 36, 6);
+      fillStrokePath("#ff7a3a", outline, 2);
+      ctx.beginPath();
+      ctx.arc(1, -36, 9, 0, Math.PI * 2);
+      fillStrokePath(skin, outline, 1.8);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(26, -68);
+      ctx.rotate(1.55 - wave);
+      ctx.beginPath();
+      roundRect(-7, -34, 13, 36, 6);
+      fillStrokePath("#ff7a3a", outline, 2);
+      ctx.beginPath();
+      ctx.arc(0, -36, 9, 0, Math.PI * 2);
+      fillStrokePath(skin, outline, 1.8);
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.arc(0, -92, 24, 0, Math.PI * 2);
+      fillStrokePath(skin, outline, 2.4);
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.ellipse(-8, -94, 7.5, 8.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(8, -94, 7.5, 8.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#1a1008";
+      ctx.beginPath();
+      ctx.arc(-6, -93, 3.4, 0, Math.PI * 2);
+      ctx.arc(10, -93, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#c45c40";
+      ctx.lineWidth = 2.8;
+      ctx.beginPath();
+      ctx.arc(0, -84, 9, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(0, -108, 44, 11, 0, 0, Math.PI * 2);
+      fillStrokePath("#3d2a1a", outline, 2.4);
+      ctx.beginPath();
+      roundRect(-18, -136, 36, 32, 7);
+      fillStrokePath("#5c3d28", outline, 2.2);
+      ctx.fillStyle = "#f5c518";
+      ctx.fillRect(-18, -112, 36, 5);
+
+      ctx.fillStyle = "#f5c518";
+      ctx.font = "900 18px Nunito, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("¡OLE!", 0, -148);
+      ctx.fillText("👏", -42, -120);
+      ctx.fillText("👏", 42, -120);
+    } else {
+      // De espaldas, mirando al corral (arriba)
+      ctx.beginPath();
+      roundRect(-16, -34, 13, 26, 5);
+      fillStrokePath("#2e1f14", outline, 2);
+      ctx.beginPath();
+      roundRect(3, -34, 13, 26, 5);
+      fillStrokePath("#2e1f14", outline, 2);
+      ctx.beginPath();
+      roundRect(-18, -16, 17, 10, 4);
+      fillStrokePath("#14100a", outline, 1.8);
+      ctx.beginPath();
+      roundRect(1, -16, 17, 10, 4);
+      fillStrokePath("#14100a", outline, 1.8);
+
+      // torso de espalda
+      ctx.beginPath();
+      ctx.ellipse(0, -54, 27, 29, 0, 0, Math.PI * 2);
+      fillStrokePath("#e86a2e", outline, 2.4);
+      // pliegues espalda
+      ctx.strokeStyle = "rgba(0,0,0,0.18)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -78);
+      ctx.quadraticCurveTo(-2, -54, 0, -30);
+      ctx.stroke();
+      ctx.fillStyle = "#5c3d28";
+      ctx.fillRect(-24, -40, 48, 8);
+      ctx.fillStyle = "#f5c518";
+      ctx.fillRect(-6, -41, 12, 10);
+
+      // brazo izquierdo (lazo) levantado hacia vacas
+      ctx.save();
+      ctx.translate(-24, -70);
+      ctx.rotate(-0.95 + armSway);
+      ctx.beginPath();
+      roundRect(-7, -8, 13, 34, 6);
+      fillStrokePath("#e86a2e", outline, 2);
+      ctx.beginPath();
+      ctx.arc(0, -10, 8, 0, Math.PI * 2);
+      fillStrokePath(skin, outline, 1.8);
+      // lazo
+      if (!state.lassos.length) {
+        ctx.strokeStyle = "#d4a017";
+        ctx.lineWidth = 3.6;
+        ctx.beginPath();
+        ctx.ellipse(2, -28, 16, 10, -0.4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(2, -28, 9, 5.5, -0.4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // brazo derecho
+      ctx.save();
+      ctx.translate(24, -66);
+      ctx.rotate(0.55 - armSway * 0.5);
+      ctx.beginPath();
+      roundRect(-6, 0, 12, 28, 6);
+      fillStrokePath("#e86a2e", outline, 2);
+      ctx.beginPath();
+      ctx.arc(0, 28, 7, 0, Math.PI * 2);
+      fillStrokePath(skin, outline, 1.8);
+      ctx.restore();
+
+      // cabeza vista de 3/4 desde atrás (mirando arriba/corral)
+      ctx.beginPath();
+      ctx.arc(2, -96, 22, 0, Math.PI * 2);
+      fillStrokePath(skin, outline, 2.4);
+      // oreja
+      ctx.beginPath();
+      ctx.ellipse(20, -96, 5, 8, 0.2, 0, Math.PI * 2);
+      fillStrokePath(skin, outline, 1.5);
+      // perfil: un ojo mirando al corral
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.ellipse(10, -98, 5.5, 6.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = "#1a1008";
+      ctx.beginPath();
+      ctx.arc(12, -97, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // sombrero
+      ctx.beginPath();
+      ctx.ellipse(0, -112, 40, 10, 0, 0, Math.PI * 2);
+      fillStrokePath("#3d2a1a", outline, 2.4);
+      ctx.beginPath();
+      roundRect(-16, -138, 32, 28, 6);
+      fillStrokePath("#5c3d28", outline, 2.2);
+      ctx.fillStyle = "#f5c518";
+      ctx.fillRect(-16, -116, 32, 5);
+    }
+
+    ctx.restore();
+  }
+
+  function drawPlayer() {
+    drawCowboyFacingCows({ celebrate: state.playerPose === "celebrate" });
+  }
+
+  function drawFx()
+ {
     for (const d of state.dust) {
       ctx.globalAlpha = Math.max(0, d.life);
       ctx.fillStyle = "#c4a574";
@@ -939,11 +1373,20 @@
       ctx.globalAlpha = 1;
     }
     for (const p of state.pops) {
-      ctx.globalAlpha = Math.max(0, p.life);
-      ctx.fillStyle = p.text.startsWith("+") ? "#2d6a1e" : "#8b1e1e";
-      ctx.font = "800 22px Nunito, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(p.text, p.x, p.y - (1 - p.life) * 30);
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+      if (p.cheer) {
+        ctx.fillStyle = "#f5c518";
+        ctx.font = "900 18px Nunito, sans-serif";
+        ctx.strokeStyle = "#2a1810";
+        ctx.lineWidth = 3;
+        const ty = p.y - (1 - p.life) * 24;
+        ctx.strokeText(p.text, p.x, ty);
+        ctx.fillText(p.text, p.x, ty);
+      } else {
+        ctx.fillStyle = p.text.startsWith("+") ? "#2d6a1e" : "#8b1e1e";
+        ctx.font = "800 22px Nunito, sans-serif";
+        ctx.fillText(p.text, p.x, p.y - (1 - p.life) * 30);
+      }
       ctx.globalAlpha = 1;
     }
   }
@@ -964,17 +1407,53 @@
     ctx.restore();
   }
 
+  let cheerTimer = 0;
+  const CHEERS = ["¡OLE!", "¡YA!", "¡BRAVO!", "¡VAMOS!", "¡ÉCHALE!"];
+
   function loop(ts) {
-    if (!state.running) {
-      draw();
-      return;
-    }
     if (!state.lastTs) state.lastTs = ts;
     const dt = Math.min(0.033, (ts - state.lastTs) / 1000);
     state.lastTs = ts;
-    update(dt);
+
+    // Siempre anima vaquero + público (aunque no esté jugando)
+    state.horseBob += dt * (state.running ? 4.5 : 3.2);
+    if (state.celebrateTimer > 0) {
+      state.celebrateTimer -= dt;
+      if (state.celebrateTimer <= 0) state.playerPose = "arena";
+    }
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 30);
+
+    cheerTimer -= dt;
+    if (cheerTimer <= 0) {
+      cheerTimer = rand(1.4, 2.8);
+      const sx = rand(260, 400);
+      state.pops.push({
+        x: sx,
+        y: 120,
+        text: CHEERS[Math.floor(Math.random() * CHEERS.length)],
+        life: 1.1,
+        cheer: true,
+      });
+      if (Math.random() < 0.45) {
+        state.pops.push({
+          x: rand(680, 740),
+          y: 125,
+          text: CHEERS[Math.floor(Math.random() * CHEERS.length)],
+          life: 1,
+          cheer: true,
+        });
+      }
+      if (state.running && AudioFX && AudioFX.crowdCheer && Math.random() < 0.35) {
+        AudioFX.crowdCheer();
+      }
+    }
+
+    for (const p of state.pops) p.life -= dt;
+    state.pops = state.pops.filter((p) => p.life > 0);
+
+    if (state.running) update(dt);
     draw();
-    if (state.running) requestAnimationFrame(loop);
+    requestAnimationFrame(loop);
   }
 
   canvas.addEventListener("pointerdown", (e) => {

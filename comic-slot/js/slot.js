@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    const isPlayerMode = new URLSearchParams(location.search).has('player');
+
     const INITIAL_BALANCE = 0;
     const MIN_BET = 5;
     const MAX_BET = 500;
@@ -107,10 +109,31 @@
     const paylineEls = PAYLINES.map((p) => document.querySelector('.' + p.cls));
 
     function formatMoney(n) {
+        if (isPlayerMode) return PlayerAuth.formatPesos(n);
         return MachineAPI.formatPesos(n);
     }
 
     async function loadBalance() {
+        if (isPlayerMode) {
+            if (!PlayerAuth.isLoggedIn()) {
+                window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
+                return;
+            }
+            const machineNumEl = document.getElementById('machineNum');
+            if (machineNumEl) machineNumEl.textContent = PlayerAuth.getUser()?.name || 'Jugador';
+            try {
+                const data = await PlayerAuth.request('/api/auth/me');
+                balance = data.user.game_balance || 0;
+                minBet = MIN_BET;
+                maxBet = MAX_BET;
+                sessionStartBalance = balance;
+                updateBalanceUI();
+                setBet(currentBet);
+            } catch (err) {
+                showToast(err.message || 'Error al cargar saldo', 'lose');
+            }
+            return;
+        }
         machineNumber = MachineAPI.requireMachine();
         if (!machineNumber) return;
         const machineNumEl = document.getElementById('machineNum');
@@ -354,7 +377,9 @@
         setHostMessage('¡Girando... agarraos! 🌀');
 
         try {
-            const apiResult = await MachineAPI.spinSlot(bet, machineNumber);
+            const apiResult = isPlayerMode
+                ? await PlayerAuth.playComicSlot(bet)
+                : await MachineAPI.spinSlot(bet, machineNumber);
             totalSpins++;
             updateStatsUI();
 
@@ -584,10 +609,19 @@
         if (!isSpinning) setHostMessage(randomFrom(HOST_IDLE));
     }, 8000);
 
-    if (!MachineAPI.getMachineNumber()) {
+    if (isPlayerMode) {
+        if (!PlayerAuth.isLoggedIn()) {
+            window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
+            return;
+        }
+        const portalLink = document.querySelector('.header__portal');
+        if (portalLink) portalLink.href = '/portal/';
+    } else if (!MachineAPI.getMachineNumber()) {
         MachineAPI.requireMachine();
         return;
     }
+    const portalLink = document.querySelector('.header__portal');
+    if (portalLink) portalLink.href = MachineAPI.inicioUrl();
 
     buildLegend();
     buildLights();

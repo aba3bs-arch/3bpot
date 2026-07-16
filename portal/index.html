@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Las 3B — Portal de juegos</title>
+    <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/portal.css">
+</head>
+<body class="portal-body">
+    <div id="loginScreen" class="login-screen">
+        <form id="loginForm" class="login-box">
+            <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo">
+            <h1>Portal de juegos</h1>
+            <p>Entra con tu usuario para jugar</p>
+            <label>Usuario<input type="text" name="username" autocomplete="username" required></label>
+            <label>Contraseña<input type="password" name="password" autocomplete="current-password" required></label>
+            <button type="submit">Entrar</button>
+            <p class="error" id="loginError" hidden></p>
+            <p class="hint-login">¿Eres personal? <a href="/cajero/">Caja</a> · <a href="/agente/">Agente</a> · <a href="/admin/">Admin</a></p>
+        </form>
+    </div>
+
+    <div id="app" class="app" hidden>
+        <header class="header">
+            <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="header-logo">
+            <div>
+                <h1>Hola, <span id="playerName">Jugador</span></h1>
+                <p>Elige un juego</p>
+            </div>
+            <div class="balance-box">
+                <span class="balance-label">Tu saldo</span>
+                <span class="balance-val" id="playerBalance">$0</span>
+            </div>
+            <button type="button" id="logoutBtn" class="btn-logout">Salir</button>
+        </header>
+        <main class="main">
+            <h2>Juegos</h2>
+            <div class="game-grid">
+                <a class="game-card" href="/spin-game/?player=1"><span class="icon">🎡</span><span class="name">Ruleta</span></a>
+                <a class="game-card" href="/comic-slot/?player=1"><span class="icon">🎰</span><span class="name">Comic Slot</span></a>
+                <a class="game-card" href="/rancho-lazo/?player=1"><span class="icon">🤠</span><span class="name">Rancho Lazo</span></a>
+                <a class="game-card" href="/laguna-anzuelo/?player=1"><span class="icon">🎣</span><span class="name">Laguna Anzuelo</span></a>
+            </div>
+            <p class="footer-links">Máquina física: pide el enlace en caja</p>
+        </main>
+    </div>
+    <div class="toast" id="toast" hidden></div>
+    <script src="/shared/player-auth.js"></script>
+    <script src="js/portal.js"></script>
+</body>
+</html>

@@ -81,7 +81,7 @@ function getSettings() { return { ...data.settings }; }
 
 function setSettings(updates) {
     if (updates.retention_percent != null) {
-        data.settings.retention_percent = Math.max(5, Math.min(45, parseInt(updates.retention_percent, 10)));
+        data.settings.retention_percent = Math.max(5, Math.min(70, parseInt(updates.retention_percent, 10)));
     }
     if (updates.min_bet != null) data.settings.min_bet = parseInt(updates.min_bet, 10);
     if (updates.max_bet != null) data.settings.max_bet = parseInt(updates.max_bet, 10);
@@ -90,20 +90,45 @@ function setSettings(updates) {
 }
 
 /* Users */
-function findUserByEmail(email) {
-    return data.users.find((u) => u.email === email.toLowerCase()) || null;
+function normalizeUsername(raw) {
+    return String(raw || '').trim().toLowerCase().replace(/\s+/g, '');
 }
+
+function userLoginKey(u) {
+    if (u.username) return normalizeUsername(u.username);
+    if (u.email) return normalizeUsername(u.email.includes('@') ? u.email.split('@')[0] : u.email);
+    return '';
+}
+
+function findUserByEmail(email) {
+    const key = String(email || '').trim().toLowerCase();
+    return data.users.find((u) => (u.email || '').toLowerCase() === key) || null;
+}
+
+function findUserByUsername(username) {
+    const key = normalizeUsername(username);
+    if (!key) return null;
+    return data.users.find((u) => {
+        if (userLoginKey(u) === key) return true;
+        if ((u.email || '').toLowerCase() === key) return true;
+        return false;
+    }) || null;
+}
+
 function findUserById(id) { return data.users.find((u) => u.id === id) || null; }
 
-function createUser(email, passwordHash, name, role = 'cashier', branchId = null) {
+function createUser(username, passwordHash, name, role = 'cashier', branchId = null, parentId = null) {
     const user = {
         id: nextId('users'),
-        email: email.toLowerCase(),
+        username: normalizeUsername(username),
+        email: null,
         password_hash: passwordHash,
         name: String(name).trim(),
         role,
         branch_id: branchId || null,
-        float_balance: role === 'cashier' ? 0 : 0,
+        parent_id: parentId || null,
+        float_balance: ['cashier', 'agent'].includes(role) ? 0 : 0,
+        game_balance: role === 'user' ? 0 : 0,
         active: 1,
         created_at: now(),
     };
@@ -112,17 +137,96 @@ function createUser(email, passwordHash, name, role = 'cashier', branchId = null
     return user;
 }
 
-function listCashiers() {
-    return data.users.filter((u) => u.role === 'cashier').map(sanitizeUser);
+function listCashiers(branchId = null) {
+    let list = data.users.filter((u) => u.role === 'cashier');
+    if (branchId) list = list.filter((u) => u.branch_id === branchId);
+    return list.map(sanitizeUser);
+}
+
+function listAgents() {
+    return data.users.filter((u) => u.role === 'agent').map(sanitizeUser);
+}
+
+function listPlayers(filter = {}) {
+    let list = data.users.filter((u) => u.role === 'user');
+    if (filter.cashierId) list = list.filter((u) => u.parent_id === filter.cashierId);
+    if (filter.branchId) list = list.filter((u) => u.branch_id === filter.branchId);
+    return list.map(sanitizeUser);
+}
+
+function createPlayer(username, password, name, opts = {}) {
+    const key = normalizeUsername(username);
+    if (!key || key.length < 3) throw new Error('Usuario mínimo 3 caracteres');
+    if (!/^[a-z0-9._-]{3,32}$/.test(key)) {
+        throw new Error('Usuario: 3-32 caracteres (letras, números, . _ -)');
+    }
+    if (findUserByUsername(key)) throw new Error('Usuario ya registrado');
+    const display = String(name || key).trim();
+    if (!display) throw new Error('Nombre requerido');
+    const pwd = String(password || '').trim();
+    const finalPwd = pwd.length >= 6 ? pwd : 'jugador123';
+    const user = createUser(key, bcrypt.hashSync(finalPwd, 10), display, 'user', opts.branchId || null, opts.parentId || null);
+    user.game_balance = 0;
+    persist();
+    return { user: sanitizeUser(user), password: finalPwd };
+}
+
+function creditPlayer(userId, amount, opts = {}) {
+    const u = findUserById(userId);
+    if (!u || u.role !== 'user') throw new Error('Jugador no encontrado');
+    if (!u.active) throw new Error('Jugador inactivo');
+    if (amount <= 0) throw new Error('Monto inválido');
+
+    if (opts.branchId) {
+        const branch = findBranchById(opts.branchId);
+        if (!branch) throw new Error('Sucursal no encontrada');
+        if (u.branch_id && u.branch_id !== opts.branchId) {
+            throw new Error('El jugador no pertenece a esta sucursal');
+        }
+        if ((branch.float_balance || 0) > 0) {
+            if ((branch.float_balance || 0) < amount) throw new Error('Saldo insuficiente de la sucursal');
+            branch.float_balance -= amount;
+        }
+        if (!u.branch_id) u.branch_id = opts.branchId;
+    } else if (opts.agentId) {
+        const agent = findUserById(opts.agentId);
+        if (!agent || agent.role !== 'agent') throw new Error('Agente inválido');
+        if ((agent.float_balance || 0) < amount) throw new Error('Saldo insuficiente del agente');
+        agent.float_balance -= amount;
+    }
+    // admin: mints without deducting
+
+    u.game_balance = (u.game_balance || 0) + amount;
+    addTransaction({
+        user_id: userId,
+        branch_id: opts.branchId || u.branch_id || null,
+        type: 'cash_sale',
+        amount,
+        balance_after: u.game_balance,
+        cash_cents: amount * 100,
+        payment_method: opts.paymentMethod || 'efectivo',
+        note: opts.note || `Crédito portal a ${u.name}`,
+        admin_id: opts.adminId || opts.agentId || null,
+    });
+    persist();
+    return { user: sanitizeUser(u), balance: u.game_balance };
 }
 
 function sanitizeUser(u) {
     const branch = u.branch_id ? findBranchById(u.branch_id) : null;
+    const username = userLoginKey(u);
     return {
-        id: u.id, email: u.email, name: u.name, role: u.role,
+        id: u.id,
+        username,
+        email: username,
+        name: u.name,
+        role: u.role,
         branch_id: u.branch_id || null,
         branch_name: branch?.name || null,
-        float_balance: u.float_balance || 0, active: u.active, created_at: u.created_at,
+        parent_id: u.parent_id || null,
+        float_balance: u.float_balance || 0,
+        game_balance: u.game_balance || 0,
+        active: u.active, created_at: u.created_at,
     };
 }
 
@@ -134,6 +238,54 @@ function setUserActive(id, active) {
     return u;
 }
 
+function updateStaffUser(id, updates = {}) {
+    const u = findUserById(id);
+    if (!u) throw new Error('Usuario no encontrado');
+    if (u.role === 'admin') throw new Error('No se puede editar al administrador');
+    if (!['agent', 'cashier'].includes(u.role)) throw new Error('Solo agentes o cajeros');
+
+    if (updates.name != null) {
+        const name = String(updates.name).trim();
+        if (!name) throw new Error('Nombre requerido');
+        u.name = name;
+    }
+    if (updates.username != null || updates.email != null) {
+        const username = normalizeUsername(updates.username != null ? updates.username : updates.email);
+        if (!username) throw new Error('Usuario requerido');
+        if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+            throw new Error('Usuario: 3-32 caracteres (letras, números, . _ -)');
+        }
+        const other = findUserByUsername(username);
+        if (other && other.id !== u.id) throw new Error('Usuario ya registrado');
+        u.username = username;
+        u.email = null;
+    }
+    if (updates.password) {
+        const pwd = String(updates.password).trim();
+        if (pwd.length < 6) throw new Error('Contraseña mínimo 6 caracteres');
+        u.password_hash = bcrypt.hashSync(pwd, 10);
+    }
+    if (updates.active != null) u.active = updates.active ? 1 : 0;
+    persist();
+    return sanitizeUser(u);
+}
+
+function deleteStaffUser(id) {
+    const u = findUserById(id);
+    if (!u) throw new Error('Usuario no encontrado');
+    if (u.role === 'admin') throw new Error('No se puede eliminar al administrador');
+    if (!['agent', 'cashier'].includes(u.role)) throw new Error('Solo agentes o cajeros');
+
+    if (u.role === 'cashier') {
+        data.users.forEach((player) => {
+            if (player.parent_id === u.id) player.parent_id = null;
+        });
+    }
+    data.users = data.users.filter((x) => x.id !== u.id);
+    persist();
+    return true;
+}
+
 function topUpCashier(cashierId, amount, adminId, note) {
     const c = findUserById(cashierId);
     if (!c || c.role !== 'cashier') throw new Error('Cajero no encontrado');
@@ -141,7 +293,37 @@ function topUpCashier(cashierId, amount, adminId, note) {
     c.float_balance = (c.float_balance || 0) + amount;
     addTransaction({
         user_id: cashierId, type: 'float_topup', amount, balance_after: c.float_balance,
-        note: note || 'Recarga de caja', admin_id: adminId,
+        note: note || 'Inyección admin', admin_id: adminId,
+    });
+    persist();
+    return c.float_balance;
+}
+
+function topUpAgent(agentId, amount, adminId, note) {
+    const a = findUserById(agentId);
+    if (!a || a.role !== 'agent') throw new Error('Agente no encontrado');
+    if (amount <= 0) throw new Error('Monto inválido');
+    a.float_balance = (a.float_balance || 0) + amount;
+    addTransaction({
+        user_id: agentId, type: 'float_topup', amount, balance_after: a.float_balance,
+        note: note || 'Inyección admin a agente', admin_id: adminId,
+    });
+    persist();
+    return a.float_balance;
+}
+
+function transferAgentToCashier(agentId, cashierId, amount, note) {
+    const a = findUserById(agentId);
+    const c = findUserById(cashierId);
+    if (!a || a.role !== 'agent') throw new Error('Agente no encontrado');
+    if (!c || c.role !== 'cashier') throw new Error('Cajero no encontrado');
+    if (amount <= 0) throw new Error('Monto inválido');
+    if ((a.float_balance || 0) < amount) throw new Error('Saldo insuficiente del agente');
+    a.float_balance -= amount;
+    c.float_balance = (c.float_balance || 0) + amount;
+    addTransaction({
+        user_id: cashierId, type: 'float_transfer', amount, balance_after: c.float_balance,
+        note: note || `Transferencia de agente ${a.name}`, admin_id: agentId,
     });
     persist();
     return c.float_balance;
@@ -196,25 +378,83 @@ function setMachineActive(id, active) {
     return m;
 }
 
+function updateMachine(id, updates = {}) {
+    const m = findMachineById(id);
+    if (!m) throw new Error('Máquina no encontrada');
+    if (updates.name != null) {
+        const name = String(updates.name).trim();
+        if (name) m.name = name;
+    }
+    if (updates.number != null) {
+        const num = parseInt(updates.number, 10);
+        if (!num || num < 1) throw new Error('Número inválido');
+        const dup = findMachineByNumber(num, m.branch_id);
+        if (dup && dup.id !== m.id) throw new Error(`Máquina #${num} ya existe en esta sucursal`);
+        m.number = num;
+    }
+    if (updates.active != null) m.active = updates.active ? 1 : 0;
+    persist();
+    return enrichMachine(m);
+}
+
+function deleteMachine(id) {
+    const m = findMachineById(id);
+    if (!m) throw new Error('Máquina no encontrada');
+    data.machines = data.machines.filter((x) => x.id !== id);
+    persist();
+    return true;
+}
+
+function assertCashierMachineAccess(cashierId, machineId) {
+    const c = findUserById(cashierId);
+    if (!c || c.role !== 'cashier') throw new Error('Cajero inválido');
+    if (!c.branch_id) throw new Error('Sin sucursal asignada — contacta a tu agente');
+    const m = findMachineById(machineId);
+    if (!m) throw new Error('Máquina no encontrada');
+    if (m.branch_id !== c.branch_id) throw new Error('Esta máquina no pertenece a tu sucursal');
+    if (!m.active) throw new Error('Máquina inactiva');
+    return m;
+}
+
+function assertBranchMachineAccess(branchId, machineId) {
+    const branch = findBranchById(branchId);
+    if (!branch || !branch.active) throw new Error('Sucursal no disponible');
+    const m = findMachineById(machineId);
+    if (!m) throw new Error('Máquina no encontrada');
+    if (m.branch_id !== branchId) throw new Error('Esta máquina no pertenece a tu sucursal');
+    if (!m.active) throw new Error('Máquina inactiva');
+    return m;
+}
+
 function creditMachine(machineId, amount, opts = {}) {
     const m = findMachineById(machineId);
     if (!m) throw new Error('Máquina no encontrada');
     if (!m.active) throw new Error('Máquina inactiva');
     if (amount <= 0) throw new Error('Monto inválido');
 
-    if (opts.cashierId) {
+    if (opts.branchId) {
+        const branch = findBranchById(opts.branchId);
+        if (!branch) throw new Error('Sucursal inválida');
+        assertBranchMachineAccess(opts.branchId, machineId);
+        // Si hay saldo de casa (inyectado por admin/agente), se descuenta.
+        // Si no, es venta en efectivo: se permite cargar la máquina igual.
+        if ((branch.float_balance || 0) >= amount) {
+            branch.float_balance -= amount;
+        } else if ((branch.float_balance || 0) > 0 && (branch.float_balance || 0) < amount) {
+            throw new Error(`Saldo de casa insuficiente ($${branch.float_balance}). Baja el monto o pide inyección al admin.`);
+        }
+    } else if (opts.cashierId) {
         const c = findUserById(opts.cashierId);
         if (!c || c.role !== 'cashier') throw new Error('Cajero inválido');
         if ((c.float_balance || 0) < amount) throw new Error('El cajero no tiene saldo suficiente en caja');
-        if (c.branch_id && m.branch_id && c.branch_id !== m.branch_id) {
-            throw new Error('Esta máquina no pertenece a la sucursal del cajero');
-        }
+        assertCashierMachineAccess(opts.cashierId, machineId);
         c.float_balance -= amount;
     }
 
     m.balance += amount;
     addTransaction({
         user_id: opts.cashierId || null,
+        branch_id: opts.branchId || m.branch_id || null,
         machine_id: machineId,
         type: 'cash_sale',
         amount,
@@ -238,6 +478,55 @@ function adjustMachineBalance(machineId, amount, adminId, note) {
     });
     persist();
     return m.balance;
+}
+
+function creditUser(userId, amount, opts = {}) {
+    const u = findUserById(userId);
+    if (!u || u.role !== 'user') throw new Error('Usuario no encontrado');
+    if (!u.active) throw new Error('Usuario inactivo');
+    if (amount <= 0) throw new Error('Monto inválido');
+
+    if (opts.cashierId) {
+        const c = findUserById(opts.cashierId);
+        if (!c || c.role !== 'cashier') throw new Error('Cajero inválido');
+        if ((c.float_balance || 0) < amount) throw new Error('Saldo insuficiente en caja');
+        if (c.branch_id && u.branch_id && c.branch_id !== u.branch_id) {
+            throw new Error('El usuario no pertenece a la sucursal del cajero');
+        }
+        c.float_balance -= amount;
+    }
+
+    u.game_balance = (u.game_balance || 0) + amount;
+    addTransaction({
+        user_id: userId,
+        type: 'cash_sale',
+        amount,
+        balance_after: u.game_balance,
+        cash_cents: opts.cashCents ?? amount * 100,
+        payment_method: opts.paymentMethod || 'efectivo',
+        note: opts.note || `Recarga a ${u.name}`,
+        admin_id: opts.adminId || null,
+    });
+    persist();
+    return { user: sanitizeUser(u), balance: u.game_balance };
+}
+
+function playUser(userId, bet, game, result) {
+    const u = findUserById(userId);
+    if (!u || u.role !== 'user' || !u.active) throw new Error('Usuario no disponible');
+    if ((u.game_balance || 0) < bet) throw new Error('Saldo insuficiente');
+
+    u.game_balance -= bet;
+    addTransaction({ user_id: userId, type: 'bet', amount: -bet, balance_after: u.game_balance, game });
+
+    if (result.payout > 0) {
+        u.game_balance += result.payout;
+        addTransaction({ user_id: userId, type: 'win', amount: result.payout, balance_after: u.game_balance, game });
+    }
+
+    addGameRound({ user_id: userId, game, bet, payout: result.payout, net: result.net, result_json: JSON.stringify(result) });
+    persist();
+    return { ...result, balance: u.game_balance, user_name: u.name };
 }
 
 function playMachine(machineId, bet, game, result) {
@@ -268,6 +557,7 @@ function addTransaction(row) {
 function getTransactions(limit = 100, filter = {}) {
     let list = [...data.transactions];
     if (filter.cashierId) list = list.filter((t) => t.user_id === filter.cashierId);
+    if (filter.branchId) list = list.filter((t) => t.branch_id === filter.branchId || (t.machine_id && findMachineById(t.machine_id)?.branch_id === filter.branchId));
     if (filter.machineId) list = list.filter((t) => t.machine_id === filter.machineId);
     if (filter.type) list = list.filter((t) => t.type === filter.type);
     return list.sort((a, b) => b.id - a.id).slice(0, limit).map(enrichTx);
@@ -278,7 +568,7 @@ function enrichTx(t) {
     if (t.user_id) {
         const u = findUserById(t.user_id);
         out.user_name = u?.name;
-        out.user_email = u?.email;
+        out.user_email = u?.username || u?.email;
     }
     if (t.machine_id) {
         const m = findMachineById(t.machine_id);
@@ -302,11 +592,13 @@ function getStats() {
     const betsToday = txsToday.filter((t) => t.type === 'bet').reduce((s, t) => s + Math.abs(t.amount), 0);
     const winsToday = txsToday.filter((t) => t.type === 'win').reduce((s, t) => s + t.amount, 0);
     const machineBalance = data.machines.reduce((s, m) => s + m.balance, 0);
+    const branchFloat = data.branches.reduce((s, b) => s + (b.float_balance || 0), 0);
     const cashierFloat = data.users.filter((u) => u.role === 'cashier').reduce((s, u) => s + (u.float_balance || 0), 0);
 
     return {
         machines: data.machines.filter((m) => m.active).length,
         machineBalance,
+        branchFloat,
         cashierFloat,
         salesToday: salesToday.length,
         cashToday,
@@ -315,16 +607,20 @@ function getStats() {
         houseToday: betsToday - winsToday,
         retention: data.settings.retention_percent,
         cashiers: data.users.filter((u) => u.role === 'cashier' && u.active).length,
+        branches: data.branches.filter((b) => b.active).length,
     };
 }
 
 function ensureAdminUser() {
-    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@winpot.local').toLowerCase();
+    const adminUser = normalizeUsername(process.env.ADMIN_USER || process.env.ADMIN_EMAIL || 'admin');
     const desiredPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    let admin = findUserByEmail(adminEmail);
+    let admin = findUserByUsername(adminUser)
+        || findUserByEmail('admin@winpot.local')
+        || data.users.find((u) => u.role === 'admin')
+        || null;
 
     if (!admin) {
-        createUser(adminEmail, bcrypt.hashSync(desiredPassword, 10), 'Administrador', 'admin');
+        createUser(adminUser, bcrypt.hashSync(desiredPassword, 10), 'Administrador', 'admin');
         data.settings.admin_password_seed = desiredPassword;
         persist();
         return;
@@ -332,49 +628,45 @@ function ensureAdminUser() {
 
     admin.role = 'admin';
     admin.active = 1;
+    admin.username = adminUser;
+    admin.email = null;
 
     if (data.settings.admin_password_seed !== desiredPassword
         || !admin.password_hash
         || !bcrypt.compareSync(desiredPassword, admin.password_hash)) {
         admin.password_hash = bcrypt.hashSync(desiredPassword, 10);
         data.settings.admin_password_seed = desiredPassword;
-        persist();
     }
+    persist();
+}
+
+function ensureDefaultAgent() {
+    if (findUserByUsername('agente')) return;
+    createUser('agente', bcrypt.hashSync('agente123', 10), 'Agente', 'agent');
 }
 
 function ensureCashierUser() {
-    const demoCashier = (process.env.CASHIER_EMAIL || 'cajero@winpot.local').toLowerCase();
-    const desiredPassword = process.env.CASHIER_PASSWORD || 'cajero123';
-    let cashier = findUserByEmail(demoCashier);
+    /* Cajero demo desactivado — los crea admin o agente */
+}
 
-    if (!cashier) {
-        const c = createUser(demoCashier, bcrypt.hashSync(desiredPassword, 10), 'Cajero Demo', 'cashier');
-        c.float_balance = 5000;
-        data.settings.cashier_password_seed = desiredPassword;
-        persist();
-        return;
-    }
-
-    cashier.role = 'cashier';
-    cashier.active = 1;
-    if ((cashier.float_balance || 0) === 0 && data.transactions.length === 0) {
-        cashier.float_balance = 5000;
-    }
-
-    if (data.settings.cashier_password_seed !== desiredPassword) {
-        cashier.password_hash = bcrypt.hashSync(desiredPassword, 10);
-        data.settings.cashier_password_seed = desiredPassword;
-        persist();
-    }
+function migrateUsernames() {
+    let changed = false;
+    data.users.forEach((u) => {
+        if (!u.username && u.email) {
+            u.username = normalizeUsername(u.email.includes('@') ? u.email.split('@')[0] : u.email);
+            changed = true;
+        }
+        if (u.username) u.username = normalizeUsername(u.username);
+    });
+    if (changed) persist();
 }
 
 function seedDefaults() {
     seedBranches();
-    if (data.machines.length === 0 && data.branches.length > 0) {
-        const first = data.branches[0];
-        for (let n = 1; n <= 3; n++) createMachine(n, `${first.name} #${n}`, first.id);
-    }
+    ensureDefaultBranches();
+    migrateUsernames();
     ensureAdminUser();
+    ensureDefaultAgent();
     ensureCashierUser();
 }
 
@@ -393,39 +685,194 @@ function listBranches() {
 }
 
 function findBranchById(id) {
-    return data.branches.find((b) => b.id === id) || null;
+    const key = String(id || '').trim().toLowerCase();
+    if (!key) return null;
+    return data.branches.find((b) => String(b.id).toLowerCase() === key) || null;
 }
 
-function createBranch(id, name) {
+function createBranch(id, name, password) {
     const cleanId = String(id || '').trim().toLowerCase();
     const cleanName = String(name || '').trim();
     if (!cleanId || !cleanName) throw new Error('ID y nombre requeridos');
     if (!/^[a-z0-9_]+$/.test(cleanId)) throw new Error('ID inválido (solo letras minúsculas, números y _)');
     if (findBranchById(cleanId)) throw new Error('Esa sucursal ya existe');
-    const branch = { id: cleanId, name: cleanName, active: 1, created_at: now() };
+    const pwd = String(password || '').trim();
+    const finalPwd = pwd.length >= 6 ? pwd : 'sucursal123';
+    const branch = {
+        id: cleanId,
+        name: cleanName,
+        active: 1,
+        float_balance: 0,
+        password_hash: bcrypt.hashSync(finalPwd, 10),
+        password_seed: finalPwd === 'sucursal123' ? 'sucursal123' : null,
+        password_custom: finalPwd === 'sucursal123' ? 0 : 1,
+        games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'],
+        created_at: now(),
+    };
     data.branches.push(branch);
+    ensureMachinesForBranch(cleanId, 3);
     persist();
-    return branch;
+    return { branch: sanitizeBranch(branch), password: finalPwd };
 }
 
-function updateBranch(id, name) {
+function sanitizeBranch(b) {
+    if (!b) return null;
+    return {
+        id: b.id,
+        name: b.name,
+        role: 'branch',
+        branch_id: b.id,
+        branch_name: b.name,
+        float_balance: b.float_balance || 0,
+        active: b.active,
+        games: getBranchGames(b.id),
+        created_at: b.created_at,
+        has_password: !!b.password_hash,
+    };
+}
+
+function ensureBranchAuth(branch) {
+    if (!branch) return;
+    if (branch.float_balance == null) branch.float_balance = 0;
+    if (branch.active == null) branch.active = 1;
+    const defaultPwd = 'sucursal123';
+    if (branch.password_custom) {
+        if (!branch.password_hash) {
+            branch.password_hash = bcrypt.hashSync(defaultPwd, 10);
+            branch.password_custom = 0;
+            branch.password_seed = defaultPwd;
+        }
+        return;
+    }
+    if (!branch.password_hash
+        || branch.password_seed !== defaultPwd
+        || !bcrypt.compareSync(defaultPwd, branch.password_hash)) {
+        branch.password_hash = bcrypt.hashSync(defaultPwd, 10);
+        branch.password_seed = defaultPwd;
+    }
+}
+
+function setBranchPassword(branchId, password) {
+    const branch = findBranchById(branchId);
+    if (!branch) throw new Error('Sucursal no encontrada');
+    const pwd = String(password || '').trim();
+    if (pwd.length < 6) throw new Error('Contraseña mínimo 6 caracteres');
+    branch.password_hash = bcrypt.hashSync(pwd, 10);
+    branch.password_seed = pwd === 'sucursal123' ? 'sucursal123' : null;
+    branch.password_custom = pwd === 'sucursal123' ? 0 : 1;
+    persist();
+    return sanitizeBranch(branch);
+}
+
+function topUpBranch(branchId, amount, adminId, note) {
+    const branch = findBranchById(branchId);
+    if (!branch) throw new Error('Sucursal no encontrada');
+    if (amount <= 0) throw new Error('Monto inválido');
+    branch.float_balance = (branch.float_balance || 0) + amount;
+    addTransaction({
+        branch_id: branchId, type: 'float_topup', amount, balance_after: branch.float_balance,
+        note: note || 'Inyección admin a sucursal', admin_id: adminId,
+    });
+    persist();
+    return branch.float_balance;
+}
+
+function transferAgentToBranch(agentId, branchId, amount, note) {
+    const a = findUserById(agentId);
+    const branch = findBranchById(branchId);
+    if (!a || a.role !== 'agent') throw new Error('Agente no encontrado');
+    if (!branch) throw new Error('Sucursal no encontrada');
+    if (amount <= 0) throw new Error('Monto inválido');
+    if ((a.float_balance || 0) < amount) throw new Error('Saldo insuficiente del agente');
+    a.float_balance -= amount;
+    branch.float_balance = (branch.float_balance || 0) + amount;
+    addTransaction({
+        branch_id: branchId, type: 'float_transfer', amount, balance_after: branch.float_balance,
+        note: note || `Transferencia de agente ${a.name}`, admin_id: agentId,
+    });
+    persist();
+    return branch.float_balance;
+}
+
+function ensureMachinesForBranch(branchId, count = 3) {
+    const branch = findBranchById(branchId);
+    if (!branch) throw new Error('Sucursal no encontrada');
+    const existing = data.machines.filter((m) => m.branch_id === branchId);
+    const nums = new Set(existing.map((m) => m.number));
+    const created = [];
+    for (let n = 1; n <= count; n++) {
+        if (!nums.has(n)) {
+            created.push(createMachine(n, `${branch.name} #${n}`, branchId));
+        }
+    }
+    return { machines: listMachines(branchId), created: created.length };
+}
+
+function assignCashierToBranch(cashierId, branchId) {
+    const c = findUserById(cashierId);
+    if (!c || c.role !== 'cashier') throw new Error('Cajero no encontrado');
+    const branch = findBranchById(branchId);
+    if (!branch) throw new Error('Sucursal no encontrada');
+    const other = data.users.find((u) => u.role === 'cashier' && u.branch_id === branchId && u.id !== cashierId && u.active);
+    if (other) {
+        throw new Error(`La sucursal ${branch.name} ya tiene cajero: ${other.name}`);
+    }
+    c.branch_id = branchId;
+    persist();
+    return sanitizeUser(c);
+}
+
+function unassignCashier(cashierId) {
+    const c = findUserById(cashierId);
+    if (!c || c.role !== 'cashier') throw new Error('Cajero no encontrado');
+    c.branch_id = null;
+    persist();
+    return sanitizeUser(c);
+}
+
+function getBranchGames(branchId) {
+    const branch = findBranchById(branchId);
+    const defaults = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
+    if (!branch) return defaults;
+    if (!Array.isArray(branch.games) || !branch.games.length) {
+        branch.games = defaults;
+        persist();
+    }
+    return [...branch.games];
+}
+
+function setBranchGames(branchId, games) {
+    const branch = findBranchById(branchId);
+    if (!branch) throw new Error('Sucursal no encontrada');
+    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
+    const list = (games || []).filter((g) => allowed.includes(g));
+    if (!list.length) throw new Error('Selecciona al menos un juego');
+    branch.games = list;
+    persist();
+    return getBranchGames(branchId);
+}
+
+function updateBranch(id, updates = {}) {
     const branch = findBranchById(id);
     if (!branch) throw new Error('Sucursal no encontrada');
-    const cleanName = String(name || '').trim();
-    if (!cleanName) throw new Error('Nombre requerido');
-    branch.name = cleanName;
+    if (updates.name != null) {
+        const cleanName = String(updates.name || '').trim();
+        if (!cleanName) throw new Error('Nombre requerido');
+        branch.name = cleanName;
+    }
+    if (updates.active != null) branch.active = updates.active ? 1 : 0;
+    if (updates.password) setBranchPassword(id, updates.password);
     persist();
-    return branch;
+    return sanitizeBranch(branch);
 }
 
 function deleteBranch(id) {
     const branch = findBranchById(id);
     if (!branch) throw new Error('Sucursal no encontrada');
-    const linkedUsers = data.users.filter((u) => u.branch_id === id);
-    const linkedMachines = data.machines.filter((m) => m.branch_id === id);
-    if (linkedUsers.length || linkedMachines.length) {
-        throw new Error('No se puede eliminar: hay cajeros o máquinas vinculados');
-    }
+    data.users.forEach((u) => {
+        if (u.branch_id === id) u.branch_id = null;
+    });
+    data.machines = data.machines.filter((m) => m.branch_id !== id);
     data.branches = data.branches.filter((b) => b.id !== id);
     persist();
     return true;
@@ -442,38 +889,60 @@ function ensureDefaultBranches() {
     let added = 0;
     DEFAULT_BRANCHES.forEach((b) => {
         if (!findBranchById(b.id)) {
-            data.branches.push({ id: b.id, name: b.name, active: 1, created_at: now() });
+            data.branches.push({
+                id: b.id,
+                name: b.name,
+                active: 1,
+                float_balance: 5000,
+                password_hash: bcrypt.hashSync('sucursal123', 10),
+                games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'],
+                created_at: now(),
+            });
             added += 1;
         }
     });
+    data.branches.forEach((b) => {
+        ensureBranchAuth(b);
+        if (!Array.isArray(b.games) || !b.games.length) {
+            b.games = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
+        } else if (!b.games.includes('laguna-anzuelo')) {
+            b.games = [...b.games, 'laguna-anzuelo'];
+        }
+        ensureMachinesForBranch(b.id, 3);
+    });
     if (added) persist();
+    else persist();
     return added;
 }
 
 function listMachinesForCashier(cashierId) {
     const c = findUserById(cashierId);
     if (!c) return [];
-    if (!c.branch_id) return listMachines().filter((m) => m.active);
+    if (!c.branch_id) return [];
     return listMachines(c.branch_id).filter((m) => m.active);
 }
 
 function branchStats(branchId) {
-    const cashiers = data.users.filter((u) => u.role === 'cashier' && u.branch_id === branchId);
+    const branch = findBranchById(branchId);
     const machines = data.machines.filter((m) => m.branch_id === branchId);
     return {
-        cashiers: cashiers.length,
-        cashierFloat: cashiers.reduce((s, u) => s + (u.float_balance || 0), 0),
         machines: machines.length,
         machineBalance: machines.reduce((s, m) => s + m.balance, 0),
+        float_balance: branch?.float_balance || 0,
     };
 }
 
 module.exports = {
     isServerless, initLocal, reload, flush,
     getSettings, setSettings, ensureAdminUser,
-    findUserByEmail, findUserById, createUser, listCashiers, sanitizeUser, setUserActive, topUpCashier,
-    findMachineByNumber, findMachineById, listMachines, listMachinesForCashier, createMachine, setMachineActive,
-    creditMachine, adjustMachineBalance, playMachine,
+    findUserByEmail, findUserByUsername, findUserById, createUser, createPlayer, creditPlayer, listCashiers, listAgents, listPlayers,
+    sanitizeUser, setUserActive, updateStaffUser, deleteStaffUser,
+    topUpCashier, topUpAgent, transferAgentToCashier,
+    findMachineByNumber, findMachineById, listMachines, listMachinesForCashier,
+    createMachine, updateMachine, deleteMachine, setMachineActive, assertCashierMachineAccess,
+    creditMachine, creditUser, adjustMachineBalance, playMachine, playUser,
     getTransactions, getStats,
     listBranches, findBranchById, createBranch, updateBranch, deleteBranch, seedBranches, ensureDefaultBranches, branchStats,
+    sanitizeBranch, setBranchPassword, topUpBranch, transferAgentToBranch, ensureBranchAuth, assertBranchMachineAccess,
+    ensureMachinesForBranch, assignCashierToBranch, unassignCashier, getBranchGames, setBranchGames,
 };

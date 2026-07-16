@@ -19,5 +19,25 @@
 
 [[redirects]]
   from = "/"
-  to = "/inicio/"
+  to = "/portal/"
   status = 302
+
+[[redirects]]
+  from = "/admin"
+  to = "/admin/"
+  status = 301
+
+[[redirects]]
+  from = "/agente"
+  to = "/agente/"
+  status = 301
+
+[[redirects]]
+  from = "/cajero"
+  to = "/cajero/"
+  status = 301
+
+[[redirects]]
+  from = "/portal"
+  to = "/portal/"
+  status = 301

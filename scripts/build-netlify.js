@@ -17,13 +17,13 @@ function copyDir(src, dest) {
 if (fs.existsSync(DIST)) fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(DIST, { recursive: true });
 
-for (const dir of ['inicio', 'admin', 'cajero', 'spin-game', 'comic-slot', 'rancho-lazo', 'shared']) {
+for (const dir of ['inicio', 'admin', 'agente', 'cajero', 'portal', 'spin-game', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'shared']) {
     copyDir(path.join(ROOT, dir), path.join(DIST, dir));
 }
 
 fs.writeFileSync(
     path.join(DIST, 'index.html'),
-    '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/inicio/"><title>3B Pot</title></head><body></body></html>'
+    '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/portal/"><title>3B Pot</title></head><body></body></html>'
 );
 
 console.log('Build completado -> dist/');

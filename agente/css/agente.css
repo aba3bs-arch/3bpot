@@ -64,17 +64,11 @@ input[type=range] { width: 100%; margin: 12px 0; accent-color: var(--gold); }
 .btn--ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .btn-xs { padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; margin-right: 4px; margin-bottom: 4px; }
 .btn-xs--danger { border-color: rgba(239,68,68,0.4); color: var(--red); }
-.btn-xs--danger:hover { background: rgba(239,68,68,0.15); }
 .actions { white-space: nowrap; }
 .modal-box--wide { max-width: 480px; }
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 .checkbox-inline { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text); margin: 12px 0; }
 .checkbox-inline input { width: auto; margin: 0; }
-.inline-label { flex: 1; min-width: 120px; font-size: 0.85rem; color: var(--muted); }
-.inline-label input { display: block; width: 100%; margin-top: 6px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
-.game-list { list-style: none; padding: 0; }
-.game-list li { padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
-.game-list li strong { color: var(--text); }
 select { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 140px; }
 .form-row-wrap select { flex: 1; min-width: 140px; }
 

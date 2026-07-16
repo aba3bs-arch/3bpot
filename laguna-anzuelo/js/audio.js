@@ -1,5 +1,5 @@
-/** Procedural audio for Rancho Lazo (Web Audio API) */
-window.RanchoAudio = (() => {
+/** Procedural audio for Laguna Anzuelo (Web Audio API) */
+window.LagunaAudio = (() => {
   let ctx = null;
   let master = null;
   let musicGain = null;
@@ -9,14 +9,15 @@ window.RanchoAudio = (() => {
   let started = false;
 
   const NOTES = {
-    C3: 130.81, E3: 164.81, G3: 196.0, A3: 220.0,
+    C3: 130.81, D3: 146.83, E3: 164.81, G3: 196.0, A3: 220.0,
     C4: 261.63, D4: 293.66, E4: 329.63, G4: 392.0, A4: 440.0, B4: 493.88,
+    C5: 523.25, E5: 659.25,
   };
 
-  // Simple western-ish loop (pentatonic feel)
+  // Soft aquatic / tropical loop
   const MELODY = [
-    "G3", "C4", "E4", "G4", "E4", "C4", "G3", "A3",
-    "C4", "E4", "G4", "A4", "G4", "E4", "C4", "G3",
+    "E4", "G4", "A4", "G4", "E4", "D4", "C4", "E4",
+    "G4", "A4", "C5", "A4", "G4", "E4", "D4", "C4",
   ];
 
   function ensure() {
@@ -25,15 +26,15 @@ window.RanchoAudio = (() => {
     if (!AC) return false;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.7;
+    master.gain.value = 0.72;
     master.connect(ctx.destination);
 
     musicGain = ctx.createGain();
-    musicGain.gain.value = 0.12;
+    musicGain.gain.value = 0.11;
     musicGain.connect(master);
 
     sfxGain = ctx.createGain();
-    sfxGain.gain.value = 0.55;
+    sfxGain.gain.value = 0.5;
     sfxGain.connect(master);
     return true;
   }
@@ -48,7 +49,7 @@ window.RanchoAudio = (() => {
   function setMuted(v) {
     muted = v;
     if (!ensure()) return;
-    master.gain.value = muted ? 0 : 0.7;
+    master.gain.value = muted ? 0 : 0.72;
     if (muted) stopMusic();
     else if (started) startMusic();
   }
@@ -95,19 +96,18 @@ window.RanchoAudio = (() => {
   function startMusic() {
     if (!ctx || muted || musicTimer) return;
     let step = 0;
-    const beat = 0.28;
+    const beat = 0.32;
     const tick = () => {
       if (!ctx || muted) return;
       const t0 = ctx.currentTime;
       const name = MELODY[step % MELODY.length];
       const f = NOTES[name] || 220;
-      // bass
-      tone(f / 2, t0, 0.22, "triangle", musicGain, 0.18);
-      // melody pluck
-      if (step % 2 === 0) tone(f, t0, 0.18, "square", musicGain, 0.07);
-      // soft chord every 4
+      tone(f / 2, t0, 0.28, "sine", musicGain, 0.14);
+      if (step % 2 === 0) tone(f, t0, 0.22, "triangle", musicGain, 0.08);
       if (step % 4 === 0) {
-        tone(f * 1.5, t0, 0.35, "sine", musicGain, 0.05);
+        tone(f * 1.5, t0, 0.4, "sine", musicGain, 0.045);
+        // soft bubble-ish blip
+        tone(f * 2.2, t0 + 0.05, 0.08, "sine", musicGain, 0.03, f * 3);
       }
       step += 1;
     };
@@ -122,93 +122,89 @@ window.RanchoAudio = (() => {
     }
   }
 
-  function whoosh() {
+  function splash() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
-    tone(600, t0, 0.18, "sawtooth", sfxGain, 0.08, 180);
-    noiseBurst(t0, 0.12, 0.08, 1200);
+    noiseBurst(t0, 0.18, 0.14, 1400);
+    tone(420, t0, 0.12, "sine", sfxGain, 0.08, 180);
   }
 
-  function moo() {
+  function cast() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
-    tone(180, t0, 0.55, "sawtooth", sfxGain, 0.22, 110);
-    tone(90, t0 + 0.05, 0.5, "sine", sfxGain, 0.18, 70);
+    tone(520, t0, 0.16, "sawtooth", sfxGain, 0.07, 160);
+    noiseBurst(t0 + 0.05, 0.1, 0.06, 900);
   }
 
-  function oink() {
+  function tug() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
-    tone(420, t0, 0.08, "square", sfxGain, 0.16, 280);
-    tone(320, t0 + 0.09, 0.1, "square", sfxGain, 0.14, 200);
-    noiseBurst(t0, 0.1, 0.1, 900);
+    tone(170, t0, 0.05, "square", sfxGain, 0.07);
   }
 
-  function bellow() {
+  function bite() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
-    tone(95, t0, 0.7, "sawtooth", sfxGain, 0.28, 55);
-    tone(140, t0 + 0.08, 0.55, "triangle", sfxGain, 0.16, 80);
-    noiseBurst(t0 + 0.05, 0.25, 0.12, 400);
+    tone(180, t0, 0.08, "sawtooth", sfxGain, 0.14, 90);
+    noiseBurst(t0, 0.12, 0.12, 500);
+  }
+
+  function snap() {
+    if (!ensure() || muted) return;
+    const t0 = ctx.currentTime;
+    tone(320, t0, 0.06, "square", sfxGain, 0.16, 80);
+    noiseBurst(t0, 0.14, 0.16, 2200);
+    tone(90, t0 + 0.04, 0.2, "triangle", sfxGain, 0.1, 40);
   }
 
   function coin() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
-    tone(880, t0, 0.08, "square", sfxGain, 0.12);
-    tone(1174, t0 + 0.07, 0.12, "square", sfxGain, 0.1);
+    tone(880, t0, 0.08, "square", sfxGain, 0.11);
+    tone(1174, t0 + 0.07, 0.12, "square", sfxGain, 0.09);
   }
 
   function winBig() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
     [523, 659, 784, 1046].forEach((f, i) => {
-      tone(f, t0 + i * 0.09, 0.2, "triangle", sfxGain, 0.16);
+      tone(f, t0 + i * 0.09, 0.22, "triangle", sfxGain, 0.15);
     });
   }
 
   function miss() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
-    tone(220, t0, 0.15, "triangle", sfxGain, 0.1, 110);
+    tone(220, t0, 0.15, "triangle", sfxGain, 0.09, 110);
   }
 
   function escape() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
-    tone(300, t0, 0.12, "sawtooth", sfxGain, 0.12, 90);
-    noiseBurst(t0, 0.15, 0.1, 600);
+    tone(280, t0, 0.12, "sawtooth", sfxGain, 0.1, 90);
+    noiseBurst(t0, 0.12, 0.08, 700);
   }
 
-  function tug() {
+  function bubble() {
     if (!ensure() || muted) return;
     const t0 = ctx.currentTime;
-    tone(150, t0, 0.05, "square", sfxGain, 0.08);
-  }
-
-  function crowdCheer() {
-    if (!ensure() || muted) return;
-    const t0 = ctx.currentTime;
-    // Voces / gritos del público (tonos cortos)
-    [420, 520, 610, 480, 700].forEach((f, i) => {
-      tone(f + Math.random() * 40, t0 + i * 0.04, 0.12, "sawtooth", sfxGain, 0.07, f * 0.6);
-    });
-    noiseBurst(t0, 0.18, 0.08, 900);
+    const f = 500 + Math.random() * 700;
+    tone(f, t0, 0.1, "sine", sfxGain, 0.04, f * 1.6);
   }
 
   return {
     unlock,
     setMuted,
     isMuted,
-    whoosh,
-    moo,
-    oink,
-    bellow,
+    splash,
+    cast,
+    tug,
+    bite,
+    snap,
     coin,
     winBig,
     miss,
     escape,
-    tug,
-    crowdCheer,
+    bubble,
   };
 })();

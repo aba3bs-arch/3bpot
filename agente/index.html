@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Las 3B — Agente</title>
+    <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/agente.css">
+</head>
+<body>
+    <div id="loginScreen" class="login-screen">
+        <form id="loginForm" class="login-box">
+            <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo">
+            <h1>Panel Agente</h1>
+            <p>Sucursales, máquinas y saldo (sin crear moneda)</p>
+            <label>Usuario<input type="text" name="username" autocomplete="username" required></label>
+            <label>Contraseña<input type="password" name="password" autocomplete="current-password" required></label>
+            <button type="submit">Entrar</button>
+            <p class="hint-login">Por defecto: <strong>agente</strong> / <strong>agente123</strong></p>
+            <p class="error" id="loginError" hidden></p>
+        </form>
+    </div>
+
+    <div id="app" class="app">
+        <aside class="sidebar">
+            <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo-sm">
+            <nav>
+                <button type="button" class="nav active" data-tab="sucursales">🏪 Sucursales</button>
+                <button type="button" class="nav" data-tab="jugadores">🎮 Jugadores</button>
+                <button type="button" class="nav" data-tab="maquinas">🎰 Máquinas</button>
+                <button type="button" class="nav" data-tab="moneda">💰 Mi saldo</button>
+            </nav>
+            <div class="sidebar-foot">
+                <span id="agentBalance" class="gold"></span>
+                <a href="/cajero/">Caja sucursal</a>
+                <button type="button" id="logoutBtn">Salir</button>
+            </div>
+        </aside>
+        <main class="main">
+            <section class="tab" id="tab-sucursales">
+                <h1>Sucursales</h1>
+                <p class="hint">Creas sucursales con contraseña. Ellas operan máquinas y recargas desde su panel.</p>
+                <div class="toolbar">
+                    <button type="button" class="btn btn--ghost" id="seedBranches">Cargar sucursales 3B</button>
+                </div>
+                <div class="card">
+                    <h3>Nueva sucursal</h3>
+                    <form id="createBranchForm" class="form-row-wrap">
+                        <input type="text" id="branchId" placeholder="id (ej. 3b8)" required>
+                        <input type="text" id="branchName" placeholder="Nombre" required>
+                        <input type="text" id="branchPass" placeholder="Clave (vacío = sucursal123)">
+                        <button type="submit" class="btn btn--primary">Crear</button>
+                    </form>
+                </div>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="branchesTable">
+                        <thead><tr><th>Sucursal</th><th>Saldo</th><th>Máquinas</th><th>Juegos</th><th>Portal</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="tab" id="tab-maquinas" hidden>
+                <h1>Máquinas</h1>
+                <p class="hint">También puedes crearlas desde el panel de cada sucursal.</p>
+                <div class="card">
+                    <h3>Nueva máquina</h3>
+                    <form id="createMachineForm" class="form-row-wrap">
+                        <select id="machineBranch" required><option value="">Sucursal</option></select>
+                        <input type="number" id="machineNum" min="1" placeholder="Número" required>
+                        <input type="text" id="machineName" placeholder="Nombre (opcional)">
+                        <button type="submit" class="btn btn--primary">Crear</button>
+                    </form>
+                </div>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="machinesTable">
+                        <thead><tr><th>#</th><th>Nombre</th><th>Sucursal</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="tab" id="tab-jugadores" hidden>
+                <h1>Jugadores</h1>
+                <p class="hint">Cuentas para el portal de juegos (/portal/). El crédito sale de tu saldo.</p>
+                <div class="card">
+                    <h3>Crear jugador</h3>
+                    <form id="createPlayerForm" class="form-row-wrap">
+                        <input type="text" id="playerName" placeholder="Nombre" required>
+                        <input type="text" id="playerUser" placeholder="Usuario" required>
+                        <input type="text" id="playerPass" placeholder="Clave (vacío = jugador123)">
+                        <input type="number" id="playerCredit" min="0" value="50" placeholder="Crédito">
+                        <button type="submit" class="btn btn--primary">Crear</button>
+                    </form>
+                </div>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="playersTable">
+                        <thead><tr><th>Nombre</th><th>Usuario</th><th>Saldo</th><th></th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="tab" id="tab-moneda" hidden>
+                <h1>Mi saldo</h1>
+                <p class="hint">Transfieres saldo a sucursales. No generas moneda nueva.</p>
+                <div class="stats" id="moneyStats" style="margin-bottom:24px"></div>
+                <div class="card card--wide">
+                    <h3>Transferir a sucursal</h3>
+                    <form id="floatBranchForm" class="form-row-wrap">
+                        <select id="floatBranchSel" required><option value="">Sucursal</option></select>
+                        <input type="number" id="floatBranchAmt" min="1" value="500" required>
+                        <button type="submit" class="btn btn--gold">Transferir</button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal" id="editModal">
+        <div class="modal-box modal-box--wide">
+            <h3 id="editModalTitle">Editar</h3>
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                <input type="hidden" id="editType">
+                <label>Nombre<input type="text" id="editName" required></label>
+                <label id="editPassWrap">Nueva contraseña <small>(vacío = no cambiar)</small><input type="text" id="editPass"></label>
+                <label id="editNumberWrap" hidden>Número<input type="number" id="editNumber" min="1"></label>
+                <label id="editGamesWrap" hidden>Juegos
+                    <div class="checkbox-row" id="editGames"></div>
+                </label>
+                <label id="editActiveWrap" class="checkbox-inline">
+                    <input type="checkbox" id="editActive" checked> Activo
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn--ghost" id="editCancel">Cancelar</button>
+                    <button type="submit" class="btn btn--primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+    <script src="/shared/staff-auth.js"></script>
+    <script src="js/agente.js"></script>
+</body>
+</html>

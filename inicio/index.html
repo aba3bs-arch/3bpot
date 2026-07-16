@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3B Pot — Máquinas</title>
+    <title>3B Pot — Tu máquina</title>
     <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/inicio.css">
@@ -12,95 +12,85 @@
     <div class="wrap">
         <header class="hero">
             <img src="/shared/assets/logo_3b.png" alt="Abarrotes Las 3B" class="hero-logo">
-            <p>Salón de máquinas — paga en caja, juega aquí</p>
+            <p id="heroText">Tu máquina — elige un juego</p>
         </header>
 
-        <section class="machine-card">
-            <h2>Tu máquina</h2>
-            <p class="hint">Selecciona sucursal y número. El crédito se carga en caja.</p>
-            <form id="machineForm">
-                <label>Sucursal
-                    <select id="branchSelect" required>
-                        <option value="">Cargando...</option>
-                    </select>
-                </label>
-                <label>Número de máquina<input type="number" id="machineNum" min="1" placeholder="1, 2, 3..." required autofocus></label>
-                <button type="submit">Continuar</button>
-            </form>
-            <p class="balance" id="balanceInfo" hidden></p>
+        <section class="machine-card" id="machineCard" hidden>
+            <h2>Falta el enlace de tu máquina</h2>
+            <p class="hint" id="setupHint">Pide en caja el enlace de tu máquina (ya tiene el crédito cargado).</p>
+            <p class="error" id="branchError" hidden></p>
+        </section>
+
+        <section class="machine-card" id="statusCard" hidden>
+            <h2 id="machineTitle">Máquina</h2>
+            <p class="balance" id="balanceInfo"></p>
+            <p class="hint" id="statusHint">El crédito ya está en esta máquina. Solo elige un juego.</p>
         </section>
 
         <section class="games" id="gamesSection" hidden>
             <h2>Elige tu juego</h2>
-            <div class="game-grid">
-                <a href="/spin-game/" class="game-card" id="linkSpin">
-                    <span class="icon">🎡</span>
-                    <span class="name">Ruleta</span>
-                </a>
-                <a href="/comic-slot/" class="game-card" id="linkSlot">
-                    <span class="icon">🎰</span>
-                    <span class="name">Comic Slot</span>
-                </a>
-                <a href="/rancho-lazo/" class="game-card" id="linkRancho">
-                    <span class="icon">🤠</span>
-                    <span class="name">Rancho Lazo</span>
-                </a>
-            </div>
+            <div class="game-grid" id="gameGrid"></div>
         </section>
 
         <footer class="footer">
-            <a href="/cajero/">Soy cajero</a>
-            <span>·</span>
-            <a href="/admin/">Administración</a>
+            <a href="/cajero/">Soy caja</a>
         </footer>
     </div>
 
     <script src="/shared/machine-client.js"></script>
     <script>
-        async function loadBranches() {
-            const data = await fetch('/api/play/branches').then((r) => r.json());
-            const sel = document.getElementById('branchSelect');
-            sel.innerHTML = '<option value="">Selecciona sucursal</option>' +
-                data.branches.map((b) => `<option value="${b.id}">${b.name}</option>`).join('');
-            const savedBranch = MachineAPI.getBranchId();
-            if (savedBranch) sel.value = savedBranch;
+        const params = new URLSearchParams(location.search);
+        const branchFromUrl = params.get('branch') || params.get('branch_id');
+        const machineFromUrl = params.get('m') || params.get('machine');
+
+        if (branchFromUrl) MachineAPI.setBranchId(branchFromUrl);
+        if (machineFromUrl) MachineAPI.setMachineNumber(machineFromUrl);
+
+        const branchId = MachineAPI.getBranchId();
+        const machineNum = MachineAPI.getMachineNumber();
+
+        const gameMeta = {
+            'spin-wheel': { href: '/spin-game/', icon: '🎡', name: 'Ruleta' },
+            'comic-slot': { href: '/comic-slot/', icon: '🎰', name: 'Comic Slot' },
+            'rancho-lazo': { href: '/rancho-lazo/', icon: '🤠', name: 'Rancho Lazo' },
+            'laguna-anzuelo': { href: '/laguna-anzuelo/', icon: '🎣', name: 'Laguna Anzuelo' },
+        };
+
+        async function showGames(num, branch) {
+            const data = await MachineAPI.getMachine(num, branch);
+            MachineAPI.setMachineNumber(num);
+            MachineAPI.setBranchId(branch);
+
+            document.getElementById('machineCard').hidden = true;
+            document.getElementById('statusCard').hidden = false;
+            document.getElementById('machineTitle').textContent = 'Máquina #' + num;
+            document.getElementById('heroText').textContent = 'Máquina #' + num + ' — elige tu juego';
+            document.getElementById('balanceInfo').className = 'balance';
+            document.getElementById('balanceInfo').textContent =
+                'Saldo: ' + MachineAPI.formatPesos(data.balance);
+            document.getElementById('gamesSection').hidden = false;
+
+            const q = '?m=' + num + '&branch=' + encodeURIComponent(branch);
+            const games = data.games || ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
+            document.getElementById('gameGrid').innerHTML = games.map((g) => {
+                const m = gameMeta[g];
+                if (!m) return '';
+                return `<a href="${m.href}${q}" class="game-card"><span class="icon">${m.icon}</span><span class="name">${m.name}</span></a>`;
+            }).join('');
         }
 
-        const saved = MachineAPI.getMachineNumber();
-        if (saved) document.getElementById('machineNum').value = saved;
-
-        async function loadMachine(num, branchId) {
-            try {
-                const data = await MachineAPI.getMachine(num, branchId);
-                MachineAPI.setMachineNumber(num);
-                MachineAPI.setBranchId(branchId);
-                document.getElementById('balanceInfo').hidden = false;
-                document.getElementById('balanceInfo').textContent =
-                    data.branch_name + ' · Máquina #' + num + ' — Saldo: ' + MachineAPI.formatPesos(data.balance);
-                document.getElementById('gamesSection').hidden = false;
-                const q = '?m=' + num + '&branch=' + encodeURIComponent(branchId);
-                document.getElementById('linkSpin').href = '/spin-game/' + q;
-                document.getElementById('linkSlot').href = '/comic-slot/' + q;
-                document.getElementById('linkRancho').href = '/rancho-lazo/' + q;
-            } catch (e) {
-                document.getElementById('balanceInfo').hidden = false;
-                document.getElementById('balanceInfo').textContent = e.message;
-                document.getElementById('balanceInfo').className = 'balance error';
-            }
+        if (!branchId || !machineNum) {
+            document.getElementById('machineCard').hidden = false;
+            document.getElementById('branchError').hidden = false;
+            document.getElementById('branchError').textContent =
+                'Usa el enlace que te dan en caja, por ejemplo: /inicio/?branch=fusion&m=1';
+        } else {
+            showGames(machineNum, branchId).catch((e) => {
+                document.getElementById('machineCard').hidden = false;
+                document.getElementById('branchError').hidden = false;
+                document.getElementById('branchError').textContent = e.message;
+            });
         }
-
-        document.getElementById('machineForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const branchId = document.getElementById('branchSelect').value;
-            if (!branchId) return;
-            loadMachine(parseInt(document.getElementById('machineNum').value, 10), branchId);
-        });
-
-        loadBranches().then(() => {
-            const branchId = MachineAPI.getBranchId();
-            const num = MachineAPI.getMachineNumber();
-            if (branchId && num) loadMachine(num, branchId);
-        });
     </script>
 </body>
 </html>

@@ -1,0 +1,91 @@
+:root {
+    --bg: #0f1117;
+    --surface: rgba(18, 20, 28, 0.88);
+    --border: rgba(255, 255, 255, 0.14);
+    --text: #e8eaef;
+    --muted: #b8beca;
+    --gold: #f5c518;
+    --accent: #c9a227;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.portal-body {
+    font-family: Inter, system-ui, sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    background:
+        linear-gradient(120deg, rgba(8, 12, 28, 0.72), rgba(20, 10, 40, 0.55)),
+        url('/shared/assets/portal-bg.png') center / cover no-repeat fixed;
+}
+
+.login-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.login-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    width: 100%;
+    max-width: 380px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.brand-logo { display: block; width: 120px; margin: 0 auto 16px; }
+.login-box h1 { font-size: 1.5rem; text-align: center; margin-bottom: 4px; }
+.login-box p { color: var(--muted); margin-bottom: 20px; font-size: 0.9rem; text-align: center; }
+.login-box label { display: block; margin-bottom: 14px; font-size: 0.85rem; color: var(--muted); }
+.login-box input {
+    display: block; width: 100%; margin-top: 6px; padding: 10px 12px;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.35); color: var(--text);
+}
+.login-box button {
+    width: 100%; padding: 12px; border: none; border-radius: 8px;
+    background: var(--gold); color: #1a1208; font-weight: 800; cursor: pointer; margin-top: 8px;
+}
+.hint-login { font-size: 0.8rem; margin-top: 16px; margin-bottom: 0; }
+.hint-login a { color: var(--gold); }
+.error { color: #ef4444; font-size: 0.85rem; margin-top: 10px; text-align: center; }
+
+.app { min-height: 100vh; background: rgba(8, 10, 18, 0.55); backdrop-filter: blur(4px); }
+.header {
+    display: flex; align-items: center; gap: 20px; padding: 20px 32px;
+    border-bottom: 1px solid var(--border); background: rgba(12, 14, 22, 0.75); flex-wrap: wrap;
+}
+.header-logo { width: 56px; }
+.header h1 { font-size: 1.2rem; }
+.header p { color: var(--muted); font-size: 0.85rem; }
+.balance-box { margin-left: auto; text-align: right; }
+.balance-label { display: block; font-size: 0.75rem; color: var(--muted); }
+.balance-val { font-size: 1.5rem; font-weight: 800; color: var(--gold); }
+.btn-logout {
+    padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); cursor: pointer;
+}
+
+.main { padding: 40px 32px; max-width: 900px; margin: 0 auto; }
+.main h2 { margin-bottom: 24px; }
+.game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+.game-card {
+    display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px;
+    background: rgba(18, 20, 28, 0.85); border: 1px solid var(--border); border-radius: 16px;
+    text-decoration: none; color: var(--text); transition: border-color 0.2s, transform 0.2s;
+}
+.game-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+.game-card .icon { font-size: 2.5rem; }
+.game-card .name { font-weight: 700; }
+.footer-links { margin-top: 32px; text-align: center; color: var(--muted); font-size: 0.85rem; }
+
+.toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid var(--border); padding: 12px 24px; border-radius: 8px; z-index: 100;
+}
+.toast.error { border-color: #ef4444; }

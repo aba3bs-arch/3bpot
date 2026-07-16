@@ -1,14 +1,14 @@
 /**
- * Auth para admin, agente y sucursal.
+ * Auth para jugadores (portal).
  */
-const StaffAuth = (function () {
+const PlayerAuth = (function () {
     'use strict';
 
-    const TOKEN_KEY = 'winpot_staff_token';
-    const USER_KEY = 'winpot_staff_user';
+    const TOKEN_KEY = 'winpot_player_token';
+    const USER_KEY = 'winpot_player_user';
 
     function apiBase() {
-        if (window.MACHINE_API) return window.MACHINE_API;
+        if (window.PLAYER_API) return window.PLAYER_API;
         return '';
     }
 
@@ -33,33 +33,17 @@ const StaffAuth = (function () {
     async function request(path, options = {}) {
         const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
         const token = getToken();
-        if (token && !options.skipAuth) headers.Authorization = 'Bearer ' + token;
+        if (token) headers.Authorization = 'Bearer ' + token;
         const res = await fetch(apiBase() + path, { ...options, headers });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Error de conexión con el servidor');
+        if (!res.ok) throw new Error(data.error || 'Error de conexión');
         return data;
     }
 
     async function login(username, password) {
-        clearSession();
-        const data = await request('/api/auth/login', {
+        const data = await request('/api/auth/login-player', {
             method: 'POST',
-            skipAuth: true,
             body: JSON.stringify({ username, password }),
-        });
-        setSession(data.token, data.user);
-        return data;
-    }
-
-    async function loginBranch(branchId, password) {
-        clearSession();
-        const data = await request('/api/auth/login-branch', {
-            method: 'POST',
-            skipAuth: true,
-            body: JSON.stringify({
-                branch_id: String(branchId || '').trim().toLowerCase(),
-                password,
-            }),
         });
         setSession(data.token, data.user);
         return data;
@@ -74,5 +58,24 @@ const StaffAuth = (function () {
         return '$' + Math.abs(n).toLocaleString('es-MX', { maximumFractionDigits: 0 });
     }
 
-    return { login, loginBranch, logout, request, getUser, isLoggedIn, clearSession, setSession, formatPesos };
+    async function playSpinWheel(bet) {
+        return request('/api/play/user/spin-wheel', { method: 'POST', body: JSON.stringify({ bet }) });
+    }
+
+    async function playComicSlot(bet) {
+        return request('/api/play/user/comic-slot', { method: 'POST', body: JSON.stringify({ bet }) });
+    }
+
+    async function playRanchoLazo(bet) {
+        return request('/api/play/user/rancho-lazo', { method: 'POST', body: JSON.stringify({ bet }) });
+    }
+
+    async function playLagunaAnzuelo(bet) {
+        return request('/api/play/user/laguna-anzuelo', { method: 'POST', body: JSON.stringify({ bet }) });
+    }
+
+    return {
+        login, logout, request, getUser, isLoggedIn, clearSession, formatPesos,
+        playSpinWheel, playComicSlot, playRanchoLazo, playLagunaAnzuelo,
+    };
 })();

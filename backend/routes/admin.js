@@ -6,34 +6,134 @@ const { adminRequired } = require('../middleware/auth');
 const router = express.Router();
 router.use(adminRequired);
 
-router.get('/stats', (_req, res) => res.json({ stats: store.getStats() }));
-
-router.get('/settings', (_req, res) => res.json({ settings: store.getSettings() }));
-
-router.patch('/settings', (req, res) => {
-    res.json({ settings: store.setSettings(req.body), message: 'Configuración guardada' });
+router.get('/stats', (_req, res) => {
+    res.json({
+        stats: store.getStats(),
+        agents: store.listAgents().length,
+        cashiers: store.listCashiers().length,
+        branches: store.listBranches().length,
+    });
 });
 
-/* Sucursales */
+/* —— Agentes —— */
+router.get('/agents', (_req, res) => res.json({ agents: store.listAgents() }));
+
+router.post('/agents', (req, res) => {
+    const name = String(req.body.name || '').trim();
+    const username = String(req.body.username || req.body.email || '').trim();
+    const password = String(req.body.password || '').trim();
+    if (!name || !username) return res.status(400).json({ error: 'Nombre y usuario requeridos' });
+    const key = username.toLowerCase().replace(/\s+/g, '');
+    if (!/^[a-z0-9._-]{3,32}$/.test(key)) {
+        return res.status(400).json({ error: 'Usuario: 3-32 caracteres (letras, números, . _ -)' });
+    }
+    if (store.findUserByUsername(key)) return res.status(409).json({ error: 'Usuario ya registrado' });
+    const pwd = password && password.length >= 6 ? password : 'agente123';
+    const user = store.createUser(key, bcrypt.hashSync(pwd, 10), name, 'agent', null);
+    res.status(201).json({
+        agent: store.sanitizeUser(user),
+        username: user.username,
+        password: pwd,
+        message: `Agente ${name} creado`,
+    });
+});
+
+router.post('/agents/:id/float', (req, res) => {
+    const amount = parseInt(req.body.amount, 10);
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
+    try {
+        const balance = store.topUpAgent(parseInt(req.params.id, 10), amount, req.user.id, req.body.note);
+        res.json({ float_balance: balance, message: `$${amount} inyectados al agente` });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.patch('/agents/:id', (req, res) => {
+    try {
+        const agent = store.updateStaffUser(parseInt(req.params.id, 10), {
+            name: req.body.name,
+            username: req.body.username || req.body.email,
+            password: req.body.password || undefined,
+            active: req.body.active,
+        });
+        res.json({ agent, message: 'Agente actualizado' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.delete('/agents/:id', (req, res) => {
+    try {
+        store.deleteStaffUser(parseInt(req.params.id, 10));
+        res.json({ message: 'Agente eliminado' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+/* —— Sucursales —— */
 router.get('/branches', (_req, res) => {
-    const branches = store.listBranches().map((b) => ({
-        ...b,
-        stats: store.branchStats(b.id),
-    }));
-    res.json({ branches });
+    res.json({
+        branches: store.listBranches().map((b) => ({
+            ...store.sanitizeBranch(b),
+            stats: store.branchStats(b.id),
+        })),
+    });
 });
 
 router.post('/branches', (req, res) => {
     try {
-        const branch = store.createBranch(req.body.id, req.body.name);
-        res.status(201).json({ branch, message: `Sucursal ${branch.name} creada` });
+        const out = store.createBranch(req.body.id, req.body.name, req.body.password);
+        res.status(201).json({
+            branch: out.branch,
+            password: out.password,
+            machines: store.listMachines(out.branch.id),
+            message: `Sucursal ${out.branch.name} creada · clave: ${out.password}`,
+        });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/branches/seed', (_req, res) => {
+    const added = store.ensureDefaultBranches();
+    res.json({
+        branches: store.listBranches().map((b) => store.sanitizeBranch(b)),
+        message: added
+            ? `${added} sucursales agregadas (clave por defecto: sucursal123)`
+            : 'Sucursales listas (clave por defecto: sucursal123)',
+    });
+});
+
+router.patch('/branches/:id/games', (req, res) => {
+    try {
+        const games = store.setBranchGames(req.params.id, req.body.games);
+        res.json({ games, message: 'Juegos de la sucursal actualizados' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/branches/:id/machines', (req, res) => {
+    try {
+        const out = store.ensureMachinesForBranch(req.params.id, parseInt(req.body.count, 10) || 3);
+        res.json({ ...out, message: out.created ? `${out.created} máquinas creadas` : 'Ya tiene sus máquinas' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/branches/:id/float', (req, res) => {
+    const amount = parseInt(req.body.amount, 10);
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
+    try {
+        const balance = store.topUpBranch(req.params.id, amount, req.user.id, req.body.note);
+        res.json({ float_balance: balance, message: `$${amount} inyectados a la sucursal` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 router.patch('/branches/:id', (req, res) => {
     try {
-        const branch = store.updateBranch(req.params.id, req.body.name);
-        res.json({ branch, message: 'Sucursal actualizada' });
+        const branch = store.updateBranch(req.params.id, {
+            name: req.body.name,
+            password: req.body.password || undefined,
+            active: req.body.active,
+        });
+        if (req.body.games) store.setBranchGames(req.params.id, req.body.games);
+        res.json({
+            branch,
+            games: store.getBranchGames(req.params.id),
+            message: 'Sucursal actualizada',
+        });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -44,100 +144,79 @@ router.delete('/branches/:id', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/branches/seed', (_req, res) => {
-    const added = store.ensureDefaultBranches();
-    res.json({ branches: store.listBranches(), message: added ? `${added} sucursales agregadas` : 'Todas las sucursales ya existen' });
-});
+/* —— Cajeros (legado: opcional; el panel opera como sucursal) —— */
+router.get('/cashiers', (_req, res) => res.json({ cashiers: store.listCashiers() }));
 
-/* Máquinas */
 router.get('/machines', (req, res) => {
-    const branchId = req.query.branch_id || null;
-    res.json({ machines: store.listMachines(branchId) });
+    res.json({ machines: store.listMachines(req.query.branch_id || null) });
 });
 
 router.post('/machines', (req, res) => {
     try {
-        if (!req.body.branch_id) return res.status(400).json({ error: 'Selecciona una sucursal' });
+        if (!req.body.branch_id) return res.status(400).json({ error: 'Sucursal requerida' });
         const machine = store.createMachine(req.body.number, req.body.name, req.body.branch_id);
-        res.status(201).json({ machine, message: `Máquina #${machine.number} creada en ${machine.branch_name}` });
+        res.status(201).json({ machine, message: `Máquina #${machine.number} creada` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.patch('/machines/:id/status', (req, res) => {
-    const m = store.setMachineActive(parseInt(req.params.id, 10), !!req.body.active);
-    if (!m) return res.status(404).json({ error: 'No encontrada' });
-    res.json({ message: req.body.active ? 'Máquina activada' : 'Máquina desactivada' });
-});
-
-router.post('/machines/:id/adjust', (req, res) => {
-    const amount = parseInt(req.body.amount, 10);
-    if (!amount) return res.status(400).json({ error: 'Monto inválido' });
+router.patch('/machines/:id', (req, res) => {
     try {
-        const balance = store.adjustMachineBalance(parseInt(req.params.id, 10), amount, req.user.id, req.body.note || 'Ajuste admin');
-        res.json({ balance, message: 'Saldo actualizado' });
+        const machine = store.updateMachine(parseInt(req.params.id, 10), {
+            name: req.body.name,
+            number: req.body.number,
+            active: req.body.active,
+        });
+        res.json({ machine, message: 'Máquina actualizada' });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-/* Cajeros */
-router.get('/cashiers', (_req, res) => res.json({ cashiers: store.listCashiers() }));
-
-router.post('/cashiers', (req, res) => {
-    const name = String(req.body.name || '').trim();
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const password = String(req.body.password || '').trim();
-    if (!name || !email) return res.status(400).json({ error: 'Nombre y email requeridos' });
-    if (!req.body.branch_id) return res.status(400).json({ error: 'Selecciona una sucursal' });
-    if (password && password.length < 6) {
-        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
-    }
-    if (store.findUserByEmail(email)) return res.status(409).json({ error: 'Email ya registrado' });
-    if (req.body.branch_id && !store.findBranchById(req.body.branch_id)) {
-        return res.status(400).json({ error: 'Sucursal no válida' });
-    }
-    const pwd = password || 'cajero123';
-    const user = store.createUser(email, bcrypt.hashSync(pwd, 10), name, 'cashier', req.body.branch_id || null);
-    res.status(201).json({
-        cashier: store.sanitizeUser(user),
-        email: user.email,
-        password: pwd,
-        message: `Cajero ${name} creado`,
-    });
+router.delete('/machines/:id', (req, res) => {
+    try {
+        store.deleteMachine(parseInt(req.params.id, 10));
+        res.json({ message: 'Máquina eliminada' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/cashiers/:id/float', (req, res) => {
+router.get('/players', (_req, res) => res.json({ players: store.listPlayers() }));
+
+router.post('/players', (req, res) => {
+    try {
+        const out = store.createPlayer(req.body.username, req.body.password, req.body.name, {
+            branchId: req.body.branch_id || null,
+            parentId: req.user.id,
+        });
+        const credit = parseInt(req.body.credit, 10) || 0;
+        if (credit > 0) {
+            store.creditPlayer(out.user.id, credit, {
+                adminId: req.user.id,
+                note: 'Crédito inicial admin',
+            });
+            out.user = store.sanitizeUser(store.findUserById(out.user.id));
+        }
+        res.status(201).json({
+            player: out.user,
+            username: out.user.username,
+            password: out.password,
+            message: `Jugador ${out.user.name} creado`,
+        });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/players/:id/credit', (req, res) => {
     const amount = parseInt(req.body.amount, 10);
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
     try {
-        const balance = store.topUpCashier(parseInt(req.params.id, 10), amount, req.user.id, req.body.note);
-        res.json({ float_balance: balance, message: `$${amount} agregados a la caja del cajero` });
-    } catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-router.patch('/cashiers/:id/status', (req, res) => {
-    const u = store.setUserActive(parseInt(req.params.id, 10), !!req.body.active);
-    if (!u) return res.status(404).json({ error: 'No encontrado' });
-    res.json({ message: req.body.active ? 'Cajero activado' : 'Cajero desactivado' });
-});
-
-/* Venta directa admin → máquina */
-router.post('/sell', (req, res) => {
-    const machineId = parseInt(req.body.machineId, 10);
-    const amount = parseInt(req.body.amount, 10);
-    if (!machineId || !amount || amount <= 0) return res.status(400).json({ error: 'Datos inválidos' });
-    try {
-        const result = store.creditMachine(machineId, amount, {
+        const result = store.creditPlayer(parseInt(req.params.id, 10), amount, {
             adminId: req.user.id,
-            cashCents: amount * 100,
-            paymentMethod: req.body.paymentMethod || 'efectivo',
-            note: req.body.note || 'Venta directa admin',
+            note: req.body.note || 'Crédito admin a jugador',
         });
-        res.json({ ...result, message: `$${amount} cargados a máquina #${result.machine.number}` });
+        res.json({ ...result, message: `$${amount} acreditados` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.get('/transactions', (req, res) => {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 80, 200);
-    res.json({ transactions: store.getTransactions(limit) });
+router.get('/settings', (_req, res) => res.json({ settings: store.getSettings() }));
+router.patch('/settings', (req, res) => {
+    res.json({ settings: store.setSettings(req.body), message: 'Configuración guardada' });
 });
 
 module.exports = router;

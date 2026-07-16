@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3B Pot — Cajero</title>
+    <title>Las 3B — Sucursal</title>
     <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/cajero.css">
@@ -11,12 +11,23 @@
 <body>
     <div id="loginScreen" class="login-screen">
         <form id="loginForm" class="login-box">
-            <img src="/shared/assets/logo_3b.png" alt="Abarrotes Las 3B" class="brand-logo">
-            <h1>Caja 3B Pot</h1>
-            <p>Vende crédito en efectivo a las máquinas</p>
-            <label>Email<input type="email" name="email" value="cajero@winpot.local" required></label>
-            <label>Contraseña<input type="password" name="password" value="cajero123" required></label>
-            <p class="hint-login">Si no pusiste contraseña al crear el cajero, usa <strong>cajero123</strong></p>
+            <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo">
+            <h1>Caja de sucursal</h1>
+            <p>Entras a tu sucursal, eliges máquina y le pones crédito. El jugador no usa este panel.</p>
+            <label>ID sucursal
+                <input type="text" name="branch_id" list="branchIds" placeholder="ej. fusion" value="fusion" autocomplete="username" required>
+                <datalist id="branchIds">
+                    <option value="fusion"></option>
+                    <option value="3b2"></option>
+                    <option value="3b5"></option>
+                    <option value="3b6"></option>
+                    <option value="3b7"></option>
+                    <option value="3b9"></option>
+                    <option value="3b10"></option>
+                </datalist>
+            </label>
+            <label>Contraseña<input type="password" name="password" value="sucursal123" autocomplete="current-password" required></label>
+            <p class="hint-login">Ejemplo: <strong>fusion</strong> / <strong>sucursal123</strong></p>
             <button type="submit">Entrar</button>
             <p class="error" id="loginError" hidden></p>
         </form>
@@ -26,48 +37,74 @@
         <header class="header">
             <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="header-logo">
             <div>
-                <h1>Caja — <span id="cashierName">Cajero</span></h1>
-                <p id="cashierBranch">Sucursal</p>
+                <h1><span id="branchName">Sucursal</span></h1>
+                <p id="branchIdLabel">ID</p>
             </div>
             <div class="float-box">
-                <span class="float-label">Saldo en caja</span>
+                <span class="float-label">Saldo sucursal</span>
                 <span class="float-val" id="floatBalance">$0</span>
             </div>
+            <button type="button" id="copyTerminalBtn" class="btn-logout" style="border-color:var(--gold);color:var(--gold)">Enlace máq. seleccionada</button>
             <button type="button" id="logoutBtn" class="btn-logout">Salir</button>
         </header>
 
+        <nav class="tabs">
+            <button type="button" class="tab active" data-tab="recarga-maquina">Recargar máquina</button>
+            <button type="button" class="tab" data-tab="jugadores">Jugadores portal</button>
+            <button type="button" class="tab" data-tab="maquinas">Máquinas</button>
+            <button type="button" class="tab" data-tab="historial">Historial</button>
+        </nav>
+
         <main class="main">
-            <section class="sell-section">
-                <h2>Vender crédito</h2>
-                <p class="hint">El cliente paga en efectivo. Selecciona la máquina y el monto.</p>
+            <section class="panel" id="panel-recarga-maquina">
+                <h2>Poner saldo a máquina</h2>
+                <p class="hint">Eliges la máquina y cargas el crédito. Luego copias el enlace de esa máquina para el jugador — él solo elige el juego.</p>
+                <p class="hint" id="floatWarn" hidden style="color:#ef4444;font-weight:600"></p>
                 <form id="sellForm" class="sell-form">
-                    <label>
-                        Número de máquina
-                        <select id="machineSelect" required></select>
-                    </label>
-                    <label>
-                        Pesos a cargar
-                        <input type="number" id="sellAmount" min="1" step="1" placeholder="50, 100, 200..." required>
-                    </label>
+                    <label>Máquina<select id="machineSelect" required></select></label>
+                    <label>Pesos a cargar<input type="number" id="sellAmount" min="1" required></label>
                     <div class="quick-btns">
                         <button type="button" data-amt="50">$50</button>
                         <button type="button" data-amt="100">$100</button>
                         <button type="button" data-amt="200">$200</button>
                         <button type="button" data-amt="500">$500</button>
                     </div>
-                    <button type="submit" class="btn-sell">Cobrar y cargar máquina</button>
+                    <button type="submit" class="btn-sell">Cargar máquina</button>
                 </form>
+                <p class="hint" id="lastLinkBox" hidden style="margin-top:16px;word-break:break-all"></p>
             </section>
 
-            <section class="history-section">
-                <h2>Mis ventas recientes</h2>
+            <section class="panel" id="panel-jugadores" hidden>
+                <h2>Jugadores del portal</h2>
+                <p class="hint">Usuario + contraseña para /portal/. El crédito puede salir del saldo de la sucursal.</p>
+                <form id="createPlayerForm" class="sell-form" style="margin-bottom:20px">
+                    <label>Nombre<input type="text" id="playerName" required></label>
+                    <label>Usuario<input type="text" id="playerUser" required autocomplete="off"></label>
+                    <label>Contraseña<input type="text" id="playerPass" placeholder="vacío = jugador123"></label>
+                    <label>Crédito inicial<input type="number" id="playerCredit" min="0" value="50"></label>
+                    <button type="submit" class="btn-sell">Crear jugador</button>
+                </form>
+                <div id="playersList" class="sales-list"></div>
+            </section>
+
+            <section class="panel" id="panel-maquinas" hidden>
+                <h2>Máquinas de la sucursal</h2>
+                <form id="createMachineForm" class="sell-form" style="margin-bottom:20px">
+                    <label>Número<input type="number" id="newMachineNum" min="1" required></label>
+                    <label>Nombre<input type="text" id="newMachineName" placeholder="Opcional"></label>
+                    <button type="submit" class="btn-sell">Crear máquina</button>
+                </form>
+                <div id="machinesList" class="sales-list"></div>
+            </section>
+
+            <section class="panel" id="panel-historial" hidden>
+                <h2>Recargas recientes</h2>
                 <div id="salesList" class="sales-list"></div>
             </section>
         </main>
     </div>
 
     <div class="toast" id="toast" hidden></div>
-
     <script src="/shared/staff-auth.js"></script>
     <script src="js/cajero.js"></script>
 </body>

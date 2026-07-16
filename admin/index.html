@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3B Pot — Panel Admin</title>
+    <title>Las 3B — Admin</title>
     <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/admin.css">
@@ -11,12 +11,11 @@
 <body>
     <div id="loginScreen" class="login-screen">
         <form id="loginForm" class="login-box">
-            <img src="/shared/assets/logo_3b.png" alt="Abarrotes Las 3B" class="brand-logo">
-            <h1>3B Pot Admin</h1>
-            <p>Panel del dueño del negocio</p>
-            <label>Email<input type="email" name="email" value="admin@winpot.local" required></label>
-            <label>Contraseña<input type="password" name="password" value="admin123" required></label>
-            <p class="hint-login">Admin: <strong>admin@winpot.local</strong> / <strong>admin123</strong></p>
+            <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo">
+            <h1>Panel Admin</h1>
+            <p>Agentes, sucursales, moneda y retención</p>
+            <label>Usuario<input type="text" name="username" value="admin" autocomplete="username" required></label>
+            <label>Contraseña<input type="password" name="password" value="admin123" autocomplete="current-password" required></label>
             <button type="submit">Entrar</button>
             <p class="error" id="loginError" hidden></p>
         </form>
@@ -24,207 +23,187 @@
 
     <div id="app" class="app">
         <aside class="sidebar">
-            <div class="brand"><img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo-sm"></div>
+            <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo-sm">
             <nav>
-                <button type="button" class="nav active" data-tab="inicio">🏠 Inicio</button>
-                <button type="button" class="nav" data-tab="sucursales">🏢 Sucursales</button>
-                <button type="button" class="nav" data-tab="retencion">🎯 Retención</button>
-                <button type="button" class="nav" data-tab="maquinas">🎰 Máquinas</button>
-                <button type="button" class="nav" data-tab="cajeros">👤 Cajeros</button>
-                <button type="button" class="nav" data-tab="ventas">💵 Ventas</button>
+                <button type="button" class="nav active" data-tab="agentes">👤 Agentes</button>
+                <button type="button" class="nav" data-tab="jugadores">🎮 Jugadores</button>
+                <button type="button" class="nav" data-tab="sucursales">🏪 Sucursales</button>
+                <button type="button" class="nav" data-tab="terminales">🎮 Terminales</button>
+                <button type="button" class="nav" data-tab="moneda">💰 Moneda virtual</button>
+                <button type="button" class="nav" data-tab="juegos">🎰 Retención juegos</button>
             </nav>
             <div class="sidebar-foot">
-                <a href="/inicio/">Ver máquinas</a>
-                <a href="/cajero/">Panel cajero</a>
+                <a href="/agente/">Panel agente</a>
+                <a href="/cajero/">Caja sucursal</a>
                 <button type="button" id="logoutBtn">Salir</button>
             </div>
         </aside>
-
         <main class="main">
-            <!-- INICIO -->
-            <section class="tab" id="tab-inicio">
-                <h1>Resumen del negocio</h1>
-                <p class="hint">Todo en pesos mexicanos (MXN). Solo ventas en efectivo en caja.</p>
-                <div class="stats" id="statsGrid"></div>
-            </section>
-
-            <!-- SUCURSALES -->
-            <section class="tab" id="tab-sucursales" hidden>
-                <h1>Sucursales</h1>
-                <p class="hint">Fusion, 3B2, 3B5, 3B6, 3B7, 3B9, 3B10 y las que agregues.</p>
-                <div class="card" style="margin-bottom:20px">
-                    <h3>Agregar sucursal</h3>
-                    <form id="createBranchForm" class="form-row-wrap">
-                        <input type="text" id="branchId" placeholder="ID (ej: 3b11)" required>
-                        <input type="text" id="branchName" placeholder="Nombre visible (ej: 3B11)" required>
-                        <button type="submit" class="btn btn--primary">Agregar</button>
-                    </form>
-                </div>
-                <div class="toolbar">
-                    <button type="button" class="btn btn--ghost" id="seedBranchesBtn">Cargar sucursales iniciales</button>
-                </div>
-                <div class="table-wrap">
-                    <table class="table" id="branchesTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nombre</th>
-                                <th>Cajeros</th>
-                                <th>Máquinas</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- RETENCIÓN -->
-            <section class="tab" id="tab-retencion" hidden>
-                <h1>Retención de premios</h1>
-                <p class="hint">Controla cuánto paga la casa. Más retención = menos premios para el jugador.</p>
-                <div class="card card--wide">
-                    <label class="slider-label">
-                        Retención de la casa: <strong id="retentionVal">15%</strong>
-                    </label>
-                    <input type="range" id="retentionSlider" min="5" max="45" value="15">
-                    <div class="slider-hints"><span>5% más premios</span><span>45% más ganancia casa</span></div>
-                    <button type="button" class="btn btn--primary" id="saveRetention">Guardar retención</button>
-                </div>
-            </section>
-
-            <!-- MÁQUINAS / CRÉDITO -->
-            <section class="tab" id="tab-maquinas" hidden>
-                <h1>Crédito en máquinas</h1>
-                <p class="hint">Cada máquina pertenece a una sucursal. Los cajeros solo venden a máquinas de su sucursal.</p>
-                <div class="toolbar">
-                    <select id="machineBranchFilter"><option value="">Todas las sucursales</option></select>
-                    <select id="newMachineBranch" required><option value="">Sucursal</option></select>
-                    <input type="number" id="newMachineNum" placeholder="Número" min="1">
-                    <input type="text" id="newMachineName" placeholder="Nombre (opcional)">
-                    <button type="button" class="btn btn--primary" id="addMachineBtn">+ Agregar máquina</button>
-                </div>
-                <div class="table-wrap">
-                    <table class="table table--credit" id="machinesTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Sucursal</th>
-                                <th>Máquina</th>
-                                <th>Estado del crédito</th>
-                                <th>Cantidad a depositar</th>
-                                <th class="col-action">+</th>
-                                <th class="col-action">−</th>
-                                <th>Fecha</th>
-                                <th>Hora</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-
-                <h3 class="section-sub">Historial de transacciones</h3>
-                <div class="table-wrap">
-                    <table class="table" id="movementsTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Máquina</th>
-                                <th>Estado del crédito</th>
-                                <th>Cantidad</th>
-                                <th class="col-action">+</th>
-                                <th class="col-action">−</th>
-                                <th>Fecha</th>
-                                <th>Hora</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- CAJEROS -->
-            <section class="tab" id="tab-cajeros" hidden>
-                <h1>Cajeros</h1>
-                <p class="hint">Recarga saldo a la caja del cajero para que pueda vender crédito a las máquinas.</p>
+            <section class="tab" id="tab-agentes">
+                <h1>Agentes</h1>
+                <p class="hint">Creas agentes e inyectas moneda. Ellos dan saldo a sucursales.</p>
                 <div class="card">
-                    <h3>Crear cajero</h3>
-                    <form id="createCashierForm" class="form-row-wrap">
-                        <input type="text" id="cashierName" placeholder="Nombre" required>
-                        <input type="email" id="cashierEmail" placeholder="Email" required>
-                        <select id="cashierBranch" required><option value="">Sucursal</option></select>
-                        <input type="text" id="cashierPass" placeholder="Contraseña (mín. 6 chars, o vacío = cajero123)">
+                    <h3>Crear agente</h3>
+                    <form id="createAgentForm" class="form-row-wrap">
+                        <input type="text" id="agentName" placeholder="Nombre" required>
+                        <input type="text" id="agentUser" placeholder="Usuario" required autocomplete="off">
+                        <input type="text" id="agentPass" placeholder="Contraseña (vacío = agente123)">
                         <button type="submit" class="btn btn--primary">Crear</button>
                     </form>
                 </div>
                 <div class="table-wrap" style="margin-top:20px">
-                    <table class="table" id="cashiersTable">
-                        <thead><tr><th>Nombre</th><th>Email</th><th>Sucursal</th><th>Saldo en caja</th><th>Acciones</th></tr></thead>
+                    <table class="table" id="agentsTable">
+                        <thead><tr><th>Nombre</th><th>Usuario</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
             </section>
 
-            <!-- VENTAS -->
-            <section class="tab" id="tab-ventas" hidden>
-                <h1>Venta directa (admin)</h1>
-                <div class="card sell-card">
-                    <form id="adminSellForm" class="form-grid">
-                        <label>Máquina<select id="sellMachine" required></select></label>
-                        <label>Pesos a cargar<input type="number" id="sellAmount" min="1" step="1" placeholder="100" required></label>
-                        <button type="submit" class="btn btn--gold">Cobrar y cargar</button>
+            <section class="tab" id="tab-jugadores" hidden>
+                <h1>Jugadores (portal)</h1>
+                <p class="hint">Usuario + contraseña para entrar en /portal/ y jugar con saldo propio.</p>
+                <div class="card">
+                    <h3>Crear jugador</h3>
+                    <form id="createPlayerForm" class="form-row-wrap">
+                        <input type="text" id="playerName" placeholder="Nombre" required>
+                        <input type="text" id="playerUser" placeholder="Usuario" required autocomplete="off">
+                        <input type="text" id="playerPass" placeholder="Clave (vacío = jugador123)">
+                        <input type="number" id="playerCredit" min="0" placeholder="Crédito inicial" value="100">
+                        <button type="submit" class="btn btn--primary">Crear</button>
                     </form>
                 </div>
-                <h3 style="margin-top:24px">Historial reciente</h3>
-                <div class="table-wrap">
-                    <table class="table" id="txTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Máquina</th>
-                                <th>Estado del crédito</th>
-                                <th>Cantidad</th>
-                                <th class="col-action">+</th>
-                                <th class="col-action">−</th>
-                                <th>Fecha</th>
-                                <th>Hora</th>
-                            </tr>
-                        </thead>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="playersTable">
+                        <thead><tr><th>Nombre</th><th>Usuario</th><th>Saldo</th><th>Acciones</th></tr></thead>
                         <tbody></tbody>
                     </table>
+                </div>
+            </section>
+
+            <section class="tab" id="tab-sucursales" hidden>
+                <h1>Sucursales</h1>
+                <p class="hint">Cada sucursal tiene contraseña, saldo y máquinas. El personal opera desde /cajero/ con el ID de sucursal.</p>
+                <div class="toolbar">
+                    <button type="button" class="btn btn--ghost" id="seedBranches">Cargar sucursales 3B</button>
+                </div>
+                <div class="card">
+                    <h3>Nueva sucursal</h3>
+                    <form id="createBranchForm" class="form-row-wrap">
+                        <input type="text" id="branchId" placeholder="id (ej. fusion)" required>
+                        <input type="text" id="branchName" placeholder="Nombre" required>
+                        <input type="text" id="branchPass" placeholder="Clave (vacío = sucursal123)">
+                        <button type="submit" class="btn btn--primary">Crear (+ 3 máquinas)</button>
+                    </form>
+                </div>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="branchesTable">
+                        <thead><tr><th>Sucursal</th><th>Saldo</th><th>Máquinas</th><th>Juegos</th><th>Portal</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="tab" id="tab-terminales" hidden>
+                <h1>Terminales</h1>
+                <p class="hint">Crea una terminal/máquina para cualquier sucursal, sin depender de que el cajero de esa sucursal lo haga desde su panel. El módulo de juegos nunca crea máquinas.</p>
+                <div class="card">
+                    <h3>Registrar terminal por sucursal</h3>
+                    <form id="createTerminalForm" class="form-grid">
+                        <label>Sucursal
+                            <select id="termBranchSel" required></select>
+                        </label>
+                        <label>Número de terminal
+                            <input type="number" id="termNumber" min="1" required>
+                        </label>
+                        <label>Nombre (opcional)
+                            <input type="text" id="termName" placeholder="ej. Fusion #4">
+                        </label>
+                        <button type="submit" class="btn btn--primary">Registrar terminal</button>
+                    </form>
+                    <p class="hint" id="termHint" style="margin-top:12px;margin-bottom:0"></p>
+                </div>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="terminalsTable">
+                        <thead><tr><th>Sucursal</th><th>Terminal</th><th>Nombre</th><th>Saldo</th><th>Estado</th><th>Enlace</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="tab" id="tab-moneda" hidden>
+                <h1>Moneda virtual</h1>
+                <p class="hint">Solo el admin genera crédito nuevo.</p>
+                <div class="stats" id="moneyStats" style="margin-bottom:24px"></div>
+                <div class="card card--wide">
+                    <h3>Inyectar a agente</h3>
+                    <form id="floatAgentForm" class="form-row-wrap">
+                        <select id="floatAgentSel" required><option value="">Agente</option></select>
+                        <input type="number" id="floatAgentAmtDirect" min="1" value="5000" required>
+                        <button type="submit" class="btn btn--gold">Inyectar</button>
+                    </form>
+                </div>
+                <div class="card card--wide" style="margin-top:16px">
+                    <h3>Inyectar a sucursal</h3>
+                    <form id="floatBranchForm" class="form-row-wrap">
+                        <select id="floatBranchSel" required><option value="">Sucursal</option></select>
+                        <input type="number" id="floatBranchAmt" min="1" value="1000" required>
+                        <button type="submit" class="btn btn--gold">Inyectar</button>
+                    </form>
+                </div>
+            </section>
+
+            <section class="tab" id="tab-juegos" hidden>
+                <h1>Retención de juegos</h1>
+                <p class="hint">Porcentaje que retiene la casa. Afecta Ruleta, Slot y Rancho Lazo.</p>
+                <div class="card card--wide">
+                    <label class="slider-label">Retención casa: <strong id="retentionVal">15</strong>% · RTP: <strong id="rtpVal">85</strong>%</label>
+                    <input type="range" id="retentionSlider" min="5" max="70" step="1" value="15">
+                    <div class="slider-hints"><span>5% (más premios)</span><span>70% (más casa)</span></div>
+                    <div class="form-row-wrap">
+                        <label class="inline-label">Apuesta mín<input type="number" id="minBet" min="1" value="5"></label>
+                        <label class="inline-label">Apuesta máx<input type="number" id="maxBet" min="5" value="500"></label>
+                        <button type="button" class="btn btn--primary" id="saveSettings">Guardar</button>
+                    </div>
                 </div>
             </section>
         </main>
     </div>
 
-    <div class="toast" id="toast" hidden></div>
+    <div class="modal" id="editModal">
+        <div class="modal-box modal-box--wide">
+            <h3 id="editModalTitle">Editar</h3>
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                <input type="hidden" id="editType">
+                <label>Nombre<input type="text" id="editName" required></label>
+                <label id="editEmailWrap">Usuario<input type="text" id="editUsername" autocomplete="off"></label>
+                <label id="editPassWrap">Nueva contraseña <small>(vacío = no cambiar)</small><input type="text" id="editPass"></label>
+                <label id="editGamesWrap" hidden>Juegos
+                    <div class="checkbox-row" id="editGames"></div>
+                </label>
+                <label id="editActiveWrap" class="checkbox-inline">
+                    <input type="checkbox" id="editActive" checked> Activo
+                </label>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn--ghost" id="editCancel">Cancelar</button>
+                    <button type="submit" class="btn btn--primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    <!-- Modal recarga cajero -->
     <div class="modal" id="floatModal">
         <div class="modal-box">
-            <h3>Recargar caja del cajero</h3>
-            <p id="floatCashierName"></p>
-            <label>Pesos a agregar<input type="number" id="floatAmount" min="1" value="1000"></label>
+            <h3>Inyectar saldo a agente</h3>
+            <p id="floatAgentName"></p>
+            <label>Monto<input type="number" id="floatAgentAmt" min="1" value="5000"></label>
             <div class="modal-actions">
                 <button type="button" class="btn btn--ghost" id="floatCancel">Cancelar</button>
-                <button type="button" class="btn btn--primary" id="floatConfirm">Recargar</button>
+                <button type="button" class="btn btn--primary" id="floatConfirm">Inyectar</button>
             </div>
         </div>
     </div>
-
-    <!-- Modal editar sucursal -->
-    <div class="modal" id="branchModal">
-        <div class="modal-box">
-            <h3>Editar sucursal</h3>
-            <p id="branchEditId" class="muted-xs"></p>
-            <label>Nombre visible<input type="text" id="branchEditName"></label>
-            <div class="modal-actions">
-                <button type="button" class="btn btn--ghost" id="branchCancel">Cancelar</button>
-                <button type="button" class="btn btn--primary" id="branchSave">Guardar</button>
-            </div>
-        </div>
-    </div>
-
+    <div class="toast" id="toast" hidden></div>
     <script src="/shared/staff-auth.js"></script>
     <script src="js/admin.js"></script>
 </body>

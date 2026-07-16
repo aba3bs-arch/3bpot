@@ -20,6 +20,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`Inicio:  http://localhost:${PORT}/inicio/`);
     console.log(`Cajero:  http://localhost:${PORT}/cajero/`);
     console.log(`Admin:   http://localhost:${PORT}/admin/`);
-    console.log(`Admin:   ${process.env.ADMIN_EMAIL || 'admin@winpot.local'} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
-    console.log(`Cajero:  ${process.env.CASHIER_EMAIL || 'cajero@winpot.local'} / ${process.env.CASHIER_PASSWORD || 'cajero123'}`);
+    console.log(`Admin:   ${process.env.ADMIN_USER || 'admin'} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
+    console.log(`Agente:  agente / agente123`);
+    console.log(`Caja:    fusion / sucursal123`);
 });
