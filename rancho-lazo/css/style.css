@@ -105,6 +105,59 @@ body {
   background: #7ec8e3;
 }
 
+.mobile-actions {
+  width: min(960px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 0.65rem;
+}
+
+.mobile-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0.85rem 1rem;
+  border: none;
+  border-radius: 10px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 800;
+  font-size: clamp(1rem, 3.8vw, 1.15rem);
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.22);
+}
+
+.mobile-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+}
+
+.mobile-btn.menu {
+  color: var(--ink);
+  background: linear-gradient(180deg, #fff8ea, #e8d4a8);
+  border: 2px solid var(--wood);
+}
+
+.mobile-btn.action {
+  color: var(--ink);
+  background: linear-gradient(180deg, #f0c75a, #c9922a);
+  box-shadow: 0 4px 0 #8a6418;
+}
+
+.mobile-btn.action:active {
+  box-shadow: 0 2px 0 #8a6418;
+}
+
+.mobile-btn.action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .controls {
   width: min(960px, 100%);
   display: flex;
@@ -238,4 +291,29 @@ body {
   color: #102008;
   border: none;
   box-shadow: 0 4px 0 #3d6b2a;
+}
+
+@media (max-width: 640px) {
+  #app {
+    justify-content: flex-start;
+    padding: 0.5rem;
+    gap: 0.45rem;
+    overflow-y: auto;
+  }
+
+  .controls .back-link {
+    display: none;
+  }
+
+  .mobile-actions {
+    position: sticky;
+    bottom: 0.35rem;
+    z-index: 5;
+    padding-top: 0.15rem;
+  }
+
+  .mobile-btn {
+    min-height: 3.6rem;
+    font-size: 1.05rem;
+  }
 }

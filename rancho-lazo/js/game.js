@@ -13,6 +13,8 @@
   const betDown = document.getElementById("betDown");
   const betUp = document.getElementById("betUp");
   const muteBtn = document.getElementById("muteBtn");
+  const actionBtn = document.getElementById("actionBtn");
+  const menuBtn = document.getElementById("menuBtn");
   const machineLabel = document.getElementById("machineLabel");
   const AudioFX = window.RanchoAudio;
 
@@ -59,6 +61,18 @@
     betEl.textContent = mxn(bet());
     winEl.textContent = mxn(state.lastWin);
     if (machineLabel) machineLabel.textContent = machineNumber ? "#" + machineNumber : "—";
+    refreshActionBtn();
+  }
+
+  function refreshActionBtn() {
+    if (!actionBtn) return;
+    if (!state.running) {
+      actionBtn.textContent = "JUGAR";
+      actionBtn.disabled = false;
+      return;
+    }
+    actionBtn.textContent = activeStruggle() ? "¡TIRA!" : "LANZAR";
+    actionBtn.disabled = busy;
   }
 
   function rand(a, b) { return a + Math.random() * (b - a); }
@@ -133,6 +147,10 @@
 
   async function loadBalance() {
     if (isPlayerMode) {
+      if (menuBtn) {
+        menuBtn.href = "/portal/";
+        menuBtn.textContent = "← Portal";
+      }
       if (!PlayerAuth.isLoggedIn()) {
         window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
         return;
@@ -142,7 +160,7 @@
         const data = await PlayerAuth.request('/api/auth/me');
         credits = data.user.game_balance || 0;
         refreshHud();
-        hintEl.textContent = "Saldo de jugador · Toca para lanzar";
+        hintEl.textContent = "Saldo de jugador · Usa el botón LANZAR";
       } catch (err) {
         hintEl.textContent = err.message || "Error al cargar saldo";
         titleEl.textContent = "Sin sesión";
@@ -158,7 +176,7 @@
       const data = await MachineAPI.getMachine(machineNumber);
       credits = data.balance;
       refreshHud();
-      hintEl.textContent = "Saldo de máquina · Toca para lanzar";
+      hintEl.textContent = "Saldo de máquina · Usa el botón LANZAR";
     } catch (err) {
       hintEl.textContent = err.message || "Error al cargar saldo";
       titleEl.textContent = "Sin máquina";
@@ -245,6 +263,7 @@
       AudioFX && AudioFX.miss();
     } finally {
       busy = false;
+      refreshActionBtn();
     }
   }
 
@@ -269,9 +288,10 @@
     lasso.ropeStretch = 0;
     state.shake = 4;
     playAnimalSound(animal);
-    hintEl.textContent = "¡Se resiste! Toca rápido — el lazo se rompe a los 5s";
+    hintEl.textContent = "¡Se resiste! Pulsa ¡TIRA! rápido — el lazo se rompe a los 5s";
     state.pops.push({ x: animal.x + animal.w / 2, y: animal.y - 8, text: "¡Forcejeo!", life: 0.9 });
     spawnDust(animal, 6);
+    refreshActionBtn();
   }
 
   function tugStruggle(lasso) {
@@ -406,7 +426,7 @@
     state.lastWin = 0;
     refreshHud();
     overlay.classList.add("hidden");
-    hintEl.textContent = `Toca para lanzar (cuesta ${mxn(bet())})`;
+    hintEl.textContent = `Pulsa LANZAR (cuesta ${mxn(bet())})`;
     spawnAnimal();
     AudioFX && AudioFX.crowdCheer && AudioFX.crowdCheer();
     requestAnimationFrame(loop);
@@ -1452,6 +1472,7 @@
     state.pops = state.pops.filter((p) => p.life > 0);
 
     if (state.running) update(dt);
+    refreshActionBtn();
     draw();
     requestAnimationFrame(loop);
   }
@@ -1460,6 +1481,17 @@
     e.preventDefault();
     throwLasso();
   });
+  if (actionBtn) {
+    actionBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      AudioFX && AudioFX.unlock();
+      if (!state.running) {
+        startGame();
+        return;
+      }
+      throwLasso();
+    });
+  }
   startBtn.addEventListener("click", startGame);
   betDown.addEventListener("click", () => {
     betIndex = Math.max(0, betIndex - 1);

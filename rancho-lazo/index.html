@@ -30,12 +30,17 @@
 
     <canvas id="game" width="960" height="540" aria-label="Rancho Lazo"></canvas>
 
+    <div class="mobile-actions" aria-label="Controles táctiles">
+      <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
+      <button type="button" id="actionBtn" class="mobile-btn action">JUGAR</button>
+    </div>
+
     <div class="controls">
       <button type="button" id="betDown" class="ctrl">−</button>
       <button type="button" id="betUp" class="ctrl">+</button>
       <button type="button" id="muteBtn" class="ctrl mute">🔊</button>
       <a class="back-link" href="/inicio/" data-inicio-link>← Máquinas</a>
-      <p class="hint" id="hint">Saldo de máquina · MXN · Toca para lanzar</p>
+      <p class="hint" id="hint">Saldo de máquina · MXN · Botón LANZAR</p>
     </div>
 
     <div class="overlay" id="overlay">
@@ -55,6 +60,6 @@
   <script src="/shared/machine-client.js"></script>
   <script src="/shared/player-auth.js"></script>
   <script src="js/audio.js"></script>
-  <script src="js/game.js?v=loopfix"></script>
+  <script src="js/game.js?v=mobilebtns"></script>
 </body>
 </html>
