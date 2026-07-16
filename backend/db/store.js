@@ -584,9 +584,6 @@ function getScratchPrizePool(branchId = null, userId = null) {
     };
 }
 
-    };
-}
-
 function ensureCableSessions() {
     if (!data.cable_sessions) data.cable_sessions = [];
     if (!data.counters.cable_sessions) data.counters.cable_sessions = 0;
