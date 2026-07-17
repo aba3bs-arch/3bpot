@@ -6,6 +6,7 @@ const ranchoLazo = require('../engines/rancho-lazo');
 const lagunaAnzuelo = require('../engines/laguna-anzuelo');
 const rascadito = require('../engines/rascadito');
 const desenredaCable = require('../engines/desenreda-cable');
+const loteria = require('../engines/loteria');
 const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
@@ -266,5 +267,7 @@ router.post('/user/comic-slot', authRequired, (req, res) => playUserGame(req, re
 router.post('/user/rancho-lazo', authRequired, (req, res) => playUserGame(req, res, ranchoLazo, 'rancho-lazo'));
 router.post('/user/laguna-anzuelo', authRequired, (req, res) => playUserGame(req, res, lagunaAnzuelo, 'laguna-anzuelo'));
 router.post('/user/rascadito', authRequired, (req, res) => playScratchUserGame(req, res, 'rascadito'));
+router.post('/loteria', (req, res) => playGame(req, res, loteria, 'loteria'));
+router.post('/user/loteria', authRequired, (req, res) => playUserGame(req, res, loteria, 'loteria'));
 
 module.exports = router;

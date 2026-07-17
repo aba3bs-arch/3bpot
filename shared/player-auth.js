@@ -89,9 +89,13 @@ const PlayerAuth = (function () {
         });
     }
 
+    async function playLoteria(bet) {
+        return request('/api/play/user/loteria', { method: 'POST', body: JSON.stringify({ bet }) });
+    }
+
     return {
         login, logout, request, getUser, isLoggedIn, clearSession, formatPesos,
         playSpinWheel, playComicSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito,
-        startDesenredaCable, pullDesenredaCable,
+        startDesenredaCable, pullDesenredaCable, playLoteria,
     };
 })();

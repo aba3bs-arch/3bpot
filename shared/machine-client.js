@@ -162,6 +162,17 @@ const MachineAPI = (function () {
         });
     }
 
+    async function playLoteria(bet, machineNumber, branchId) {
+        return request('/api/play/loteria', {
+            method: 'POST',
+            body: JSON.stringify({
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+                bet,
+            }),
+        });
+    }
+
     function formatPesos(n) {
         const sign = n < 0 ? '-' : '';
         return sign + '$' + Math.abs(n).toLocaleString('es-MX', { maximumFractionDigits: 0 });
@@ -190,7 +201,7 @@ const MachineAPI = (function () {
     return {
         getMachineNumber, setMachineNumber, getBranchId, setBranchId, inicioUrl, machinePortalUrl,
         getPortal, getMachine, spinWheel, spinSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito, getScratchPool,
-        startDesenredaCable, pullDesenredaCable,
+        startDesenredaCable, pullDesenredaCable, playLoteria,
         formatPesos, requireMachine, wireInicioLinks, apiBase,
     };
 })();

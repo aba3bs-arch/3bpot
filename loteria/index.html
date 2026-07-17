@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Lotería Mexicana — 3B Pot</title>
+  <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="hud">
+      <div class="brand">Lotería</div>
+      <div class="stats">
+        <span>Máq. <strong id="machineLabel">—</strong></span>
+        <span>Saldo <strong id="credits">$0</strong></span>
+        <span>Apuesta <strong id="bet">$5</strong></span>
+        <span>Premio <strong id="win">$0</strong></span>
+      </div>
+    </header>
+
+    <div class="paytable">
+      <span class="pay">🫘 ×0.5</span>
+      <span class="pay">📏 Línea ×1.5</span>
+      <span class="pay">⬜ Esquinas ×2.5</span>
+      <span class="pay">╱ Diagonal ×4</span>
+      <span class="pay">❤️ Corazón ×6</span>
+      <span class="pay jackpot">¡LOTERÍA! ×20</span>
+    </div>
+
+    <div class="stage">
+      <div class="drawn-panel">
+        <div class="drawn-label">Cantando…</div>
+        <div class="drawn-card" id="drawnCard">
+          <span class="emoji" id="drawnEmoji">🎴</span>
+          <span class="name" id="drawnName">¡Cántalas!</span>
+        </div>
+        <div class="drawn-count">Cartas: <strong id="drawnCount">0</strong></div>
+      </div>
+
+      <div class="tabla" id="tabla" aria-label="Tabla de lotería"></div>
+    </div>
+
+    <div class="mobile-actions">
+      <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
+      <button type="button" id="actionBtn" class="mobile-btn action">JUGAR</button>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="betDown" class="ctrl">−</button>
+      <button type="button" id="betUp" class="ctrl">+</button>
+      <p class="hint" id="hint">Compra tabla · MXN · ¡Cántalas!</p>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="panel">
+        <h1 id="title">Lotería Mexicana</h1>
+        <p id="subtitle">
+          Las cartas clásicas: sandía, paraguas, sol, diablito, catrín, melón, jaras…
+          Marca frijoles y gana por línea, esquinas, diagonal, corazón o ¡LOTERÍA!
+        </p>
+        <div class="panel-actions">
+          <a class="btn-link" href="/inicio/" data-inicio-link>Elegir máquina</a>
+          <button type="button" id="startBtn">¡A jugar!</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast hidden" id="toast">
+      <strong id="toastTitle">—</strong>
+      <span id="toastText">—</span>
+    </div>
+  </div>
+  <script src="/shared/machine-client.js"></script>
+  <script src="/shared/player-auth.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
