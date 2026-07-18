@@ -1,0 +1,26 @@
+{
+  "name": "3B Pot — Terminal de juegos",
+  "short_name": "3B Pot",
+  "description": "Portal de juegos instalable. Vincúlalo a cualquier sucursal 3B Pot.",
+  "start_url": "/inicio/",
+  "scope": "/inicio/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d12",
+  "theme_color": "#0d0d12",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "/shared/assets/logo_3b.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/shared/assets/logo_3b.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

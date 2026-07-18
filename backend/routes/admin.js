@@ -66,6 +66,78 @@ router.delete('/agents/:id', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+/* —— Cajeros —— */
+router.get('/cashiers', (_req, res) => res.json({ cashiers: store.listCashiers() }));
+
+router.post('/cashiers', (req, res) => {
+    const name = String(req.body.name || '').trim();
+    const username = String(req.body.username || req.body.email || '').trim();
+    const password = String(req.body.password || '').trim();
+    const branchId = req.body.branch_id || null;
+    if (!name || !username) return res.status(400).json({ error: 'Nombre y usuario requeridos' });
+    const key = username.toLowerCase().replace(/\s+/g, '');
+    if (!/^[a-z0-9._-]{3,32}$/.test(key)) {
+        return res.status(400).json({ error: 'Usuario: 3-32 caracteres (letras, números, . _ -)' });
+    }
+    if (store.findUserByUsername(key)) return res.status(409).json({ error: 'Usuario ya registrado' });
+    if (branchId && !store.findBranchById(branchId)) {
+        return res.status(404).json({ error: 'Sucursal no encontrada' });
+    }
+    const pwd = password && password.length >= 6 ? password : 'cajero123';
+    const user = store.createUser(key, bcrypt.hashSync(pwd, 10), name, 'cashier', branchId);
+    res.status(201).json({
+        cashier: store.sanitizeUser(user),
+        username: user.username,
+        password: pwd,
+        message: `Cajero ${name} creado`,
+    });
+});
+
+router.patch('/cashiers/:id', (req, res) => {
+    try {
+        const cashier = store.updateStaffUser(parseInt(req.params.id, 10), {
+            name: req.body.name,
+            username: req.body.username || req.body.email,
+            password: req.body.password || undefined,
+            active: req.body.active,
+        });
+        if (req.body.branch_id !== undefined) {
+            if (req.body.branch_id) store.assignCashierToBranch(parseInt(req.params.id, 10), req.body.branch_id);
+            else store.unassignCashier(parseInt(req.params.id, 10));
+        }
+        res.json({ cashier: store.sanitizeUser(store.findUserById(parseInt(req.params.id, 10))), message: 'Cajero actualizado' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.delete('/cashiers/:id', (req, res) => {
+    try {
+        store.deleteStaffUser(parseInt(req.params.id, 10));
+        res.json({ message: 'Cajero eliminado' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/cashiers/:id/float', (req, res) => {
+    const amount = parseInt(req.body.amount, 10);
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
+    try {
+        const balance = store.topUpCashier(parseInt(req.params.id, 10), amount, req.user.id, req.body.note);
+        res.json({ float_balance: balance, message: `$${amount} inyectados al cajero` });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+/* —— Juegos (quitar de sucursales) —— */
+router.get('/games', (_req, res) => {
+    res.json({ catalog: store.getGamesCatalog() });
+});
+
+router.delete('/games/:gameId', (req, res) => {
+    try {
+        const branchId = req.query.branch_id || req.body?.branch_id || null;
+        const out = store.removeGameEverywhere(req.params.gameId, branchId);
+        res.json({ ...out, message: out.message });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 /* —— Sucursales —— */
 router.get('/branches', (_req, res) => {
     res.json({
@@ -144,9 +216,7 @@ router.delete('/branches/:id', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-/* —— Cajeros (legado: opcional; el panel opera como sucursal) —— */
-router.get('/cashiers', (_req, res) => res.json({ cashiers: store.listCashiers() }));
-
+/* —— Cajeros (legado + panel) —— */
 router.get('/machines', (req, res) => {
     res.json({ machines: store.listMachines(req.query.branch_id || null) });
 });

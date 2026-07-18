@@ -1037,6 +1037,62 @@ function setBranchGames(branchId, games) {
     return getBranchGames(branchId);
 }
 
+function getGamesCatalog() {
+    const labels = {
+        'spin-wheel': 'Ruleta',
+        'comic-slot': 'Comic Slot',
+        'rancho-lazo': 'Rancho Lazo',
+        'laguna-anzuelo': 'Laguna Anzuelo',
+        'rascadito': 'Rascadito',
+        'desenreda-cable': 'Desenreda Cable',
+        'loteria': 'Lotería',
+    };
+    const ids = Object.keys(labels);
+    return ids.map((id) => ({
+        id,
+        name: labels[id],
+        branches: listBranches()
+            .filter((b) => getBranchGames(b.id).includes(id))
+            .map((b) => ({ id: b.id, name: b.name })),
+    }));
+}
+
+function removeGameEverywhere(gameId, branchId = null) {
+    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria'];
+    if (!allowed.includes(gameId)) throw new Error('Juego no válido');
+
+    const targets = branchId
+        ? [findBranchById(branchId)].filter(Boolean)
+        : listBranches();
+    if (!targets.length) throw new Error('Sucursal no encontrada');
+
+    let updated = 0;
+    let skipped = 0;
+    for (const branch of targets) {
+        const games = getBranchGames(branch.id);
+        if (!games.includes(gameId)) continue;
+        if (games.length <= 1) {
+            skipped += 1;
+            continue;
+        }
+        branch.games = games.filter((g) => g !== gameId);
+        updated += 1;
+    }
+    if (!updated && skipped) {
+        throw new Error('No se puede quitar: alguna sucursal quedaría sin juegos');
+    }
+    if (!updated) throw new Error('Ese juego no está activo en las sucursales indicadas');
+    persist();
+    return {
+        updated,
+        skipped,
+        catalog: getGamesCatalog(),
+        message: branchId
+            ? `Juego quitado de la sucursal`
+            : `Juego quitado de ${updated} sucursal(es)` + (skipped ? ` · ${skipped} omitida(s)` : ''),
+    };
+}
+
 function updateBranch(id, updates = {}) {
     const branch = findBranchById(id);
     if (!branch) throw new Error('Sucursal no encontrada');
@@ -1131,4 +1187,5 @@ module.exports = {
     listBranches, findBranchById, createBranch, updateBranch, deleteBranch, seedBranches, ensureDefaultBranches, branchStats,
     sanitizeBranch, setBranchPassword, topUpBranch, transferAgentToBranch, ensureBranchAuth, assertBranchMachineAccess,
     ensureMachinesForBranch, assignCashierToBranch, unassignCashier, getBranchGames, setBranchGames,
+    getGamesCatalog, removeGameEverywhere,
 };

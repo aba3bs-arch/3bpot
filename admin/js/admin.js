@@ -10,6 +10,7 @@
     let floatAgentId = null;
     let branchesCache = [];
     let agentsCache = [];
+    let cashiersCache = [];
 
     const GAME_LABELS = { 'spin-wheel': 'Ruleta', 'comic-slot': 'Slot', 'rancho-lazo': 'Rancho', 'laguna-anzuelo': 'Laguna Anzuelo', 'rascadito': 'Rascadito', 'desenreda-cable': 'Desenreda Cable', 'loteria': 'Lotería' };
     const ALL_GAMES = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria'];
@@ -45,14 +46,15 @@
             btn.classList.add('active');
             document.querySelectorAll('.tab').forEach((t) => { t.hidden = true; });
             document.getElementById('tab-' + btn.dataset.tab).hidden = false;
-            if (btn.dataset.tab === 'juegos') loadSettings();
+            if (btn.dataset.tab === 'juegos') { loadSettings(); loadGamesCatalog(); }
             if (btn.dataset.tab === 'terminales') loadTerminales();
             if (btn.dataset.tab === 'jugadores') loadPlayers();
+            if (btn.dataset.tab === 'cajeros') loadCashiers();
         });
     });
 
     async function reloadAll() {
-        await Promise.all([loadAgents(), loadBranches(), loadMoneyStats(), loadPlayers()]);
+        await Promise.all([loadAgents(), loadCashiers(), loadBranches(), loadMoneyStats(), loadPlayers()]);
     }
 
     async function loadPlayers() {
@@ -140,6 +142,82 @@
             '<option value="">Agente</option>' +
             agents.map((a) => `<option value="${a.id}">${esc(a.name)} (${StaffAuth.formatPesos(a.float_balance)})</option>`).join('');
         wireTableActions(tbody);
+    }
+
+    function branchName(id) {
+        const b = branchesCache.find((x) => x.id === id);
+        return b ? b.name : (id || '—');
+    }
+
+    function fillCashierBranchSelect() {
+        const sel = document.getElementById('cashierBranch');
+        if (!sel) return;
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">Sucursal</option>' +
+            branchesCache.map((b) => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
+        if (prev) sel.value = prev;
+    }
+
+    async function loadCashiers() {
+        if (!branchesCache.length) await loadBranches();
+        fillCashierBranchSelect();
+        const { cashiers } = await api('/cashiers');
+        cashiersCache = cashiers;
+        const tbody = document.querySelector('#cashiersTable tbody');
+        if (!tbody) return;
+        tbody.innerHTML = cashiers.map((c) => `
+            <tr>
+                <td><strong>${esc(c.name)}</strong></td>
+                <td>${esc(c.username || c.email)}</td>
+                <td>${esc(branchName(c.branch_id))}</td>
+                <td class="gold">${StaffAuth.formatPesos(c.float_balance)}</td>
+                <td>${statusBadge(c.active)}</td>
+                <td class="actions">${actionBtns('cashier', c.id)}</td>
+            </tr>`).join('') || '<tr><td colspan="6">Sin cajeros</td></tr>';
+        wireTableActions(tbody);
+    }
+
+    async function loadGamesCatalog() {
+        const tbody = document.querySelector('#gamesCatalogTable tbody');
+        if (!tbody) return;
+        const { catalog } = await api('/games');
+        tbody.innerHTML = catalog.map((g) => {
+            const branches = (g.branches || []);
+            const list = branches.length
+                ? branches.map((b) => `
+                    <span class="game-branch-chip">
+                        ${esc(b.name)}
+                        <button type="button" class="btn-xs btn-xs--danger" data-del-game="${esc(g.id)}" data-branch="${esc(b.id)}" title="Quitar de esta sucursal">×</button>
+                    </span>`).join(' ')
+                : '<em>Ninguna</em>';
+            return `<tr>
+                <td><strong>${esc(g.name)}</strong><br><small>${esc(g.id)}</small></td>
+                <td>${list}</td>
+                <td class="actions">
+                    <button type="button" class="btn-xs btn-xs--danger" data-del-game="${esc(g.id)}" ${branches.length ? '' : 'disabled'}>
+                        Quitar de todas
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+        tbody.querySelectorAll('[data-del-game]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const gameId = btn.dataset.delGame;
+                const branchId = btn.dataset.branch || '';
+                const label = GAME_LABELS[gameId] || gameId;
+                const msg = branchId
+                    ? `¿Quitar ${label} de esta sucursal?`
+                    : `¿Quitar ${label} de TODAS las sucursales?`;
+                if (!confirm(msg)) return;
+                try {
+                    const path = '/games/' + encodeURIComponent(gameId) + (branchId ? '?branch_id=' + encodeURIComponent(branchId) : '');
+                    const data = await api(path, { method: 'DELETE' });
+                    showToast(data.message || 'Juego eliminado');
+                    loadGamesCatalog();
+                    loadBranches();
+                } catch (err) { showToast(err.message, true); }
+            });
+        });
     }
 
     async function loadBranches() {
@@ -304,6 +382,14 @@
             document.getElementById('editUsername').value = a.username || a.email || '';
             document.getElementById('editPass').value = '';
             document.getElementById('editActive').checked = !!a.active;
+        } else if (type === 'cashier') {
+            const c = cashiersCache.find((x) => String(x.id) === String(id));
+            if (!c) return;
+            document.getElementById('editModalTitle').textContent = 'Editar cajero';
+            document.getElementById('editName').value = c.name;
+            document.getElementById('editUsername').value = c.username || c.email || '';
+            document.getElementById('editPass').value = '';
+            document.getElementById('editActive').checked = !!c.active;
         } else if (type === 'branch') {
             const b = branchesCache.find((x) => x.id === id);
             if (!b) return;
@@ -321,9 +407,10 @@
     }
 
     async function confirmDelete(type, id) {
-        const labels = { agent: 'agente', branch: 'sucursal' };
-        const paths = { agent: '/agents/', branch: '/branches/' };
-        if (!confirm(`¿Eliminar ${labels[type]}?`)) return;
+        const labels = { agent: 'agente', cashier: 'cajero', branch: 'sucursal' };
+        const paths = { agent: '/agents/', cashier: '/cashiers/', branch: '/branches/' };
+        if (!labels[type]) return;
+        if (!confirm(`¿Eliminar ${labels[type]}? Esta acción no se puede deshacer.`)) return;
         try {
             await api(paths[type] + id, { method: 'DELETE' });
             showToast(`${labels[type]} eliminado`);
@@ -361,12 +448,14 @@
         };
         const pwd = document.getElementById('editPass').value.trim();
         if (pwd) body.password = pwd;
-        if (type === 'agent') body.username = document.getElementById('editUsername').value;
+        if (type === 'agent' || type === 'cashier') body.username = document.getElementById('editUsername').value;
         if (type === 'branch') {
             body.games = [...document.querySelectorAll('#editGames input:checked')].map((el) => el.value);
         }
         try {
-            const path = type === 'branch' ? '/branches/' + id : '/agents/' + id;
+            const path = type === 'branch' ? '/branches/' + id
+                : type === 'cashier' ? '/cashiers/' + id
+                : '/agents/' + id;
             await api(path, { method: 'PATCH', body: JSON.stringify(body) });
             editModal.classList.remove('is-open');
             showToast('Guardado');
@@ -390,6 +479,25 @@
             showToast(`${data.message} · ${data.username} / ${data.password}`, false, 8000);
             e.target.reset();
             loadAgents();
+        } catch (err) { showToast(err.message, true); }
+    });
+
+    document.getElementById('createCashierForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            const data = await api('/cashiers', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: document.getElementById('cashierName').value,
+                    username: document.getElementById('cashierUser').value,
+                    password: document.getElementById('cashierPass').value || undefined,
+                    branch_id: document.getElementById('cashierBranch').value || null,
+                }),
+            });
+            showToast(`${data.message} · ${data.username} / ${data.password}`, false, 8000);
+            e.target.reset();
+            fillCashierBranchSelect();
+            loadCashiers();
         } catch (err) { showToast(err.message, true); }
     });
 

@@ -27,10 +27,11 @@
             <nav>
                 <button type="button" class="nav active" data-tab="agentes">👤 Agentes</button>
                 <button type="button" class="nav" data-tab="jugadores">🎮 Jugadores</button>
+                <button type="button" class="nav" data-tab="cajeros">🧾 Cajeros</button>
                 <button type="button" class="nav" data-tab="sucursales">🏪 Sucursales</button>
                 <button type="button" class="nav" data-tab="terminales">🎮 Terminales</button>
                 <button type="button" class="nav" data-tab="moneda">💰 Moneda virtual</button>
-                <button type="button" class="nav" data-tab="juegos">🎰 Retención juegos</button>
+                <button type="button" class="nav" data-tab="juegos">🎰 Juegos</button>
             </nav>
             <div class="sidebar-foot">
                 <a href="/agente/">Panel agente</a>
@@ -75,6 +76,29 @@
                 <div class="table-wrap" style="margin-top:20px">
                     <table class="table" id="playersTable">
                         <thead><tr><th>Nombre</th><th>Usuario</th><th>Saldo</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="tab" id="tab-cajeros" hidden>
+                <h1>Cajeros</h1>
+                <p class="hint">Usuarios de caja. Puedes asignarlos a una sucursal o eliminarlos.</p>
+                <div class="card">
+                    <h3>Crear cajero</h3>
+                    <form id="createCashierForm" class="form-row-wrap">
+                        <input type="text" id="cashierName" placeholder="Nombre" required>
+                        <input type="text" id="cashierUser" placeholder="Usuario" required autocomplete="off">
+                        <input type="text" id="cashierPass" placeholder="Contraseña (vacío = cajero123)">
+                        <select id="cashierBranch" required>
+                            <option value="">Sucursal</option>
+                        </select>
+                        <button type="submit" class="btn btn--primary">Crear</button>
+                    </form>
+                </div>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="cashiersTable">
+                        <thead><tr><th>Nombre</th><th>Usuario</th><th>Sucursal</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -153,8 +177,8 @@
             </section>
 
             <section class="tab" id="tab-juegos" hidden>
-                <h1>Retención de juegos</h1>
-                <p class="hint">Porcentaje que retiene la casa. Afecta Ruleta, Slot y Rancho Lazo.</p>
+                <h1>Juegos</h1>
+                <p class="hint">Retención de la casa y control de qué juegos están activos. Puedes quitar un juego de una o de todas las sucursales.</p>
                 <div class="card card--wide">
                     <label class="slider-label">Retención casa: <strong id="retentionVal">15</strong>% · RTP: <strong id="rtpVal">85</strong>%</label>
                     <input type="range" id="retentionSlider" min="5" max="70" step="1" value="15">
@@ -164,6 +188,12 @@
                         <label class="inline-label">Apuesta máx<input type="number" id="maxBet" min="5" value="500"></label>
                         <button type="button" class="btn btn--primary" id="saveSettings">Guardar</button>
                     </div>
+                </div>
+                <div class="table-wrap" style="margin-top:20px">
+                    <table class="table" id="gamesCatalogTable">
+                        <thead><tr><th>Juego</th><th>Sucursales activas</th><th>Acciones</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </section>
         </main>

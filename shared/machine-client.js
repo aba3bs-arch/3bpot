@@ -173,6 +173,36 @@ const MachineAPI = (function () {
         });
     }
 
+    function clearBinding() {
+        localStorage.removeItem(KEY);
+        localStorage.removeItem(BRANCH_KEY);
+    }
+
+    function isLinked() {
+        return !!(getBranchId() && getMachineNumber());
+    }
+
+    function bindTerminal(branchId, machineNumber) {
+        setBranchId(branchId);
+        setMachineNumber(machineNumber);
+    }
+
+    async function loginBranch(branchId, password) {
+        return request('/api/auth/login-branch', {
+            method: 'POST',
+            body: JSON.stringify({
+                branch_id: String(branchId || '').trim().toLowerCase(),
+                password,
+            }),
+        });
+    }
+
+    async function listMachines(branchId) {
+        const branch = branchId || getBranchId();
+        if (!branch) throw new Error('Sucursal requerida');
+        return request('/api/play/machines?branch=' + encodeURIComponent(branch));
+    }
+
     function formatPesos(n) {
         const sign = n < 0 ? '-' : '';
         return sign + '$' + Math.abs(n).toLocaleString('es-MX', { maximumFractionDigits: 0 });
@@ -200,6 +230,7 @@ const MachineAPI = (function () {
 
     return {
         getMachineNumber, setMachineNumber, getBranchId, setBranchId, inicioUrl, machinePortalUrl,
+        clearBinding, isLinked, bindTerminal, loginBranch, listMachines,
         getPortal, getMachine, spinWheel, spinSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito, getScratchPool,
         startDesenredaCable, pullDesenredaCable, playLoteria,
         formatPesos, requireMachine, wireInicioLinks, apiBase,

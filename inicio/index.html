@@ -2,29 +2,59 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3B Pot — Tu máquina</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0d0d12">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="3B Pot">
+    <title>3B Pot — Terminal de juegos</title>
     <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;800&display=swap" rel="stylesheet">
+    <link rel="apple-touch-icon" href="/shared/assets/logo_3b.png">
+    <link rel="manifest" href="/inicio/manifest.webmanifest">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/inicio.css">
 </head>
 <body>
     <div class="wrap">
         <header class="hero">
             <img src="/shared/assets/logo_3b.png" alt="Abarrotes Las 3B" class="hero-logo">
-            <p id="heroText">Tu máquina — elige un juego</p>
+            <p id="heroText">Terminal de juegos</p>
         </header>
 
-        <section class="machine-card" id="machineCard" hidden>
-            <h2>Falta el enlace de tu máquina</h2>
-            <p class="hint" id="setupHint">Pide en caja el enlace de tu máquina (ya tiene el crédito cargado).</p>
-            <p class="error" id="branchError" hidden></p>
+        <!-- Vinculación (solo personal de sucursal) -->
+        <section class="machine-card" id="setupCard" hidden>
+            <h2>Vincular esta terminal</h2>
+            <p class="hint">
+                Instala o abre esta app en cualquier dispositivo y vincúlala a
+                <strong>cualquier sucursal</strong> con su ID y contraseña.
+                Después el jugador solo verá juegos (sin cambiar de máquina).
+            </p>
+            <form id="linkForm">
+                <label>ID de sucursal
+                    <input type="text" id="branchIdInput" placeholder="ej. fusion" autocomplete="username" required>
+                </label>
+                <label>Contraseña de sucursal
+                    <input type="password" id="branchPassInput" placeholder="Contraseña" autocomplete="current-password" required>
+                </label>
+                <button type="submit" id="linkStepBtn">Continuar</button>
+            </form>
+            <div id="machinePickWrap" hidden>
+                <label style="margin-top:16px">Máquina de esta sucursal
+                    <select id="machineSelect" required></select>
+                </label>
+                <button type="button" id="confirmLinkBtn">Vincular y abrir juegos</button>
+            </div>
+            <p class="error" id="setupError" hidden></p>
+            <p class="hint" style="margin-top:16px;margin-bottom:0">
+                También puedes usar el enlace directo de caja:<br>
+                <code>/inicio/?branch=fusion&amp;m=1</code>
+            </p>
         </section>
 
+        <!-- Menú de juegos (jugador) -->
         <section class="machine-card" id="statusCard" hidden>
             <h2 id="machineTitle">Máquina</h2>
             <p class="balance" id="balanceInfo"></p>
-            <p class="hint" id="statusHint">El crédito ya está en esta máquina. Solo elige un juego.</p>
+            <p class="hint" id="statusHint">Solo puedes cambiar de juego. La máquina ya está vinculada.</p>
         </section>
 
         <section class="games" id="gamesSection" hidden>
@@ -33,67 +63,27 @@
         </section>
 
         <footer class="footer">
-            <a href="/cajero/">Soy caja</a>
+            <button type="button" class="linkish" id="installBtn" hidden>Instalar app</button>
+            <button type="button" class="linkish" id="unlinkBtn" hidden>Desvincular terminal</button>
         </footer>
     </div>
 
+    <div class="modal" id="unlinkModal" hidden>
+        <div class="modal-box">
+            <h3>Desvincular terminal</h3>
+            <p class="hint">Solo personal de sucursal. Confirma con la contraseña.</p>
+            <label>Contraseña
+                <input type="password" id="unlinkPass" autocomplete="current-password">
+            </label>
+            <p class="error" id="unlinkError" hidden></p>
+            <div class="modal-actions">
+                <button type="button" class="btn-ghost" id="unlinkCancel">Cancelar</button>
+                <button type="button" class="btn-danger" id="unlinkConfirm">Desvincular</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/shared/machine-client.js"></script>
-    <script>
-        const params = new URLSearchParams(location.search);
-        const branchFromUrl = params.get('branch') || params.get('branch_id');
-        const machineFromUrl = params.get('m') || params.get('machine');
-
-        if (branchFromUrl) MachineAPI.setBranchId(branchFromUrl);
-        if (machineFromUrl) MachineAPI.setMachineNumber(machineFromUrl);
-
-        const branchId = MachineAPI.getBranchId();
-        const machineNum = MachineAPI.getMachineNumber();
-
-        const gameMeta = {
-            'spin-wheel': { href: '/spin-game/', icon: '🎡', name: 'Ruleta' },
-            'comic-slot': { href: '/comic-slot/', icon: '🎰', name: 'Comic Slot' },
-            'rancho-lazo': { href: '/rancho-lazo/', icon: '🤠', name: 'Rancho Lazo' },
-            'laguna-anzuelo': { href: '/laguna-anzuelo/', icon: '🎣', name: 'Laguna Anzuelo' },
-            'rascadito': { href: '/rascadito/', icon: '🎫', name: 'Rascadito' },
-            'desenreda-cable': { href: '/desenreda-cable/', icon: '🔌', name: 'Desenreda Cable' },
-            'loteria': { href: '/loteria/', icon: '🎴', name: 'Lotería' },
-        };
-
-        async function showGames(num, branch) {
-            const data = await MachineAPI.getMachine(num, branch);
-            MachineAPI.setMachineNumber(num);
-            MachineAPI.setBranchId(branch);
-
-            document.getElementById('machineCard').hidden = true;
-            document.getElementById('statusCard').hidden = false;
-            document.getElementById('machineTitle').textContent = 'Máquina #' + num;
-            document.getElementById('heroText').textContent = 'Máquina #' + num + ' — elige tu juego';
-            document.getElementById('balanceInfo').className = 'balance';
-            document.getElementById('balanceInfo').textContent =
-                'Saldo: ' + MachineAPI.formatPesos(data.balance);
-            document.getElementById('gamesSection').hidden = false;
-
-            const q = '?m=' + num + '&branch=' + encodeURIComponent(branch);
-            const games = data.games || ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo'];
-            document.getElementById('gameGrid').innerHTML = games.map((g) => {
-                const m = gameMeta[g];
-                if (!m) return '';
-                return `<a href="${m.href}${q}" class="game-card"><span class="icon">${m.icon}</span><span class="name">${m.name}</span></a>`;
-            }).join('');
-        }
-
-        if (!branchId || !machineNum) {
-            document.getElementById('machineCard').hidden = false;
-            document.getElementById('branchError').hidden = false;
-            document.getElementById('branchError').textContent =
-                'Usa el enlace que te dan en caja, por ejemplo: /inicio/?branch=fusion&m=1';
-        } else {
-            showGames(machineNum, branchId).catch((e) => {
-                document.getElementById('machineCard').hidden = false;
-                document.getElementById('branchError').hidden = false;
-                document.getElementById('branchError').textContent = e.message;
-            });
-        }
-    </script>
+    <script src="js/inicio.js"></script>
 </body>
 </html>

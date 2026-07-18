@@ -65,6 +65,19 @@ input[type=range] { width: 100%; margin: 12px 0; accent-color: var(--gold); }
 .btn-xs { padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; margin-right: 4px; margin-bottom: 4px; }
 .btn-xs--danger { border-color: rgba(239,68,68,0.4); color: var(--red); }
 .btn-xs--danger:hover { background: rgba(239,68,68,0.15); }
+.btn-xs:disabled { opacity: 0.4; cursor: not-allowed; }
+.game-branch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 4px 2px 0;
+  padding: 2px 6px 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+}
+.game-branch-chip .btn-xs { margin: 0; padding: 0 6px; min-width: 22px; }
 .actions { white-space: nowrap; }
 .modal-box--wide { max-width: 480px; }
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
