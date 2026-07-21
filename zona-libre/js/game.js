@@ -40,6 +40,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     fireBtn: document.getElementById('fireBtn'),
     sprintBtn: document.getElementById('sprintBtn'),
     weaponBtn: document.getElementById('weaponBtn'),
+    crouchBtn: document.getElementById('crouchBtn'),
+    proneBtn: document.getElementById('proneBtn'),
+    jumpBtn: document.getElementById('jumpBtn'),
+    dodgeBtn: document.getElementById('dodgeBtn'),
     weaponName: document.getElementById('weaponName'),
     joystick: document.getElementById('joystick'),
     joyKnob: document.getElementById('joyKnob'),
@@ -68,7 +72,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   let assetsReady = false;
 
   const keys = Object.create(null);
-  const input = { x: 0, y: 0, firing: false, sprint: false };
+  const input = { x: 0, y: 0, firing: false, sprint: false, crouch: false };
+  const tap = { a: 0, d: 0 }; // double-tap dodge timing
   let joyActive = false;
   let brickTex = null;
   let grassTex = null;
@@ -320,6 +325,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       actions: { idle, walk, run },
       current: 'idle',
       hpBar,
+      baseScale: 1.05,
     };
   }
 
@@ -587,17 +593,30 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     worldRoot.add(pActor.root);
     world.player = {
       ...pActor,
+      isPlayer: true,
       x: 0, z: 6, r: 0.4,
       hp: data.playerHp,
       maxHp: data.playerMaxHp,
       angle: Math.PI,
-      walkSpeed: 8.2,
-      runSpeed: 14.5,
+      walkSpeed: 9.8,
+      runSpeed: 17.5,
+      crouchSpeed: 5.8,
+      proneSpeed: 3.4,
       vx: 0,
       vz: 0,
+      jumpY: 0,
+      jumpV: 0,
+      grounded: true,
+      stance: 'stand', // stand | crouch | prone
+      action: null, // dive | slide | dodge
+      actionT: 0,
+      actionDur: 0,
+      dodgeSign: 0,
+      dodgeCd: 0,
       shootCd: 0,
       moving: false,
       sprinting: false,
+      muzzleY: 1.42,
     };
     aim.yaw = Math.PI;
 
@@ -654,13 +673,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
         toneMapped: false,
       })
     );
-    mesh.position.set(owner.x + dir.x * 0.9, 1.42, owner.z + dir.z * 0.9);
+    mesh.position.set(owner.x + dir.x * 0.9, owner.muzzleY != null ? owner.muzzleY : 1.42, owner.z + dir.z * 0.9);
     worldRoot.add(mesh);
     if (ally) spawnMuzzle(owner.x, owner.z, yaw);
     world.bullets.push({
       mesh,
       x: mesh.position.x,
-      y: 1.42,
+      y: mesh.position.y,
       z: mesh.position.z,
       vx: dir.x * speed,
       vz: dir.z * speed,
@@ -688,12 +707,64 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   function syncActor(actor) {
     actor.root.position.x = actor.x;
     actor.root.position.z = actor.z;
-    // Soldier.glb faces -Z; add PI so walk/run match movement direction
+
+    const base = actor.baseScale || 1.05;
+    let y = actor.jumpY || 0;
+    let rx = 0;
+    let sy = base;
+    let hpY = 2.15;
+
+    if (actor.isPlayer) {
+      const st = actor.stance || 'stand';
+      const act = actor.action;
+      if (act === 'slide') {
+        rx = -0.75;
+        y = 0.08 + (actor.jumpY || 0);
+        sy = base * 0.72;
+        hpY = 1.1;
+      } else if (act === 'dive') {
+        const k = 1 - Math.max(0, actor.actionT) / (actor.actionDur || 0.55);
+        rx = -Math.PI / 2 * Math.min(1, k * 1.35);
+        y = 0.12 + (actor.jumpY || 0) * 0.3;
+        sy = base * 0.9;
+        hpY = 0.7;
+      } else if (act === 'dodge') {
+        rx = -0.35;
+        y = 0.2 + (actor.jumpY || 0);
+        sy = base * 0.85;
+        hpY = 1.4;
+      } else if (st === 'prone') {
+        rx = -Math.PI / 2 * 0.95;
+        y = 0.1;
+        sy = base * 0.95;
+        hpY = 0.55;
+      } else if (st === 'crouch') {
+        rx = -0.12;
+        y = -0.05 + (actor.jumpY || 0);
+        sy = base * 0.72;
+        hpY = 1.45;
+      } else {
+        y = actor.jumpY || 0;
+        sy = base;
+        hpY = 2.15 + y * 0.2;
+      }
+      actor.muzzleY = st === 'prone' || act === 'dive' ? 0.45 : st === 'crouch' || act === 'slide' ? 1.05 : 1.42 + (actor.jumpY || 0) * 0.5;
+      actor.r = st === 'prone' ? 0.26 : st === 'crouch' ? 0.34 : 0.4;
+    }
+
+    actor.root.position.y = y;
+    actor.root.rotation.x = rx;
     actor.root.rotation.y = actor.angle + Math.PI;
-    const pct = Math.max(0.01, actor.hp / actor.maxHp);
-    actor.hpBar.scale.x = pct;
-    actor.hpBar.material.color.setHex(pct > 0.45 ? 0x6dff7a : 0xff4d4d);
-    actor.hpBar.quaternion.copy(camera.quaternion);
+    actor.root.rotation.z = actor.action === 'dodge' ? (actor.dodgeSign || 0) * 0.45 : 0;
+    actor.root.scale.setScalar(sy);
+
+    if (actor.hpBar) {
+      actor.hpBar.position.y = hpY;
+      const pct = Math.max(0.01, actor.hp / actor.maxHp);
+      actor.hpBar.scale.x = pct;
+      actor.hpBar.material.color.setHex(pct > 0.45 ? 0x6dff7a : 0xff4d4d);
+      actor.hpBar.quaternion.copy(camera.quaternion);
+    }
   }
 
   function updateZoneVisual() {
@@ -759,6 +830,78 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     }
   }
 
+  function startPlayerAction(p, type, opts) {
+    if (!p || p.action) return false;
+    if (type === 'dodge' && p.dodgeCd > 0) return false;
+    if (type === 'jump' && (!p.grounded || p.stance === 'prone')) return false;
+
+    if (type === 'jump') {
+      p.jumpV = 7.2;
+      p.grounded = false;
+      p.stance = 'stand';
+      // small forward hop boost
+      p.vx += Math.sin(aim.yaw) * 2.2;
+      p.vz += Math.cos(aim.yaw) * 2.2;
+      return true;
+    }
+
+    if (type === 'slide') {
+      if (p.stance === 'prone') return false;
+      p.action = 'slide';
+      p.actionDur = 0.48;
+      p.actionT = 0.48;
+      p.stance = 'crouch';
+      const boost = 21;
+      p.vx = Math.sin(aim.yaw) * boost;
+      p.vz = Math.cos(aim.yaw) * boost;
+      return true;
+    }
+
+    if (type === 'dive') {
+      p.action = 'dive';
+      p.actionDur = 0.55;
+      p.actionT = 0.55;
+      const boost = 18;
+      const dirX = opts?.wx != null ? opts.wx : Math.sin(aim.yaw);
+      const dirZ = opts?.wz != null ? opts.wz : Math.cos(aim.yaw);
+      p.vx = dirX * boost;
+      p.vz = dirZ * boost;
+      p.jumpV = 2.4;
+      p.grounded = false;
+      return true;
+    }
+
+    if (type === 'dodge') {
+      const sign = opts?.sign || 1;
+      p.action = 'dodge';
+      p.actionDur = 0.32;
+      p.actionT = 0.32;
+      p.dodgeSign = sign;
+      p.dodgeCd = 0.55;
+      const side = sign;
+      const boost = 20;
+      p.vx = Math.cos(aim.yaw) * side * boost + Math.sin(aim.yaw) * 4;
+      p.vz = -Math.sin(aim.yaw) * side * boost + Math.cos(aim.yaw) * 4;
+      p.jumpV = 3.2;
+      p.grounded = false;
+      if (p.stance === 'prone') p.stance = 'crouch';
+      return true;
+    }
+    return false;
+  }
+
+  function setStance(p, stance) {
+    if (!p || p.action) return;
+    if (stance === 'prone') {
+      p.stance = 'prone';
+      p.sprinting = false;
+    } else if (stance === 'crouch') {
+      p.stance = 'crouch';
+    } else {
+      p.stance = 'stand';
+    }
+  }
+
   function update(dt) {
     if (!world.running || !world.player) return;
     const p = world.player;
@@ -775,7 +918,6 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     const inputMag = Math.hypot(mx, mz);
     if (inputMag > 1) { mx /= inputMag; mz /= inputMag; }
 
-    // Precise aim-relative movement (mouse turns aim; WASD strafe/forward)
     const cosA = Math.cos(aim.yaw);
     const sinA = Math.sin(aim.yaw);
     let wishX = sinA * (-mz) + cosA * mx;
@@ -783,42 +925,133 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     const wishMag = Math.hypot(wishX, wishZ);
     if (wishMag > 1e-4) { wishX /= wishMag; wishZ /= wishMag; }
 
-    const wantSprint = input.sprint || keys.ShiftLeft || keys.ShiftRight || keys.shift;
-    p.sprinting = wantSprint && wishMag > 0.1;
-    const maxSpeed = p.sprinting ? p.runSpeed : p.walkSpeed;
-    if (els.sprintBtn) els.sprintBtn.classList.toggle('active', !!p.sprinting);
+    // Stance input
+    const wantCrouch = input.crouch || keys.ControlLeft || keys.ControlRight || keys.KeyC || keys.c;
+    if ((keys.KeyZ || keys.z) && !keys._zLatch) {
+      keys._zLatch = true;
+      if (p.stance === 'prone') setStance(p, 'stand');
+      else if (wishMag > 0.2 || p.sprinting) startPlayerAction(p, 'dive', { wx: wishX || Math.sin(aim.yaw), wz: wishZ || Math.cos(aim.yaw) });
+      else setStance(p, 'prone');
+    }
+    if (!(keys.KeyZ || keys.z)) keys._zLatch = false;
 
-    const targetVx = wishX * maxSpeed * (wishMag > 0.05 ? 1 : 0);
-    const targetVz = wishZ * maxSpeed * (wishMag > 0.05 ? 1 : 0);
-    const accel = wishMag > 0.05 ? (p.sprinting ? 70 : 55) : 90;
-    p.vx += Math.sign(targetVx - p.vx) * Math.min(Math.abs(targetVx - p.vx), accel * dt);
-    p.vz += Math.sign(targetVz - p.vz) * Math.min(Math.abs(targetVz - p.vz), accel * dt);
-    if (wishMag < 0.05) {
-      p.vx *= Math.max(0, 1 - 14 * dt);
-      p.vz *= Math.max(0, 1 - 14 * dt);
-      if (Math.abs(p.vx) < 0.05) p.vx = 0;
-      if (Math.abs(p.vz) < 0.05) p.vz = 0;
+    // Slide: sprint + crouch
+    const wantSprint = !!(input.sprint || keys.ShiftLeft || keys.ShiftRight || keys.shift);
+    if (wantCrouch && wantSprint && wishMag > 0.2 && p.stance !== 'prone' && !p.action && p.grounded) {
+      startPlayerAction(p, 'slide');
+    } else if (wantCrouch && !p.action && p.stance !== 'prone') {
+      setStance(p, 'crouch');
+    } else if (!wantCrouch && p.stance === 'crouch' && !p.action) {
+      setStance(p, 'stand');
+    }
+
+    // Jump / get up
+    if ((keys.Space || keys[' '] || input.jumpPulse) && !keys._spaceLatch) {
+      keys._spaceLatch = true;
+      input.jumpPulse = false;
+      if (p.stance === 'prone' && !p.action) setStance(p, 'crouch');
+      else if (p.stance === 'crouch' && !p.action && !wantSprint) startPlayerAction(p, 'jump');
+      else if (!p.action) startPlayerAction(p, 'jump');
+    }
+    if (!(keys.Space || keys[' '])) keys._spaceLatch = false;
+
+    // Dodge: Alt / F / double-tap A-D / button
+    if (input.dodgePulse) {
+      const sign = input._dodgeSign || (mx !== 0 ? Math.sign(mx) : 1);
+      startPlayerAction(p, 'dodge', { sign: sign || 1 });
+      input.dodgePulse = false;
+    }
+    if ((keys.AltLeft || keys.AltRight || keys.KeyF || keys.f) && !keys._dodgeLatch) {
+      keys._dodgeLatch = true;
+      const sign = mx !== 0 ? Math.sign(mx) : 1;
+      startPlayerAction(p, 'dodge', { sign });
+    }
+    if (!(keys.AltLeft || keys.AltRight || keys.KeyF || keys.f)) keys._dodgeLatch = false;
+
+    p.dodgeCd = Math.max(0, p.dodgeCd - dt);
+
+    // Action timers
+    if (p.action) {
+      p.actionT -= dt;
+      if (p.actionT <= 0) {
+        if (p.action === 'dive') p.stance = 'prone';
+        if (p.action === 'slide') p.stance = 'crouch';
+        p.action = null;
+        p.actionT = 0;
+        p.root.rotation.z = 0;
+      }
+    }
+
+    p.sprinting = wantSprint && wishMag > 0.1 && p.stance === 'stand' && !p.action && p.grounded;
+    if (els.sprintBtn) els.sprintBtn.classList.toggle('active', !!p.sprinting);
+    if (els.crouchBtn) els.crouchBtn.classList.toggle('active', p.stance === 'crouch' || p.action === 'slide');
+    if (els.proneBtn) els.proneBtn.classList.toggle('active', p.stance === 'prone' || p.action === 'dive');
+
+    let maxSpeed = p.walkSpeed;
+    if (p.sprinting) maxSpeed = p.runSpeed;
+    else if (p.stance === 'crouch') maxSpeed = p.crouchSpeed;
+    else if (p.stance === 'prone') maxSpeed = p.proneSpeed;
+    if (p.action === 'slide' || p.action === 'dive' || p.action === 'dodge') maxSpeed = 24;
+
+    const air = !p.grounded;
+    const targetVx = (p.action ? p.vx : wishX * maxSpeed * (wishMag > 0.05 ? 1 : 0));
+    const targetVz = (p.action ? p.vz : wishZ * maxSpeed * (wishMag > 0.05 ? 1 : 0));
+    let accel = wishMag > 0.05 ? (p.sprinting ? 120 : 95) : 130;
+    if (p.stance === 'prone') accel = 40;
+    if (air) accel *= 0.45;
+    if (p.action === 'slide' || p.action === 'dive' || p.action === 'dodge') {
+      // coast with light friction during special move
+      p.vx *= Math.max(0, 1 - 1.8 * dt);
+      p.vz *= Math.max(0, 1 - 1.8 * dt);
+    } else {
+      p.vx += Math.sign(targetVx - p.vx) * Math.min(Math.abs(targetVx - p.vx), accel * dt);
+      p.vz += Math.sign(targetVz - p.vz) * Math.min(Math.abs(targetVz - p.vz), accel * dt);
+      if (wishMag < 0.05 && p.grounded) {
+        p.vx *= Math.max(0, 1 - 16 * dt);
+        p.vz *= Math.max(0, 1 - 16 * dt);
+        if (Math.abs(p.vx) < 0.08) p.vx = 0;
+        if (Math.abs(p.vz) < 0.08) p.vz = 0;
+      }
+    }
+
+    // Jump physics
+    if (!p.grounded || p.jumpV !== 0) {
+      p.jumpV -= 22 * dt;
+      p.jumpY += p.jumpV * dt;
+      if (p.jumpY <= 0) {
+        p.jumpY = 0;
+        p.jumpV = 0;
+        p.grounded = true;
+      } else {
+        p.grounded = false;
+      }
     }
 
     let nx = p.x + p.vx * dt;
     let nz = p.z + p.vz * dt;
     nx = Math.max(-half, Math.min(half, nx));
     nz = Math.max(-half, Math.min(half, nz));
-    if (!blocked(nx, p.z, p.r)) p.x = nx; else p.vx = 0;
-    if (!blocked(p.x, nz, p.r)) p.z = nz; else p.vz = 0;
+    if (!blocked(nx, p.z, p.r)) p.x = nx; else p.vx *= -0.2;
+    if (!blocked(p.x, nz, p.r)) p.z = nz; else p.vz *= -0.2;
 
     const speedNow = Math.hypot(p.vx, p.vz);
-    p.moving = speedNow > 0.35;
-    // Face aim direction (shoot where you look); soft-turn body toward move when sprinting
-    if (p.sprinting && speedNow > 1) {
+    p.moving = speedNow > 0.4;
+    if (p.sprinting && speedNow > 1 && !p.action) {
       const moveYaw = Math.atan2(p.vx, p.vz);
       let d = moveYaw - aim.yaw;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;
-      aim.yaw += d * Math.min(1, 10 * dt);
+      aim.yaw += d * Math.min(1, 8 * dt);
     }
     p.angle = aim.yaw;
-    setAnim(p, p.moving ? (p.sprinting || speedNow > 9 ? 'run' : 'walk') : 'idle');
+
+    if (p.action === 'dive' || p.action === 'slide' || p.action === 'dodge') {
+      setAnim(p, 'run');
+    } else if (p.stance === 'prone') {
+      setAnim(p, p.moving ? 'walk' : 'idle');
+    } else {
+      setAnim(p, p.moving ? (p.sprinting || speedNow > 10 ? 'run' : 'walk') : 'idle');
+    }
 
     if (world.reloadT > 0) {
       world.reloadT -= dt;
@@ -832,25 +1065,34 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     }
 
     p.shootCd = Math.max(0, p.shootCd - dt);
-    const wantFire = input.firing || keys[' '] || keys.Space || keys.Enter || keys.enter;
+    // Fire: mouse / DISPARO / Enter (Space is jump)
+    const wantFire = input.firing || keys.Enter || keys.enter;
     const wpn = currentWeapon();
-    // Light aim-assist toward nearest foe while firing (keeps feel pro, not sticky)
-    if (wantFire) {
+    const canShoot = !p.action || p.action === 'slide';
+    if (wantFire && canShoot) {
       const tgt = nearestEnemy(p);
       if (tgt) {
         const desired = Math.atan2(tgt.x - p.x, tgt.z - p.z);
         let diff = desired - aim.yaw;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
-        if (Math.abs(diff) < 0.55) aim.yaw += diff * Math.min(1, 6 * dt * (0.35 + (world.aimAssist || 0.2)));
+        const assist = p.stance === 'prone' ? 0.55 : 0.35;
+        if (Math.abs(diff) < 0.6) aim.yaw += diff * Math.min(1, 7 * dt * (assist + (world.aimAssist || 0.2)));
         p.angle = aim.yaw;
       }
     }
-    if (wantFire && p.shootCd <= 0 && world.reloadT <= 0) {
+    // Stance accuracy: prone more precise (less spread handled in fire), crouch slightly better cd feel
+    const stanceCdMul = p.stance === 'prone' ? 0.92 : p.stance === 'crouch' ? 0.96 : 1;
+    if (wantFire && canShoot && p.shootCd <= 0 && world.reloadT <= 0) {
       if (world.ammo > 0) {
         world.ammo -= 1;
-        p.shootCd = wpn.cd;
+        p.shootCd = wpn.cd * stanceCdMul;
+        // temporarily tighten spread when prone
+        const oldSpread = wpn.spread;
+        if (p.stance === 'prone') wpn.spread *= 0.45;
+        if (p.stance === 'crouch') wpn.spread *= 0.7;
         firePlayerWeapon(p);
+        wpn.spread = oldSpread;
         if (world.ammo === 0 && world.reserve > 0) world.reloadT = wpn.reload;
       } else if (world.reserve > 0) world.reloadT = wpn.reload;
     }
@@ -894,7 +1136,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       if (e.shootCd <= 0 && canSee) {
         // More aggressive as level rises; slight inaccuracy
         const inacc = Math.max(0.02, 0.12 - (session?.level || 1) * 0.008);
-        e.angle = toPlayer + (Math.random() - 0.5) * inacc;
+        e.angle = toPlayer + (Math.random() - 0.5) * inacc * (p.stance === 'prone' ? 1.8 : p.stance === 'crouch' ? 1.25 : 1);
         e.shootCd = rand(0.35, 0.75);
         fireBullet(e, false, world.enemyDmg, 24 + Math.min(8, (session?.level || 1) * 0.4));
         e.angle = toPlayer;
@@ -981,18 +1223,23 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
     syncActor(p);
 
-    // Tighter cinematic camera behind aim
-    const back = p.sprinting ? 6.6 : 7.2;
-    const height = p.sprinting ? 3.9 : 4.15;
-    const cx = p.x - Math.sin(aim.yaw) * back;
-    const cz = p.z - Math.cos(aim.yaw) * back;
-    const camLerp = 1 - Math.pow(0.0002, dt);
-    tmpCamPos.set(cx, height, cz);
+    // Tighter cinematic camera behind aim — height by stance
+    let camH = 4.15;
+    let camBack = 7.2;
+    if (p.stance === 'crouch' || p.action === 'slide') { camH = 3.1; camBack = 6.4; }
+    if (p.stance === 'prone' || p.action === 'dive') { camH = 2.05; camBack = 5.6; }
+    if (p.sprinting) { camH += 0.15; camBack -= 0.5; }
+    camH += (p.jumpY || 0) * 0.65;
+    const cx = p.x - Math.sin(aim.yaw) * camBack;
+    const cz = p.z - Math.cos(aim.yaw) * camBack;
+    const camLerp = 1 - Math.pow(0.00015, dt);
+    tmpCamPos.set(cx, camH, cz);
     camera.position.lerp(tmpCamPos, camLerp);
-    tmpLook.set(p.x + Math.sin(aim.yaw) * 2.5, 1.35, p.z + Math.cos(aim.yaw) * 2.5);
+    const lookY = p.stance === 'prone' ? 0.55 : p.stance === 'crouch' ? 1.05 : 1.4;
+    tmpLook.set(p.x + Math.sin(aim.yaw) * 2.8, lookY + (p.jumpY || 0) * 0.4, p.z + Math.cos(aim.yaw) * 2.8);
     camera.lookAt(tmpLook);
-    const targetFov = p.sprinting ? 60 : 55;
-    camera.fov += (targetFov - camera.fov) * Math.min(1, 8 * dt);
+    const targetFov = p.sprinting ? 62 : p.action === 'dodge' ? 58 : 54;
+    camera.fov += (targetFov - camera.fov) * Math.min(1, 10 * dt);
     camera.updateProjectionMatrix();
 
     const heading = ((aim.yaw * 180) / Math.PI + 360) % 360;
@@ -1222,26 +1469,37 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     keys[e.code] = true;
     keys[e.key.toLowerCase()] = true;
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = true;
+    if (e.code === 'ControlLeft' || e.code === 'ControlRight') input.crouch = true;
     if (e.code === 'Digit1' || e.key === '1') setWeapon(0);
     if (e.code === 'Digit2' || e.key === '2') setWeapon(1);
     if (e.code === 'Digit3' || e.key === '3') setWeapon(2);
-    if (e.code === 'KeyQ' || e.code === 'KeyE' || e.key === 'q' || e.key === 'e') {
+    if (e.code === 'KeyQ' || e.code === 'KeyE') {
       e.preventDefault();
       cycleWeapon();
     }
+    // Double-tap A/D = dodge
+    const now = performance.now();
+    if (e.code === 'KeyA') {
+      if (now - tap.a < 280) input.dodgePulse = true, input._dodgeSign = -1;
+      tap.a = now;
+    }
+    if (e.code === 'KeyD') {
+      if (now - tap.d < 280) input.dodgePulse = true, input._dodgeSign = 1;
+      tap.d = now;
+    }
     if (e.code === 'KeyR') {
-      // reload
       const w = currentWeapon();
       if (world.running && world.reloadT <= 0 && world.ammo < w.mag && world.reserve > 0) {
         world.reloadT = w.reload;
       }
     }
-    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ControlLeft', 'ControlRight'].includes(e.code)) e.preventDefault();
   });
   window.addEventListener('keyup', (e) => {
     keys[e.code] = false;
     keys[e.key.toLowerCase()] = false;
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = false;
+    if (e.code === 'ControlLeft' || e.code === 'ControlRight') input.crouch = false;
   });
 
   renderer.domElement.addEventListener('mousedown', () => { input.firing = true; });
@@ -1288,6 +1546,33 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     els.sprintBtn.addEventListener('touchend', up);
     els.sprintBtn.addEventListener('mousedown', down);
     els.sprintBtn.addEventListener('mouseup', up);
+  }
+  if (els.crouchBtn) {
+    const down = (e) => { e.preventDefault(); input.crouch = true; };
+    const up = () => { input.crouch = false; };
+    els.crouchBtn.addEventListener('touchstart', down, { passive: false });
+    els.crouchBtn.addEventListener('touchend', up);
+    els.crouchBtn.addEventListener('mousedown', down);
+    els.crouchBtn.addEventListener('mouseup', up);
+  }
+  if (els.proneBtn) {
+    els.proneBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!world.player) return;
+      const p = world.player;
+      if (p.stance === 'prone') setStance(p, 'stand');
+      else startPlayerAction(p, 'dive', { wx: Math.sin(aim.yaw), wz: Math.cos(aim.yaw) });
+    });
+  }
+  if (els.jumpBtn) {
+    els.jumpBtn.addEventListener('click', (e) => { e.preventDefault(); input.jumpPulse = true; });
+  }
+  if (els.dodgeBtn) {
+    els.dodgeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      input.dodgePulse = true;
+      input._dodgeSign = 1;
+    });
   }
   if (els.weaponBtn) {
     els.weaponBtn.addEventListener('click', (e) => { e.preventDefault(); cycleWeapon(); });
