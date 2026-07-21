@@ -364,9 +364,14 @@ async function buildArena() {
     }
   });
 
-  for (let i = 0; i < 6; i++) {
-    const tx = -3.5 + (i % 3) * 3.5;
-    const tz = i < 3 ? -1.8 : 1.8;
+  // Trees only on the sides / back — never between camera (z>0) and fighters
+  const treeSpots = [
+    { x: -3.8, z: -2.4 },
+    { x: 3.8, z: -2.4 },
+    { x: -4.2, z: 0.2 },
+    { x: 4.2, z: 0.2 },
+  ];
+  treeSpots.forEach(({ x: tx, z: tz }) => {
     const trunk = new THREE.Mesh(
       new THREE.CylinderGeometry(0.08, 0.12, 0.9, 8),
       new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.9 })
@@ -380,7 +385,7 @@ async function buildArena() {
     leaves.position.set(tx, 1.15, tz);
     leaves.castShadow = true;
     arenaRoot.add(trunk, leaves);
-  }
+  });
 }
 
 function findBone(root, names) {
