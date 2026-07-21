@@ -1,0 +1,293 @@
+:root {
+  --sky: #5eb3e8;
+  --foam: #fff6e8;
+  --gold: #ffcc33;
+  --red: #e23b2e;
+  --ink: #1a120c;
+  --muted: #d7c4a8;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 204, 51, 0.18), transparent 42%),
+    linear-gradient(180deg, #1c2738 0%, #0d1016 100%);
+  font-family: "IBM Plex Sans", sans-serif;
+  color: var(--foam);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+#app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.55rem;
+}
+
+.hud {
+  width: min(960px, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.brand {
+  font-family: "Bungee", cursive;
+  font-size: clamp(1.15rem, 4.5vw, 1.7rem);
+  color: var(--gold);
+  text-shadow: 3px 3px 0 var(--red), -1px -1px 0 #000;
+  letter-spacing: 0.02em;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.stats strong { color: var(--gold); }
+
+.vs-row {
+  width: min(960px, 100%);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.fighter-meta .name {
+  font-family: "Archivo Black", sans-serif;
+  font-size: 0.85rem;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.fighter-meta.rival { text-align: right; }
+
+.bar {
+  height: 14px;
+  border: 2px solid #fff;
+  background: #2a1a12;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #ffcc33, #e23b2e);
+  transition: width 0.2s ease;
+}
+
+.fighter-meta.rival .bar i {
+  margin-left: auto;
+  background: linear-gradient(90deg, #e23b2e, #ff7a18);
+}
+
+.hp { font-size: 0.75rem; color: var(--muted); }
+
+.round-badge {
+  font-family: "Bungee", cursive;
+  font-size: 0.95rem;
+  color: var(--gold);
+  padding: 0.25rem 0.55rem;
+  border: 2px solid var(--gold);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+#game {
+  width: min(960px, 100%);
+  height: auto;
+  max-height: 42vh;
+  border: 3px solid #111;
+  box-shadow: 0 0 0 2px var(--gold), 0 16px 40px rgba(0, 0, 0, 0.45);
+  background: #333;
+  image-rendering: pixelated;
+}
+
+.hint {
+  width: min(960px, 100%);
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.fight-actions {
+  width: min(960px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.atk {
+  min-height: 52px;
+  border: 3px solid #111;
+  font-family: "Archivo Black", sans-serif;
+  font-size: clamp(0.85rem, 3.5vw, 1.05rem);
+  cursor: pointer;
+  color: #111;
+  box-shadow: 0 4px 0 #111;
+}
+
+.atk:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 #111; }
+.atk:disabled { opacity: 0.4; cursor: not-allowed; }
+.atk.punch { background: linear-gradient(#ffe066, #f0a202); }
+.atk.kick { background: linear-gradient(#ff8a65, #e23b2e); color: #fff; }
+.atk.block { background: linear-gradient(#80cbc4, #00897b); color: #fff; }
+
+.mobile-actions {
+  width: min(960px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.25fr;
+  gap: 0.4rem;
+}
+
+.mobile-btn {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 700;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--foam);
+  cursor: pointer;
+  border-radius: 0.4rem;
+}
+
+.mobile-btn.action {
+  background: linear-gradient(#ffe066, #f0a202);
+  color: #111;
+  border-color: transparent;
+  font-family: "Archivo Black", sans-serif;
+}
+
+.mobile-btn.danger {
+  background: rgba(226, 59, 46, 0.25);
+  border-color: rgba(226, 59, 46, 0.55);
+  color: #ffb4a8;
+}
+
+.mobile-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.controls {
+  width: min(960px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ctrl {
+  width: 42px;
+  height: 42px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--foam);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 0.4rem;
+}
+
+.tip { flex: 1; font-size: 0.75rem; color: var(--muted); }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 6, 4, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 20;
+}
+
+.overlay.hidden { display: none; }
+
+.panel {
+  width: min(440px, 100%);
+  padding: 1.35rem 1.2rem;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 204, 51, 0.25), transparent 50%),
+    #16120e;
+  border: 3px solid var(--gold);
+}
+
+.panel h1 {
+  font-family: "Bungee", cursive;
+  color: var(--gold);
+  text-shadow: 3px 3px 0 var(--red);
+  font-size: 1.55rem;
+  margin-bottom: 0.55rem;
+}
+
+.panel p {
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.92rem;
+  margin-bottom: 1rem;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.panel-actions button,
+.btn-link {
+  flex: 1;
+  min-width: 120px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}
+
+.panel-actions button {
+  background: linear-gradient(#ffe066, #f0a202);
+  color: #111;
+  font-family: "Archivo Black", sans-serif;
+}
+
+.btn-link {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--foam);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  width: min(360px, calc(100% - 1.5rem));
+  padding: 0.7rem 0.85rem;
+  background: rgba(12, 10, 8, 0.95);
+  border: 2px solid var(--gold);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  z-index: 30;
+}
+
+.toast.hidden { display: none; }
+.toast strong { color: var(--gold); font-family: "Archivo Black", sans-serif; }
+.toast span { font-size: 0.84rem; color: var(--muted); }

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Zona Libre — 3B Pot</title>
+  <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="top-hud">
+      <div class="brand-block">
+        <img class="hero-face" src="assets/hero.png" alt="Operativo" />
+        <div>
+          <div class="brand">ZONA LIBRE</div>
+          <div class="sub">Máq. <strong id="machineLabel">—</strong> · Saldo <strong id="credits">$0</strong></div>
+        </div>
+      </div>
+      <div class="mission-stats">
+        <span>Apuesta <strong id="bet">$1</strong></span>
+        <span>Nivel <strong id="level">—</strong></span>
+        <span>Premio <strong id="prize">$0</strong></span>
+        <span>Ganado <strong id="won">$0</strong></span>
+      </div>
+    </header>
+
+    <div class="stage">
+      <canvas id="game" width="960" height="540" aria-label="Arena Zona Libre"></canvas>
+
+      <div class="hud-overlay">
+        <div class="compass" id="compass">N · NE · E</div>
+        <div class="zone-timer">Zona segura: <strong id="zoneTimer">—</strong></div>
+        <div class="alive-box">
+          <div>VIVOS <strong id="aliveCount">0</strong></div>
+          <div>BAJAS <strong id="killCount">0</strong></div>
+        </div>
+
+        <div class="hp-wrap">
+          <img class="mini-face" src="assets/hero.png" alt="" />
+          <div class="hp-col">
+            <div class="hp-bar"><i id="hpFill"></i></div>
+            <span id="hpText">—</span>
+          </div>
+        </div>
+
+        <div class="weapon-box">
+          <span class="w-name">ASALTO</span>
+          <span class="w-ammo" id="ammoText">30/120</span>
+        </div>
+      </div>
+
+      <div class="touch-layer">
+        <div class="joystick" id="joystick">
+          <div class="joy-knob" id="joyKnob"></div>
+        </div>
+        <button type="button" class="fire-btn" id="fireBtn">DISPARO</button>
+      </div>
+    </div>
+
+    <p class="hint" id="hint">Elimina a todos los rivales antes de que cierre la zona. Más nivel = más difícil y mayor premio.</p>
+
+    <div class="mobile-actions">
+      <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
+      <button type="button" id="restartBtn" class="mobile-btn danger" disabled>REINICIAR</button>
+      <button type="button" id="actionBtn" class="mobile-btn action">JUGAR</button>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="betDown" class="ctrl">−</button>
+      <button type="button" id="betUp" class="ctrl">+</button>
+      <p class="tip">WASD / joystick para mover · clic o DISPARO para atacar · cada misión cobra crédito</p>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="panel">
+        <div class="panel-faces">
+          <img src="assets/hero.png" alt="" />
+          <img src="assets/rival-a.png" alt="" />
+          <img src="assets/rival-b.png" alt="" />
+        </div>
+        <h1 id="title">ZONA LIBRE</h1>
+        <p id="subtitle">
+          Combate táctico por niveles. Despeja la zona, cobra el premio una vez por nivel
+          y escala: más enemigos, más daño rival y premios más altos. Si reinicias, vuelves al nivel 1.
+        </p>
+        <div class="panel-actions">
+          <a class="btn-link" href="/inicio/" data-inicio-link>Volver a juegos</a>
+          <button type="button" id="startBtn">Entrar a la zona</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast hidden" id="toast">
+      <strong id="toastTitle">—</strong>
+      <span id="toastText">—</span>
+    </div>
+  </div>
+  <script src="/shared/machine-client.js"></script>
+  <script src="/shared/player-auth.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

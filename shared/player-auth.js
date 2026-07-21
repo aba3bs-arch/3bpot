@@ -114,10 +114,54 @@ const PlayerAuth = (function () {
         });
     }
 
+    async function startCallePelea(bet, restart) {
+        return request('/api/play/user/calle-pelea/start', {
+            method: 'POST',
+            body: JSON.stringify({ bet, restart: !!restart }),
+        });
+    }
+
+    async function actionCallePelea(sessionId, action) {
+        return request('/api/play/user/calle-pelea/action', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId, action }),
+        });
+    }
+
+    async function retryCallePelea(sessionId) {
+        return request('/api/play/user/calle-pelea/retry', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId }),
+        });
+    }
+
+    async function startZonaLibre(bet, restart) {
+        return request('/api/play/user/zona-libre/start', {
+            method: 'POST',
+            body: JSON.stringify({ bet, restart: !!restart }),
+        });
+    }
+
+    async function completeZonaLibre(sessionId, payload) {
+        return request('/api/play/user/zona-libre/complete', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId, ...payload }),
+        });
+    }
+
+    async function retryZonaLibre(sessionId) {
+        return request('/api/play/user/zona-libre/retry', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId }),
+        });
+    }
+
     return {
         login, logout, request, getUser, isLoggedIn, clearSession, formatPesos,
         playSpinWheel, playComicSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito,
         startDesenredaCable, pullDesenredaCable, playLoteria,
         startRompecabezas, moveRompecabezas, retryRompecabezas,
+        startCallePelea, actionCallePelea, retryCallePelea,
+        startZonaLibre, completeZonaLibre, retryZonaLibre,
     };
 })();
