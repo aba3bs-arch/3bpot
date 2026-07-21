@@ -324,10 +324,10 @@
         ctx.drawImage(imgRival, W / 2 + 22, H / 2 - 68, 96, 96);
         ctx.restore();
       }
-      ctx.fillStyle = '#ffcc33';
-      ctx.font = '700 26px Bungee, sans-serif';
+      ctx.fillStyle = '#f5c542';
+      ctx.font = '800 28px Archivo Black, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('¡PREPÁRATE!', W / 2, H / 2 + 60);
+      ctx.fillText('LISTOS', W / 2, H / 2 + 60);
     } else if (anim.lastNote) {
       ctx.fillStyle = '#fff';
       ctx.font = '700 18px IBM Plex Sans, sans-serif';
