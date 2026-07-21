@@ -19,6 +19,7 @@
   const machineLabel = document.getElementById('machineLabel');
   const tablaEl = document.getElementById('tabla');
   const drawnEmoji = document.getElementById('drawnEmoji');
+  const drawnArt = document.getElementById('drawnArt');
   const drawnName = document.getElementById('drawnName');
   const drawnCard = document.getElementById('drawnCard');
   const drawnCount = document.getElementById('drawnCount');
@@ -33,6 +34,15 @@
   let playing = false;
   let lastWin = 0;
   let animating = false;
+
+  function cardArtUrl(id) {
+    return 'assets/cards/card-' + id + '.png';
+  }
+
+  function cardHtml(card) {
+    const art = cardArtUrl(card.id);
+    return `<img class="art" src="${art}" alt="${card.name}" loading="lazy" onerror="this.style.display='none';this.parentElement.classList.add('no-art')" /><span class="emoji">${card.emoji || '🎴'}</span><span class="name">${card.name}</span>`;
+  }
 
   function mxn(n) {
     if (isPlayerMode) return PlayerAuth.formatPesos(n);
@@ -76,9 +86,13 @@
     tablaEl.innerHTML = '';
     for (let i = 0; i < 16; i++) {
       const cell = document.createElement('div');
-      cell.className = 'cell';
+      cell.className = 'cell no-art';
       cell.innerHTML = '<span class="emoji">🎴</span><span class="name">…</span>';
       tablaEl.appendChild(cell);
+    }
+    if (drawnArt) {
+      drawnArt.style.display = 'none';
+      drawnEmoji.classList.remove('hidden');
     }
     drawnEmoji.textContent = '🎴';
     drawnName.textContent = '¡Cántalas!';
@@ -93,9 +107,23 @@
       cell.className = 'cell';
       if (marked && marked[i]) cell.classList.add('marked');
       if (winSet.has(i) && marked && marked[i]) cell.classList.add('win');
-      cell.innerHTML = `<span class="emoji">${card.emoji}</span><span class="name">${card.name}</span>`;
+      cell.innerHTML = cardHtml(card);
       tablaEl.appendChild(cell);
     });
+  }
+
+  function showDrawn(card) {
+    if (drawnArt && card?.id) {
+      drawnArt.style.display = '';
+      drawnArt.src = cardArtUrl(card.id);
+      drawnArt.alt = card.name;
+      drawnEmoji.classList.add('hidden');
+    } else {
+      if (drawnArt) drawnArt.style.display = 'none';
+      drawnEmoji.classList.remove('hidden');
+      drawnEmoji.textContent = card?.emoji || '🎴';
+    }
+    drawnName.textContent = card?.name || '¡Cántalas!';
   }
 
   function sleep(ms) {
@@ -113,8 +141,7 @@
 
     for (let i = 0; i < result.drawn.length; i++) {
       const card = result.drawn[i];
-      drawnEmoji.textContent = card.emoji;
-      drawnName.textContent = card.name;
+      showDrawn(card);
       drawnCount.textContent = String(i + 1);
       drawnCard.classList.remove('pulse');
       void drawnCard.offsetWidth;

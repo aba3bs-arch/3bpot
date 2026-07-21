@@ -112,26 +112,39 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
+  justify-content: flex-start;
+  gap: 0.2rem;
   border-radius: 10px;
   background: linear-gradient(160deg, #fff8ea, #f0d9a8);
   border: 3px solid var(--red);
   color: var(--ink);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
   transition: transform 0.2s ease;
+  overflow: hidden;
+  padding: 0.3rem 0.3rem 0.4rem;
 }
 
 .drawn-card.pulse {
   transform: scale(1.05);
 }
 
+.drawn-card .art {
+  width: 100%;
+  flex: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(90, 40, 20, 0.25);
+  background: #fff;
+  min-height: 0;
+}
+
 .drawn-card .emoji { font-size: 2.4rem; line-height: 1; }
+.drawn-card .emoji.hidden { display: none; }
 .drawn-card .name {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 800;
   text-align: center;
-  padding: 0 0.25rem;
+  padding: 0 0.2rem;
   line-height: 1.15;
 }
 
@@ -152,26 +165,38 @@ html, body {
 
 .cell {
   position: relative;
-  aspect-ratio: 3 / 3.4;
+  aspect-ratio: 3 / 3.6;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.1rem;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
   border-radius: 6px;
-  background: linear-gradient(180deg, #fff9ee, #f3e0b8);
-  border: 2px solid rgba(90, 40, 20, 0.2);
+  background: #fff8ea;
+  border: 2px solid rgba(90, 40, 20, 0.25);
   color: var(--ink);
   overflow: hidden;
+  padding: 2px;
 }
 
-.cell .emoji { font-size: clamp(1.1rem, 4.5vw, 1.7rem); line-height: 1; }
+.cell .art {
+  width: 100%;
+  flex: 1;
+  object-fit: cover;
+  border-radius: 4px;
+  min-height: 0;
+  background: #f5e6c8;
+}
+
+.cell .emoji { display: none; font-size: clamp(1.1rem, 4.5vw, 1.7rem); line-height: 1; }
+.cell.no-art .emoji { display: block; text-align: center; margin-top: 0.35rem; }
 .cell .name {
-  font-size: clamp(0.48rem, 1.6vw, 0.62rem);
+  font-size: clamp(0.42rem, 1.45vw, 0.58rem);
   font-weight: 800;
   text-align: center;
   line-height: 1.1;
-  padding: 0 2px;
+  padding: 2px 1px 1px;
+  background: rgba(255, 248, 234, 0.92);
 }
 
 .cell.marked::after {
