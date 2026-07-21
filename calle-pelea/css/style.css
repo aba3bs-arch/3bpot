@@ -69,10 +69,49 @@ html, body {
   font-family: "Archivo Black", sans-serif;
   font-size: 0.85rem;
   display: block;
-  margin-bottom: 0.2rem;
+}
+
+.face-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.face-row.rival { justify-content: flex-end; }
+
+.face {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 10px rgba(255, 204, 51, 0.35);
 }
 
 .fighter-meta.rival { text-align: right; }
+
+.panel-faces {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.panel-faces img {
+  width: 88px;
+  height: 88px;
+  border-radius: 0.75rem;
+  object-fit: cover;
+  border: 2px solid var(--gold);
+}
+
+.panel-faces .vs {
+  font-family: "Bungee", cursive;
+  color: var(--red);
+  font-size: 1.1rem;
+}
 
 .bar {
   height: 14px;

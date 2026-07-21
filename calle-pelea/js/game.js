@@ -135,16 +135,40 @@
     actionBtn.disabled = true;
   }
 
-  function drawFighter(x, y, facing, color, hair, pose, scale) {
+  const imgYou = new Image();
+  const imgRival = new Image();
+  imgYou.src = 'assets/you.png';
+  imgRival.src = 'assets/rival.png';
+
+  function drawPortrait(img, x, y, r) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    if (img.complete && img.naturalWidth) {
+      ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
+    } else {
+      ctx.fillStyle = '#e8b896';
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawFighter(x, y, facing, color, pose, img, scale) {
     const s = scale || 1;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(facing * s, s);
 
-    // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
-    ctx.ellipse(0, 8, 38, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 10, 48, 12, 0, 0, Math.PI * 2);
     ctx.fill();
 
     const punch = pose === 'punch';
@@ -152,124 +176,129 @@
     const block = pose === 'block';
     const hit = pose === 'hit';
 
-    const bodyX = hit ? -8 : punch ? 10 : kick ? 6 : 0;
-    const armY = punch ? -18 : block ? -8 : -4;
-    const armLen = punch ? 52 : block ? 28 : 34;
-    const legKick = kick ? 55 : 0;
+    const bodyX = hit ? -10 : punch ? 14 : kick ? 8 : 0;
+    const armY = punch ? -22 : block ? -10 : -6;
+    const armLen = punch ? 62 : block ? 30 : 40;
+    const legKick = kick ? 62 : 0;
 
-    // legs
-    ctx.strokeStyle = '#2c1810';
-    ctx.lineWidth = 14;
+    // pants / legs with shading
+    const legGrad = ctx.createLinearGradient(0, 0, 0, 60);
+    legGrad.addColorStop(0, '#2a2118');
+    legGrad.addColorStop(1, '#1a140f');
+    ctx.strokeStyle = legGrad;
+    ctx.lineWidth = 18;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(bodyX - 8, 0);
-    ctx.lineTo(bodyX - 14, 50);
-    ctx.moveTo(bodyX + 8, 0);
-    ctx.lineTo(bodyX + 10 + legKick, kick ? 20 : 50);
+    ctx.moveTo(bodyX - 10, 0);
+    ctx.lineTo(bodyX - 16, 58);
+    ctx.moveTo(bodyX + 10, 0);
+    ctx.lineTo(bodyX + 12 + legKick, kick ? 24 : 58);
     ctx.stroke();
 
-    // torso
-    ctx.fillStyle = color;
-    ctx.fillRect(bodyX - 22, -70, 44, 72);
-    // abs highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.fillRect(bodyX - 10, -50, 12, 40);
+    // torso tank
+    const torso = ctx.createLinearGradient(bodyX - 28, -90, bodyX + 28, 0);
+    torso.addColorStop(0, color);
+    torso.addColorStop(1, '#1a120c');
+    ctx.fillStyle = torso;
+    roundRect(ctx, bodyX - 28, -88, 56, 90, 10);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(bodyX - 8, -70, 10, 50);
 
     // arms
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 12;
+    ctx.strokeStyle = '#d4a078';
+    ctx.lineWidth = 14;
     ctx.beginPath();
-    ctx.moveTo(bodyX - 18, -55);
-    ctx.lineTo(bodyX - 30, armY - 10);
-    ctx.moveTo(bodyX + 18, -55);
-    ctx.lineTo(bodyX + (block ? 8 : armLen), armY);
+    ctx.moveTo(bodyX - 22, -70);
+    ctx.lineTo(bodyX - 34, armY - 8);
+    ctx.moveTo(bodyX + 22, -70);
+    ctx.lineTo(bodyX + (block ? 10 : armLen), armY);
     ctx.stroke();
 
-    // fists
-    ctx.fillStyle = '#f0c8a8';
-    ctx.beginPath();
-    ctx.arc(bodyX - 30, armY - 10, 9, 0, Math.PI * 2);
-    ctx.arc(bodyX + (block ? 8 : armLen), armY, punch ? 11 : 9, 0, Math.PI * 2);
-    ctx.fill();
-
-    // head
     ctx.fillStyle = '#e8b896';
     ctx.beginPath();
-    ctx.arc(bodyX, -92, 22, 0, Math.PI * 2);
+    ctx.arc(bodyX - 34, armY - 8, 11, 0, Math.PI * 2);
+    ctx.arc(bodyX + (block ? 10 : armLen), armY, punch ? 13 : 11, 0, Math.PI * 2);
     ctx.fill();
 
-    // hair
-    ctx.fillStyle = hair || '#1a1208';
-    ctx.beginPath();
-    ctx.moveTo(bodyX - 20, -98);
-    ctx.quadraticCurveTo(bodyX, -120, bodyX + 22, -95);
-    ctx.lineTo(bodyX + 16, -88);
-    ctx.quadraticCurveTo(bodyX, -100, bodyX - 16, -88);
-    ctx.fill();
+    // realistic head portrait
+    drawPortrait(img, bodyX, -118, 36);
 
-    // eye
-    ctx.fillStyle = '#111';
-    ctx.fillRect(bodyX + 4, -96, 6, 4);
+    // impact FX
+    if (punch || kick) {
+      ctx.fillStyle = 'rgba(255, 204, 51, 0.35)';
+      ctx.beginPath();
+      ctx.arc(bodyX + armLen + 10, armY, 18, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.restore();
   }
 
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
   function drawScene() {
-    // sky
     const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#6ec1f0');
-    sky.addColorStop(0.55, '#9fd4f5');
-    sky.addColorStop(0.55, '#6a7a4a');
-    sky.addColorStop(1, '#3d4a2e');
+    sky.addColorStop(0, '#5aa6d8');
+    sky.addColorStop(0.5, '#8ec8ea');
+    sky.addColorStop(0.5, '#5f7348');
+    sky.addColorStop(1, '#3a4a2c');
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
 
-    // building
-    ctx.fillStyle = '#8a93a0';
-    ctx.fillRect(W * 0.55, 40, 160, 200);
-    ctx.fillStyle = '#6f7886';
-    ctx.fillRect(W * 0.55 + 20, 55, 30, 22);
-    ctx.fillRect(W * 0.55 + 60, 55, 30, 22);
-    ctx.fillRect(W * 0.55 + 100, 55, 30, 22);
-    ctx.fillRect(W * 0.55 + 20, 95, 30, 22);
-    ctx.fillRect(W * 0.55 + 60, 95, 30, 22);
-    ctx.fillRect(W * 0.55 + 100, 95, 30, 22);
+    // buildings depth
+    ctx.fillStyle = '#7b8694';
+    ctx.fillRect(W * 0.58, 30, 180, 210);
+    ctx.fillStyle = '#6a7584';
+    ctx.fillRect(W * 0.42, 70, 120, 170);
+    ctx.fillStyle = '#3d6f9a';
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 4; col++) {
+        ctx.fillRect(W * 0.58 + 20 + col * 38, 50 + row * 34, 22, 18);
+      }
+    }
 
     // trees
     ctx.fillStyle = '#2f6b3a';
-    for (let i = 0; i < 6; i++) {
-      const tx = 40 + i * 70;
+    for (let i = 0; i < 7; i++) {
+      const tx = 30 + i * 55;
       ctx.beginPath();
-      ctx.moveTo(tx, 210);
-      ctx.lineTo(tx + 28, 150);
-      ctx.lineTo(tx + 56, 210);
+      ctx.moveTo(tx, 220);
+      ctx.lineTo(tx + 26, 155);
+      ctx.lineTo(tx + 52, 220);
       ctx.fill();
     }
 
-    // crowd blobs
-    for (let i = 0; i < 28; i++) {
-      const cx = 20 + (i % 14) * 30 + (Math.sin(anim.t + i) * 2);
-      const cy = 195 + Math.floor(i / 14) * 22 + Math.sin(anim.t * 3 + i) * 3;
+    // animated crowd
+    for (let i = 0; i < 30; i++) {
+      const cx = 16 + (i % 15) * 28 + Math.sin(anim.t + i) * 2;
+      const cy = 200 + Math.floor(i / 15) * 20 + Math.sin(anim.t * 3 + i) * 3;
       ctx.fillStyle = i % 3 === 0 ? '#c0392b' : i % 3 === 1 ? '#2980b9' : '#f39c12';
-      ctx.fillRect(cx, cy, 16, 20);
+      ctx.fillRect(cx, cy, 14, 18);
       ctx.fillStyle = '#e8b896';
-      ctx.fillRect(cx + 3, cy - 10, 10, 10);
+      ctx.beginPath();
+      ctx.arc(cx + 7, cy - 4, 5, 0, Math.PI * 2);
+      ctx.fill();
     }
 
-    // street
-    ctx.fillStyle = '#5a5348';
-    ctx.fillRect(0, 250, W, H - 250);
-    ctx.fillStyle = '#3f3a33';
-    ctx.fillRect(0, 250, W, 8);
+    ctx.fillStyle = '#524a40';
+    ctx.fillRect(0, 255, W, H - 255);
+    ctx.fillStyle = '#3a342c';
+    ctx.fillRect(0, 255, W, 10);
 
     const bob = Math.sin(anim.t * 4) * 2;
-    const pBase = 280 + bob + anim.playerX;
-    const eBase = 280 + bob + anim.enemyX;
     const rivalColor = session?.rival?.color || '#c45c26';
-    const rivalHair = session?.rival?.hair || '#1a1208';
 
-    drawFighter(220 + anim.playerX, pBase, 1, '#4a90d9', '#f5d76e', anim.playerPose, 1.15);
-    drawFighter(740 + anim.enemyX, eBase, -1, rivalColor, rivalHair, anim.enemyPose, 1.15);
+    drawFighter(230 + anim.playerX, 285 + bob, 1, '#4a90d9', anim.playerPose, imgYou, 1.2);
+    drawFighter(730 + anim.enemyX, 285 + bob, -1, rivalColor, anim.enemyPose, imgRival, 1.2);
 
     if (anim.flash > 0) {
       ctx.fillStyle = `rgba(255,255,255,${anim.flash * 0.35})`;
@@ -277,17 +306,33 @@
     }
 
     if (!session) {
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.fillRect(0, 0, W, H);
+      if (imgYou.complete) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(W / 2 - 70, H / 2 - 20, 48, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(imgYou, W / 2 - 118, H / 2 - 68, 96, 96);
+        ctx.restore();
+      }
+      if (imgRival.complete) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(W / 2 + 70, H / 2 - 20, 48, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(imgRival, W / 2 + 22, H / 2 - 68, 96, 96);
+        ctx.restore();
+      }
       ctx.fillStyle = '#ffcc33';
-      ctx.font = '700 28px Bungee, sans-serif';
+      ctx.font = '700 26px Bungee, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('¡PREPÁRATE!', W / 2, H / 2);
+      ctx.fillText('¡PREPÁRATE!', W / 2, H / 2 + 60);
     } else if (anim.lastNote) {
       ctx.fillStyle = '#fff';
       ctx.font = '700 18px IBM Plex Sans, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(anim.lastNote, W / 2, 40);
+      ctx.fillText(anim.lastNote, W / 2, 36);
     }
   }
 

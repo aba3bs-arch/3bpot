@@ -26,13 +26,19 @@
 
     <div class="vs-row" id="vsRow">
       <div class="fighter-meta you">
-        <span class="name">TÚ</span>
+        <div class="face-row">
+          <img class="face" src="assets/you.png" alt="Tú" />
+          <span class="name">TÚ</span>
+        </div>
         <div class="bar"><i id="playerBar"></i></div>
         <span class="hp" id="playerHp">—</span>
       </div>
       <div class="round-badge">R<span id="roundNum">0</span></div>
       <div class="fighter-meta rival">
-        <span class="name" id="rivalName">RIVAL</span>
+        <div class="face-row rival">
+          <span class="name" id="rivalName">RIVAL</span>
+          <img class="face" id="rivalFace" src="assets/rival.png" alt="Rival" />
+        </div>
         <div class="bar"><i id="enemyBar"></i></div>
         <span class="hp" id="enemyHp">—</span>
       </div>
@@ -62,11 +68,15 @@
 
     <div class="overlay" id="overlay">
       <div class="panel">
+        <div class="panel-faces">
+          <img src="assets/you.png" alt="" />
+          <span class="vs">VS</span>
+          <img src="assets/rival.png" alt="" />
+        </div>
         <h1 id="title">CALLE PELEA</h1>
         <p id="subtitle">
-          Combate arcade por niveles. Cada ronda eliges golpe, patada o bloqueo.
-          Cuanto más alto el nivel, más fuerte el rival y más grande el premio —
-          pero más difícil de ganar. El saldo se agota pelea a pelea.
+          Combate arcade por niveles con luchadores realistas. Cada ronda eliges golpe, patada o bloqueo.
+          Cuanto más alto el nivel, más fuerte el rival y más grande el premio.
         </p>
         <div class="panel-actions">
           <a class="btn-link" href="/inicio/" data-inicio-link>Volver a juegos</a>
