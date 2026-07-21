@@ -55,6 +55,18 @@ html, body {
   color: var(--foam);
 }
 
+.badge3d {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0.1rem 0.38rem;
+  border-radius: 0.35rem;
+  font-size: 0.55rem;
+  vertical-align: middle;
+  letter-spacing: 0.08em;
+  color: #1a1008;
+  background: linear-gradient(135deg, #ffe08a, var(--gold));
+}
+
 .stats {
   display: flex;
   flex-wrap: wrap;
@@ -140,16 +152,46 @@ html, body {
   backdrop-filter: blur(8px);
 }
 
-#game {
+.stage {
+  position: relative;
   width: min(980px, 100%);
-  height: auto;
-  max-height: 44vh;
   border-radius: 1rem;
+  overflow: hidden;
   border: 1px solid var(--line);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-  background: #1a2030;
-  image-rendering: auto;
 }
+
+.view3d {
+  display: block;
+  width: 100%;
+  aspect-ratio: 960 / 420;
+  max-height: 50vh;
+  background: #1a2030;
+}
+
+.view3d canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.load-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 16, 0.72);
+  color: var(--gold);
+  font-family: "Archivo Black", sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.load-banner.hidden { display: none; }
 
 .hint {
   width: min(980px, 100%);

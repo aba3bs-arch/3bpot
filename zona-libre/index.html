@@ -57,7 +57,7 @@
         </div>
 
         <div class="weapon-box">
-          <span class="w-name">ASALTO GLB</span>
+          <span class="w-name" id="weaponName">ASALTO</span>
           <span class="w-ammo" id="ammoText">30/120</span>
         </div>
       </div>
@@ -66,11 +66,15 @@
         <div class="joystick" id="joystick">
           <div class="joy-knob" id="joyKnob"></div>
         </div>
-        <button type="button" class="fire-btn" id="fireBtn">DISPARO</button>
+        <div class="right-controls">
+          <button type="button" class="util-btn" id="sprintBtn">CORRER</button>
+          <button type="button" class="util-btn" id="weaponBtn">ARMA</button>
+          <button type="button" class="fire-btn" id="fireBtn">DISPARO</button>
+        </div>
       </div>
     </div>
 
-    <p class="hint" id="hint">Modelos GLB · animaciones · bloom. Elimina rivales antes del cierre de zona.</p>
+    <p class="hint" id="hint">WASD + Shift correr · 1/2/3 o ARMA · disparo de frente. Edificios reales + GLB.</p>
 
     <div class="mobile-actions">
       <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
@@ -81,7 +85,7 @@
     <div class="controls">
       <button type="button" id="betDown" class="ctrl">−</button>
       <button type="button" id="betUp" class="ctrl">+</button>
-      <p class="tip">WASD / joystick · clic o DISPARO · cámara tercera persona</p>
+      <p class="tip">WASD · Shift correr · 1/2/3 armas · clic/DISPARO frontal · cámara TPP</p>
     </div>
 
     <div class="overlay" id="overlay">

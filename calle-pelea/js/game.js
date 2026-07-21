@@ -1,605 +1,898 @@
-(() => {
-  'use strict';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-  const isPlayerMode = new URLSearchParams(location.search).has('player');
-  const BETS = [1, 2, 5, 10, 15, 20];
+const isPlayerMode = new URLSearchParams(location.search).has('player');
+const BETS = [1, 2, 5, 10, 15, 20];
 
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width;
-  const H = canvas.height;
+const viewEl = document.getElementById('view3d');
+const loadBanner = document.getElementById('loadBanner');
 
-  const creditsEl = document.getElementById('credits');
-  const betEl = document.getElementById('bet');
-  const levelEl = document.getElementById('level');
-  const prizeEl = document.getElementById('prize');
-  const wonEl = document.getElementById('won');
-  const hintEl = document.getElementById('hint');
-  const playerBar = document.getElementById('playerBar');
-  const enemyBar = document.getElementById('enemyBar');
-  const playerHp = document.getElementById('playerHp');
-  const enemyHp = document.getElementById('enemyHp');
-  const rivalName = document.getElementById('rivalName');
-  const roundNum = document.getElementById('roundNum');
-  const overlay = document.getElementById('overlay');
-  const titleEl = document.getElementById('title');
-  const subtitleEl = document.getElementById('subtitle');
-  const startBtn = document.getElementById('startBtn');
-  const betDown = document.getElementById('betDown');
-  const betUp = document.getElementById('betUp');
-  const actionBtn = document.getElementById('actionBtn');
-  const restartBtn = document.getElementById('restartBtn');
-  const menuBtn = document.getElementById('menuBtn');
-  const machineLabel = document.getElementById('machineLabel');
-  const btnPunch = document.getElementById('btnPunch');
-  const btnKick = document.getElementById('btnKick');
-  const btnBlock = document.getElementById('btnBlock');
-  const toast = document.getElementById('toast');
-  const toastTitle = document.getElementById('toastTitle');
-  const toastText = document.getElementById('toastText');
+const creditsEl = document.getElementById('credits');
+const betEl = document.getElementById('bet');
+const levelEl = document.getElementById('level');
+const prizeEl = document.getElementById('prize');
+const wonEl = document.getElementById('won');
+const hintEl = document.getElementById('hint');
+const playerBar = document.getElementById('playerBar');
+const enemyBar = document.getElementById('enemyBar');
+const playerHp = document.getElementById('playerHp');
+const enemyHp = document.getElementById('enemyHp');
+const rivalName = document.getElementById('rivalName');
+const roundNum = document.getElementById('roundNum');
+const overlay = document.getElementById('overlay');
+const titleEl = document.getElementById('title');
+const subtitleEl = document.getElementById('subtitle');
+const startBtn = document.getElementById('startBtn');
+const betDown = document.getElementById('betDown');
+const betUp = document.getElementById('betUp');
+const actionBtn = document.getElementById('actionBtn');
+const restartBtn = document.getElementById('restartBtn');
+const menuBtn = document.getElementById('menuBtn');
+const machineLabel = document.getElementById('machineLabel');
+const btnPunch = document.getElementById('btnPunch');
+const btnKick = document.getElementById('btnKick');
+const btnBlock = document.getElementById('btnBlock');
+const toast = document.getElementById('toast');
+const toastTitle = document.getElementById('toastTitle');
+const toastText = document.getElementById('toastText');
 
-  let credits = 0;
-  let betIndex = 0;
-  let machineNumber = null;
-  let busy = false;
-  let playing = false;
-  let session = null;
-  let anim = {
-    t: 0,
-    playerPose: 'idle',
-    enemyPose: 'idle',
-    playerX: 0,
-    enemyX: 0,
-    flash: 0,
-    lastNote: '',
+let credits = 0;
+let betIndex = 0;
+let machineNumber = null;
+let busy = false;
+let playing = false;
+let session = null;
+let assetsReady = false;
+
+const clock = new THREE.Clock();
+const mixers = [];
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x6a9fc4);
+scene.fog = new THREE.Fog(0x8eb8d4, 8, 28);
+
+const camera = new THREE.PerspectiveCamera(42, 16 / 7, 0.1, 80);
+camera.position.set(0, 1.8, 4.2);
+camera.lookAt(0, 1.0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+viewEl.appendChild(renderer.domElement);
+
+const hemi = new THREE.HemisphereLight(0xd8ecff, 0x3d4a28, 0.95);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xfff1d6, 1.45);
+sun.position.set(4, 10, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 30;
+sun.shadow.camera.left = -8;
+sun.shadow.camera.right = 8;
+sun.shadow.camera.top = 8;
+sun.shadow.camera.bottom = -8;
+sun.shadow.bias = -0.0003;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0x88bbff, 0.35);
+fill.position.set(-5, 4, -3);
+scene.add(fill);
+
+const flashLight = new THREE.PointLight(0xffe08a, 0, 8, 2);
+flashLight.position.set(0, 2.2, 1.5);
+scene.add(flashLight);
+
+const arenaRoot = new THREE.Group();
+scene.add(arenaRoot);
+
+let composer;
+let bloomPass;
+
+function setupComposer() {
+  const w = viewEl.clientWidth || 960;
+  const h = viewEl.clientHeight || Math.round(w * 7 / 16);
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.42, 0.65, 0.88);
+  composer.addPass(bloomPass);
+  composer.addPass(new OutputPass());
+}
+setupComposer();
+
+function resize() {
+  const w = viewEl.clientWidth || 960;
+  const h = viewEl.clientHeight || Math.round(w * 7 / 16);
+  camera.aspect = w / Math.max(1, h);
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+  composer?.setSize(w, h);
+  bloomPass?.resolution.set(w, h);
+}
+window.addEventListener('resize', resize);
+resize();
+
+const templates = {
+  fighter: { scene: null, animations: [] },
+  rival: { scene: null, animations: [] },
+};
+
+let playerActor = null;
+let rivalActor = null;
+let flash = 0;
+let lastNote = '';
+
+function mxn(n) {
+  if (isPlayerMode) return PlayerAuth.formatPesos(n);
+  return MachineAPI.formatPesos(n);
+}
+
+function bet() {
+  return BETS[betIndex];
+}
+
+function showToast(title, text, ok) {
+  toastTitle.textContent = title;
+  toastText.textContent = text;
+  toast.style.borderColor = ok ? '#6bcb77' : ok === false ? '#e23b2e' : '#ffcc33';
+  toast.classList.remove('hidden');
+  setTimeout(() => toast.classList.add('hidden'), 2800);
+}
+
+function setFightButtons(enabled) {
+  const on = enabled && assetsReady;
+  btnPunch.disabled = !on;
+  btnKick.disabled = !on;
+  btnBlock.disabled = !on;
+}
+
+function refreshHud() {
+  creditsEl.textContent = mxn(credits);
+  betEl.textContent = mxn(bet());
+  levelEl.textContent = session ? String(session.level) : '—';
+  prizeEl.textContent = mxn(session?.prize || 0);
+  wonEl.textContent = mxn(session?.totalWon || 0);
+  roundNum.textContent = String(session?.round || 0);
+
+  if (session) {
+    const pPct = Math.max(0, (session.playerHp / session.playerMaxHp) * 100);
+    const ePct = Math.max(0, (session.enemyHp / session.enemyMaxHp) * 100);
+    playerBar.style.width = pPct + '%';
+    enemyBar.style.width = ePct + '%';
+    playerHp.textContent = `${session.playerHp}/${session.playerMaxHp}`;
+    enemyHp.textContent = `${session.enemyHp}/${session.enemyMaxHp}`;
+    rivalName.textContent = (session.rival?.name || 'RIVAL').toUpperCase();
+  } else {
+    playerBar.style.width = '100%';
+    enemyBar.style.width = '100%';
+    playerHp.textContent = '—';
+    enemyHp.textContent = '—';
+    rivalName.textContent = 'RIVAL';
+  }
+
+  if (machineLabel) {
+    machineLabel.textContent = isPlayerMode
+      ? (PlayerAuth.getUser()?.name || 'Jugador')
+      : (machineNumber ? '#' + machineNumber : '—');
+  }
+
+  restartBtn.disabled = !session || busy || !assetsReady;
+  refreshActionBtn();
+  setFightButtons(!!session && session.status === 'fighting' && !busy);
+}
+
+function refreshActionBtn() {
+  if (!assetsReady) {
+    actionBtn.textContent = 'CARGANDO…';
+    actionBtn.disabled = true;
+    return;
+  }
+  if (!playing) {
+    actionBtn.textContent = 'JUGAR';
+    actionBtn.disabled = false;
+    return;
+  }
+  if (!session) {
+    actionBtn.textContent = 'NIVEL 1';
+    actionBtn.disabled = busy;
+    return;
+  }
+  if (session.status === 'level_complete') {
+    actionBtn.textContent = 'SIGUIENTE';
+    actionBtn.disabled = busy;
+    return;
+  }
+  if (session.status === 'failed') {
+    actionBtn.textContent = 'REVANCHA';
+    actionBtn.disabled = busy;
+    return;
+  }
+  actionBtn.textContent = 'EN PELEA';
+  actionBtn.disabled = true;
+}
+
+function loadTexture(url) {
+  return new Promise((resolve) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      url,
+      (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        resolve(tex);
+      },
+      undefined,
+      () => resolve(null)
+    );
+  });
+}
+
+function makeFallbackGrass() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#4a6b38';
+  g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 800; i++) {
+    g.fillStyle = `rgba(${40 + Math.random() * 50},${80 + Math.random() * 60},${30 + Math.random() * 30},0.4)`;
+    g.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 6);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeFallbackBrick() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#8a6a55';
+  g.fillRect(0, 0, 256, 256);
+  g.fillStyle = '#6e5344';
+  for (let row = 0; row < 8; row++) {
+    const y = row * 32;
+    const off = row % 2 ? 16 : 0;
+    for (let col = -1; col < 9; col++) {
+      g.fillRect(col * 32 + off + 1, y + 1, 30, 28);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+async function buildArena() {
+  while (arenaRoot.children.length) {
+    arenaRoot.remove(arenaRoot.children[0]);
+  }
+
+  let grassTex = await loadTexture('assets/textures/grass.jpg');
+  let brickTex = await loadTexture('assets/textures/brick.jpg');
+  if (!grassTex) grassTex = makeFallbackGrass();
+  else grassTex.repeat.set(8, 8);
+  if (!brickTex) brickTex = makeFallbackBrick();
+  else brickTex.repeat.set(3, 2);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(18, 12),
+    new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.92, metalness: 0.02 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  arenaRoot.add(ground);
+
+  const street = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.5, 10),
+    new THREE.MeshStandardMaterial({ color: 0x4a463f, roughness: 0.95, metalness: 0.05 })
+  );
+  street.rotation.x = -Math.PI / 2;
+  street.position.y = 0.01;
+  street.receiveShadow = true;
+  arenaRoot.add(street);
+
+  const curbMat = new THREE.MeshStandardMaterial({ color: 0x6a655c, roughness: 0.85 });
+  [-2.4, 2.4].forEach((x) => {
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 10), curbMat);
+    curb.position.set(x, 0.04, 0);
+    curb.receiveShadow = true;
+    arenaRoot.add(curb);
+  });
+
+  const brickMat = new THREE.MeshStandardMaterial({ map: brickTex, roughness: 0.8, metalness: 0.05 });
+  const buildings = [
+    { x: -5.2, z: -3.2, w: 3.2, h: 4.2, d: 2.4 },
+    { x: 5.4, z: -2.8, w: 3.6, h: 5.0, d: 2.6 },
+    { x: -4.8, z: 2.5, w: 2.8, h: 3.4, d: 2.2 },
+    { x: 5.0, z: 2.8, w: 3.0, h: 3.8, d: 2.4 },
+    { x: 0, z: -4.5, w: 5.5, h: 3.2, d: 1.8 },
+  ];
+  buildings.forEach((b) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), brickMat.clone());
+    mesh.position.set(b.x, b.h / 2, b.z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    arenaRoot.add(mesh);
+    const winMat = new THREE.MeshStandardMaterial({
+      color: 0x9fd4ff,
+      emissive: 0x2a6088,
+      emissiveIntensity: 0.45,
+      roughness: 0.2,
+      metalness: 0.3,
+    });
+    const cols = Math.max(2, Math.floor(b.w));
+    for (let i = 0; i < cols; i++) {
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.55), winMat);
+      win.position.set(
+        b.x - b.w / 2 + 0.7 + i * ((b.w - 1.2) / Math.max(1, cols - 1)),
+        1.6 + (i % 2) * 1.1,
+        b.z + b.d / 2 + 0.02
+      );
+      arenaRoot.add(win);
+    }
+  });
+
+  for (let i = 0; i < 6; i++) {
+    const tx = -3.5 + (i % 3) * 3.5;
+    const tz = i < 3 ? -1.8 : 1.8;
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.12, 0.9, 8),
+      new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.9 })
+    );
+    trunk.position.set(tx, 0.45, tz);
+    trunk.castShadow = true;
+    const leaves = new THREE.Mesh(
+      new THREE.SphereGeometry(0.55, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0x3d7a3a, roughness: 0.85 })
+    );
+    leaves.position.set(tx, 1.15, tz);
+    leaves.castShadow = true;
+    arenaRoot.add(trunk, leaves);
+  }
+}
+
+function findBone(root, names) {
+  let found = null;
+  root.traverse((o) => {
+    if (found || !o.isBone) return;
+    const n = o.name || '';
+    if (names.some((p) => n === p || n.endsWith(p) || n.includes(p))) found = o;
+  });
+  return found;
+}
+
+function createFighter(template, facingSign, tintHex) {
+  if (!template.scene) return null;
+  const root = SkeletonUtils.clone(template.scene);
+  root.scale.setScalar(1.0);
+  root.rotation.y = facingSign > 0 ? Math.PI / 2 : -Math.PI / 2;
+
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true;
+    o.receiveShadow = true;
+    if (tintHex && o.material) {
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m, i) => {
+        const clone = m.clone();
+        if (clone.color) clone.color.lerp(new THREE.Color(tintHex), 0.32);
+        if (Array.isArray(o.material)) o.material[i] = clone;
+        else o.material = clone;
+      });
+    }
+  });
+
+  const mixer = new THREE.AnimationMixer(root);
+  const actions = {};
+  (template.animations || []).forEach((clip) => {
+    actions[clip.name] = mixer.clipAction(clip);
+  });
+  const idle = actions.Idle || actions.idle || Object.values(actions)[0] || null;
+  const walk = actions.Walk || actions.walk || idle;
+  const run = actions.Run || actions.run || walk;
+  if (idle) idle.play();
+
+  const bones = {
+    spine: findBone(root, ['mixamorigSpine', 'Spine', 'spine']),
+    spine1: findBone(root, ['mixamorigSpine1', 'Spine1']),
+    leftArm: findBone(root, ['mixamorigLeftArm', 'LeftArm', 'LeftUpperArm']),
+    rightArm: findBone(root, ['mixamorigRightArm', 'RightArm', 'RightUpperArm']),
+    leftFore: findBone(root, ['mixamorigLeftForeArm', 'LeftForeArm', 'LeftLowerArm']),
+    rightFore: findBone(root, ['mixamorigRightForeArm', 'RightForeArm', 'RightLowerArm']),
+    leftUpLeg: findBone(root, ['mixamorigLeftUpLeg', 'LeftUpLeg', 'LeftUpperLeg']),
+    rightUpLeg: findBone(root, ['mixamorigRightUpLeg', 'RightUpLeg', 'RightUpperLeg']),
   };
 
-  function mxn(n) {
-    if (isPlayerMode) return PlayerAuth.formatPesos(n);
-    return MachineAPI.formatPesos(n);
+  mixers.push(mixer);
+
+  return {
+    root,
+    mixer,
+    actions: { idle, walk, run },
+    current: 'idle',
+    facingSign,
+    bones,
+    baseX: 0,
+    pose: 'idle',
+    poseT: 0,
+    offsetX: 0,
+    offsetY: 0,
+    lean: 0,
+  };
+}
+
+function setAnim(actor, name) {
+  if (!actor || actor.current === name) return;
+  const next = actor.actions[name];
+  const prev = actor.actions[actor.current];
+  if (!next) return;
+  next.reset().fadeIn(0.15).play();
+  if (prev && prev !== next) prev.fadeOut(0.15);
+  actor.current = name;
+}
+
+function setPose(actor, pose) {
+  if (!actor) return;
+  actor.pose = pose || 'idle';
+  actor.poseT = 0.42;
+  if (pose === 'idle' || !pose) {
+    setAnim(actor, 'idle');
+    actor.offsetX = 0;
+    actor.offsetY = 0;
+    actor.lean = 0;
+    return;
+  }
+  if (pose === 'punch' || pose === 'kick') {
+    setAnim(actor, 'run');
+    actor.offsetX = 0.35 * actor.facingSign;
+    actor.offsetY = pose === 'kick' ? 0.05 : 0.02;
+    actor.lean = 0.35;
+  } else if (pose === 'block') {
+    setAnim(actor, 'idle');
+    actor.offsetX = -0.12 * actor.facingSign;
+    actor.offsetY = -0.18;
+    actor.lean = -0.15;
+  } else if (pose === 'hit') {
+    setAnim(actor, 'idle');
+    actor.offsetX = -0.28 * actor.facingSign;
+    actor.offsetY = 0.02;
+    actor.lean = -0.4;
+  }
+}
+
+function applyBonePose(actor, dt) {
+  if (!actor) return;
+  if (actor.poseT > 0) actor.poseT -= dt;
+  else if (actor.pose !== 'idle' && session?.status === 'fighting') {
+    setPose(actor, 'idle');
   }
 
-  function bet() { return BETS[betIndex]; }
+  const t = Math.max(0, Math.min(1, actor.poseT / 0.42));
+  const ease = t * t * (3 - 2 * t);
+  const ox = actor.offsetX * ease;
+  const oy = actor.offsetY * ease;
+  const lean = actor.lean * ease;
 
-  function showToast(title, text, ok) {
-    toastTitle.textContent = title;
-    toastText.textContent = text;
-    toast.style.borderColor = ok ? '#6bcb77' : ok === false ? '#e23b2e' : '#ffcc33';
-    toast.classList.remove('hidden');
-    setTimeout(() => toast.classList.add('hidden'), 2800);
+  actor.root.position.x = actor.baseX + ox;
+  if (actor.pose !== 'idle' || actor.poseT > 0) {
+    actor.root.position.y = oy;
   }
 
-  function setFightButtons(enabled) {
-    btnPunch.disabled = !enabled;
-    btnKick.disabled = !enabled;
-    btnBlock.disabled = !enabled;
+  if (actor.pose === 'idle' && actor.poseT <= 0) {
+    if (!actor.bones.spine) actor.root.rotation.z = 0;
+    return;
   }
 
-  function refreshHud() {
-    creditsEl.textContent = mxn(credits);
-    betEl.textContent = mxn(bet());
-    levelEl.textContent = session ? String(session.level) : '—';
-    prizeEl.textContent = mxn(session?.prize || 0);
-    wonEl.textContent = mxn(session?.totalWon || 0);
-    roundNum.textContent = String(session?.round || 0);
+  const { bones } = actor;
+  const side = actor.facingSign;
 
-    if (session) {
-      const pPct = Math.max(0, (session.playerHp / session.playerMaxHp) * 100);
-      const ePct = Math.max(0, (session.enemyHp / session.enemyMaxHp) * 100);
-      playerBar.style.width = pPct + '%';
-      enemyBar.style.width = ePct + '%';
-      playerHp.textContent = `${session.playerHp}/${session.playerMaxHp}`;
-      enemyHp.textContent = `${session.enemyHp}/${session.enemyMaxHp}`;
-      rivalName.textContent = (session.rival?.name || 'RIVAL').toUpperCase();
-    } else {
-      playerBar.style.width = '100%';
-      enemyBar.style.width = '100%';
-      playerHp.textContent = '—';
-      enemyHp.textContent = '—';
-      rivalName.textContent = 'RIVAL';
+  if (bones.spine) {
+    bones.spine.rotation.z = lean * 0.35 * side;
+    bones.spine.rotation.x = actor.pose === 'block' ? 0.35 * ease : actor.pose === 'hit' ? -0.25 * ease : lean * 0.15;
+  }
+  if (bones.spine1) {
+    bones.spine1.rotation.x = actor.pose === 'block' ? 0.25 * ease : 0;
+  }
+
+  if (actor.pose === 'punch') {
+    if (bones.rightArm) {
+      bones.rightArm.rotation.x = -1.4 * ease;
+      bones.rightArm.rotation.z = -0.6 * ease * side;
     }
-
-    if (machineLabel) {
-      machineLabel.textContent = isPlayerMode
-        ? (PlayerAuth.getUser()?.name || 'Jugador')
-        : (machineNumber ? '#' + machineNumber : '—');
+    if (bones.rightFore) bones.rightFore.rotation.x = -0.9 * ease;
+  } else if (actor.pose === 'kick') {
+    if (bones.rightUpLeg) {
+      bones.rightUpLeg.rotation.x = -1.5 * ease;
+      bones.rightUpLeg.rotation.z = 0.2 * ease * side;
     }
-
-    restartBtn.disabled = !session || busy;
-    refreshActionBtn();
-    setFightButtons(!!session && session.status === 'fighting' && !busy);
+    if (bones.leftArm) bones.leftArm.rotation.x = -0.5 * ease;
+  } else if (actor.pose === 'block') {
+    if (bones.leftArm) {
+      bones.leftArm.rotation.x = -1.2 * ease;
+      bones.leftArm.rotation.z = 0.8 * ease * side;
+    }
+    if (bones.rightArm) {
+      bones.rightArm.rotation.x = -1.2 * ease;
+      bones.rightArm.rotation.z = -0.8 * ease * side;
+    }
+    if (bones.leftFore) bones.leftFore.rotation.x = -1.0 * ease;
+    if (bones.rightFore) bones.rightFore.rotation.x = -1.0 * ease;
+  } else if (actor.pose === 'hit') {
+    if (bones.spine) bones.spine.rotation.x = -0.45 * ease;
+    if (bones.leftArm) bones.leftArm.rotation.x = -0.4 * ease;
+    if (bones.rightArm) bones.rightArm.rotation.x = -0.4 * ease;
   }
 
-  function refreshActionBtn() {
-    if (!playing) {
-      actionBtn.textContent = 'JUGAR';
-      actionBtn.disabled = false;
+  if (!bones.spine) {
+    actor.root.rotation.z = lean * 0.2 * side;
+  }
+}
+
+function placeFighters() {
+  if (playerActor) {
+    playerActor.baseX = -1.4;
+    playerActor.root.position.set(-1.4, 0, 0);
+    playerActor.root.rotation.y = Math.PI / 2;
+    setPose(playerActor, 'idle');
+  }
+  if (rivalActor) {
+    rivalActor.baseX = 1.4;
+    rivalActor.root.position.set(1.4, 0, 0);
+    rivalActor.root.rotation.y = -Math.PI / 2;
+    setPose(rivalActor, 'idle');
+  }
+}
+
+function applySession(data) {
+  session = {
+    sessionId: data.sessionId,
+    level: data.level,
+    prize: data.prize,
+    rival: data.rival,
+    playerHp: data.playerHp,
+    playerMaxHp: data.playerMaxHp,
+    enemyHp: data.enemyHp,
+    enemyMaxHp: data.enemyMaxHp,
+    round: data.round,
+    maxRounds: data.maxRounds,
+    status: data.status,
+    totalWon: data.totalWon || 0,
+  };
+  credits = data.balance ?? credits;
+  lastNote = data.message || '';
+  setPose(playerActor, 'idle');
+  setPose(rivalActor, 'idle');
+  refreshHud();
+}
+
+async function loadBalance() {
+  if (isPlayerMode) {
+    if (menuBtn) {
+      menuBtn.href = '/portal/';
+      menuBtn.textContent = '← Portal';
+    }
+    if (!PlayerAuth.isLoggedIn()) {
+      window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
       return;
     }
-    if (!session) {
-      actionBtn.textContent = 'NIVEL 1';
-      actionBtn.disabled = busy;
-      return;
+    try {
+      const data = await PlayerAuth.request('/api/auth/me');
+      credits = data.user.game_balance || 0;
+      refreshHud();
+    } catch (err) {
+      overlay.classList.remove('hidden');
+      titleEl.textContent = 'Sin sesión';
+      subtitleEl.textContent = err.message || 'Inicia sesión';
     }
-    if (session.status === 'level_complete') {
-      actionBtn.textContent = 'SIGUIENTE';
-      actionBtn.disabled = busy;
-      return;
-    }
-    if (session.status === 'failed') {
-      actionBtn.textContent = 'REVANCHA';
-      actionBtn.disabled = busy;
-      return;
-    }
-    actionBtn.textContent = 'EN PELEA';
-    actionBtn.disabled = true;
+    return;
   }
-
-  const imgYou = new Image();
-  const imgRival = new Image();
-  imgYou.src = 'assets/you.png';
-  imgRival.src = 'assets/rival.png';
-
-  function drawPortrait(img, x, y, r) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-    if (img.complete && img.naturalWidth) {
-      ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
-    } else {
-      ctx.fillStyle = '#e8b896';
-      ctx.fill();
-    }
-    ctx.restore();
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.stroke();
+  machineNumber = MachineAPI.requireMachine();
+  if (!machineNumber) return;
+  if (MachineAPI.wireInicioLinks) MachineAPI.wireInicioLinks();
+  try {
+    const data = await MachineAPI.getMachine(machineNumber);
+    credits = data.balance;
+    refreshHud();
+  } catch (err) {
+    overlay.classList.remove('hidden');
+    titleEl.textContent = 'Sin máquina';
+    subtitleEl.textContent = err.message || 'Selecciona máquina';
   }
+}
 
-  function drawFighter(x, y, facing, color, pose, img, scale) {
-    const s = scale || 1;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(facing * s, s);
+async function startFight(restart) {
+  if (!playing || busy || !assetsReady) return;
+  if (!isPlayerMode && !machineNumber) return;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(0, 10, 48, 12, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const punch = pose === 'punch';
-    const kick = pose === 'kick';
-    const block = pose === 'block';
-    const hit = pose === 'hit';
-
-    const bodyX = hit ? -10 : punch ? 14 : kick ? 8 : 0;
-    const armY = punch ? -22 : block ? -10 : -6;
-    const armLen = punch ? 62 : block ? 30 : 40;
-    const legKick = kick ? 62 : 0;
-
-    // pants / legs with shading
-    const legGrad = ctx.createLinearGradient(0, 0, 0, 60);
-    legGrad.addColorStop(0, '#2a2118');
-    legGrad.addColorStop(1, '#1a140f');
-    ctx.strokeStyle = legGrad;
-    ctx.lineWidth = 18;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(bodyX - 10, 0);
-    ctx.lineTo(bodyX - 16, 58);
-    ctx.moveTo(bodyX + 10, 0);
-    ctx.lineTo(bodyX + 12 + legKick, kick ? 24 : 58);
-    ctx.stroke();
-
-    // torso tank
-    const torso = ctx.createLinearGradient(bodyX - 28, -90, bodyX + 28, 0);
-    torso.addColorStop(0, color);
-    torso.addColorStop(1, '#1a120c');
-    ctx.fillStyle = torso;
-    roundRect(ctx, bodyX - 28, -88, 56, 90, 10);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    ctx.fillRect(bodyX - 8, -70, 10, 50);
-
-    // arms
-    ctx.strokeStyle = '#d4a078';
-    ctx.lineWidth = 14;
-    ctx.beginPath();
-    ctx.moveTo(bodyX - 22, -70);
-    ctx.lineTo(bodyX - 34, armY - 8);
-    ctx.moveTo(bodyX + 22, -70);
-    ctx.lineTo(bodyX + (block ? 10 : armLen), armY);
-    ctx.stroke();
-
-    ctx.fillStyle = '#e8b896';
-    ctx.beginPath();
-    ctx.arc(bodyX - 34, armY - 8, 11, 0, Math.PI * 2);
-    ctx.arc(bodyX + (block ? 10 : armLen), armY, punch ? 13 : 11, 0, Math.PI * 2);
-    ctx.fill();
-
-    // realistic head portrait
-    drawPortrait(img, bodyX, -118, 36);
-
-    // impact FX
-    if (punch || kick) {
-      ctx.fillStyle = 'rgba(255, 204, 51, 0.35)';
-      ctx.beginPath();
-      ctx.arc(bodyX + armLen + 10, armY, 18, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-
-  function roundRect(c, x, y, w, h, r) {
-    c.beginPath();
-    c.moveTo(x + r, y);
-    c.arcTo(x + w, y, x + w, y + h, r);
-    c.arcTo(x + w, y + h, x, y + h, r);
-    c.arcTo(x, y + h, x, y, r);
-    c.arcTo(x, y, x + w, y, r);
-    c.closePath();
-  }
-
-  function drawScene() {
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#5aa6d8');
-    sky.addColorStop(0.5, '#8ec8ea');
-    sky.addColorStop(0.5, '#5f7348');
-    sky.addColorStop(1, '#3a4a2c');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    // buildings depth
-    ctx.fillStyle = '#7b8694';
-    ctx.fillRect(W * 0.58, 30, 180, 210);
-    ctx.fillStyle = '#6a7584';
-    ctx.fillRect(W * 0.42, 70, 120, 170);
-    ctx.fillStyle = '#3d6f9a';
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 4; col++) {
-        ctx.fillRect(W * 0.58 + 20 + col * 38, 50 + row * 34, 22, 18);
-      }
-    }
-
-    // trees
-    ctx.fillStyle = '#2f6b3a';
-    for (let i = 0; i < 7; i++) {
-      const tx = 30 + i * 55;
-      ctx.beginPath();
-      ctx.moveTo(tx, 220);
-      ctx.lineTo(tx + 26, 155);
-      ctx.lineTo(tx + 52, 220);
-      ctx.fill();
-    }
-
-    // animated crowd
-    for (let i = 0; i < 30; i++) {
-      const cx = 16 + (i % 15) * 28 + Math.sin(anim.t + i) * 2;
-      const cy = 200 + Math.floor(i / 15) * 20 + Math.sin(anim.t * 3 + i) * 3;
-      ctx.fillStyle = i % 3 === 0 ? '#c0392b' : i % 3 === 1 ? '#2980b9' : '#f39c12';
-      ctx.fillRect(cx, cy, 14, 18);
-      ctx.fillStyle = '#e8b896';
-      ctx.beginPath();
-      ctx.arc(cx + 7, cy - 4, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.fillStyle = '#524a40';
-    ctx.fillRect(0, 255, W, H - 255);
-    ctx.fillStyle = '#3a342c';
-    ctx.fillRect(0, 255, W, 10);
-
-    const bob = Math.sin(anim.t * 4) * 2;
-    const rivalColor = session?.rival?.color || '#c45c26';
-
-    drawFighter(230 + anim.playerX, 285 + bob, 1, '#4a90d9', anim.playerPose, imgYou, 1.2);
-    drawFighter(730 + anim.enemyX, 285 + bob, -1, rivalColor, anim.enemyPose, imgRival, 1.2);
-
-    if (anim.flash > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${anim.flash * 0.35})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-
-    if (!session) {
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fillRect(0, 0, W, H);
-      if (imgYou.complete) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(W / 2 - 70, H / 2 - 20, 48, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(imgYou, W / 2 - 118, H / 2 - 68, 96, 96);
-        ctx.restore();
-      }
-      if (imgRival.complete) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(W / 2 + 70, H / 2 - 20, 48, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(imgRival, W / 2 + 22, H / 2 - 68, 96, 96);
-        ctx.restore();
-      }
-      ctx.fillStyle = '#f5c542';
-      ctx.font = '800 28px Archivo Black, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('LISTOS', W / 2, H / 2 + 60);
-    } else if (anim.lastNote) {
-      ctx.fillStyle = '#fff';
-      ctx.font = '700 18px IBM Plex Sans, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(anim.lastNote, W / 2, 36);
-    }
-  }
-
-  function loop(ts) {
-    anim.t = ts * 0.001;
-    if (anim.flash > 0) anim.flash -= 0.05;
-    if (anim.playerX) anim.playerX *= 0.85;
-    if (anim.enemyX) anim.enemyX *= 0.85;
-    drawScene();
-    requestAnimationFrame(loop);
-  }
-
-  async function loadBalance() {
-    if (isPlayerMode) {
-      if (menuBtn) {
-        menuBtn.href = '/portal/';
-        menuBtn.textContent = '← Portal';
-      }
-      if (!PlayerAuth.isLoggedIn()) {
-        window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
-        return;
-      }
+  if (credits < bet()) {
+    if (restart && session) {
       try {
-        const data = await PlayerAuth.request('/api/auth/me');
-        credits = data.user.game_balance || 0;
-        refreshHud();
-      } catch (err) {
-        overlay.classList.remove('hidden');
-        titleEl.textContent = 'Sin sesión';
-        subtitleEl.textContent = err.message || 'Inicia sesión';
-      }
-      return;
-    }
-    machineNumber = MachineAPI.requireMachine();
-    if (!machineNumber) return;
-    if (MachineAPI.wireInicioLinks) MachineAPI.wireInicioLinks();
-    try {
-      const data = await MachineAPI.getMachine(machineNumber);
-      credits = data.balance;
+        busy = true;
+        if (isPlayerMode) await PlayerAuth.startCallePelea(bet(), true);
+        else await MachineAPI.startCallePelea(bet(), true);
+      } catch (_) { /* abandoned */ }
+      finally { busy = false; }
+      session = null;
       refreshHud();
-    } catch (err) {
-      overlay.classList.remove('hidden');
-      titleEl.textContent = 'Sin máquina';
-      subtitleEl.textContent = err.message || 'Selecciona máquina';
-    }
-  }
-
-  function applySession(data) {
-    session = {
-      sessionId: data.sessionId,
-      level: data.level,
-      prize: data.prize,
-      rival: data.rival,
-      playerHp: data.playerHp,
-      playerMaxHp: data.playerMaxHp,
-      enemyHp: data.enemyHp,
-      enemyMaxHp: data.enemyMaxHp,
-      round: data.round,
-      maxRounds: data.maxRounds,
-      status: data.status,
-      totalWon: data.totalWon || 0,
-    };
-    credits = data.balance ?? credits;
-    anim.playerPose = 'idle';
-    anim.enemyPose = 'idle';
-    anim.lastNote = data.message || '';
-    refreshHud();
-  }
-
-  async function startFight(restart) {
-    if (!playing || busy) return;
-    if (!isPlayerMode && !machineNumber) return;
-
-    if (credits < bet()) {
-      if (restart && session) {
-        try {
-          busy = true;
-          if (isPlayerMode) await PlayerAuth.startCallePelea(bet(), true);
-          else await MachineAPI.startCallePelea(bet(), true);
-        } catch (_) { /* abandoned */ }
-        finally { busy = false; }
-        session = null;
-        refreshHud();
-        overlay.classList.remove('hidden');
-        titleEl.textContent = 'Sin saldo';
-        subtitleEl.textContent = 'Crédito agotado. Pide recarga al cajero para volver al nivel 1.';
-        showToast('Reiniciado', 'Volviste al nivel 1', null);
-        return;
-      }
       overlay.classList.remove('hidden');
       titleEl.textContent = 'Sin saldo';
-      subtitleEl.textContent = 'Necesitas más crédito para pelear el siguiente nivel.';
+      subtitleEl.textContent = 'Crédito agotado. Pide recarga al cajero para volver al nivel 1.';
+      showToast('Reiniciado', 'Volviste al nivel 1', null);
       return;
     }
-
-    busy = true;
-    refreshHud();
-    try {
-      const data = isPlayerMode
-        ? await PlayerAuth.startCallePelea(bet(), restart)
-        : await MachineAPI.startCallePelea(bet(), restart);
-      applySession(data);
-      showToast(restart ? 'Nueva partida' : `Nivel ${data.level}`, data.message, true);
-      hintEl.textContent = `vs ${data.rival.name} · elige GOLPE, PATADA o BLOQUEO`;
-    } catch (err) {
-      showToast('Error', err.message || 'No se pudo iniciar', false);
-      if (restart) session = null;
-      if ((err.message || '').includes('insuficiente')) {
-        overlay.classList.remove('hidden');
-        titleEl.textContent = 'Sin saldo';
-        subtitleEl.textContent = 'Pide recarga al cajero.';
-      }
-    } finally {
-      busy = false;
-      refreshHud();
-    }
+    overlay.classList.remove('hidden');
+    titleEl.textContent = 'Sin saldo';
+    subtitleEl.textContent = 'Necesitas más crédito para pelear el siguiente nivel.';
+    return;
   }
 
-  async function retryFight() {
-    if (!session || busy) return;
-    if (credits < bet()) {
+  busy = true;
+  refreshHud();
+  try {
+    const data = isPlayerMode
+      ? await PlayerAuth.startCallePelea(bet(), restart)
+      : await MachineAPI.startCallePelea(bet(), restart);
+    applySession(data);
+    placeFighters();
+    showToast(restart ? 'Nueva partida' : `Nivel ${data.level}`, data.message, true);
+    hintEl.textContent = `vs ${data.rival.name} · elige GOLPE, PATADA o BLOQUEO`;
+  } catch (err) {
+    showToast('Error', err.message || 'No se pudo iniciar', false);
+    if (restart) session = null;
+    if ((err.message || '').includes('insuficiente')) {
       overlay.classList.remove('hidden');
-      titleEl.textContent = 'Sin saldo';
-      subtitleEl.textContent = 'Pide recarga para la revancha.';
-      return;
-    }
-    busy = true;
-    refreshHud();
-    try {
-      const data = isPlayerMode
-        ? await PlayerAuth.retryCallePelea(session.sessionId)
-        : await MachineAPI.retryCallePelea(session.sessionId);
-      applySession(data);
-      showToast('Revancha', data.message, null);
-    } catch (err) {
-      showToast('Error', err.message || 'No se pudo reintentar', false);
-    } finally {
-      busy = false;
-      refreshHud();
-    }
-  }
-
-  async function doAction(action) {
-    if (!session || session.status !== 'fighting' || busy) return;
-    busy = true;
-    refreshHud();
-
-    anim.playerPose = action === 'block' ? 'block' : action;
-    anim.playerX = action === 'block' ? -6 : 28;
-
-    try {
-      const data = isPlayerMode
-        ? await PlayerAuth.actionCallePelea(session.sessionId, action)
-        : await MachineAPI.actionCallePelea(session.sessionId, action);
-
-      credits = data.balance ?? credits;
-      if (data.session) {
-        session = {
-          sessionId: data.session.sessionId,
-          level: data.session.level,
-          prize: data.session.prize,
-          rival: data.session.rival,
-          playerHp: data.session.playerHp,
-          playerMaxHp: data.session.playerMaxHp,
-          enemyHp: data.session.enemyHp,
-          enemyMaxHp: data.session.enemyMaxHp,
-          round: data.session.round,
-          maxRounds: data.session.maxRounds,
-          status: data.session.status,
-          totalWon: data.session.totalWon || 0,
-        };
-      }
-
-      const entry = data.entry;
-      if (entry) {
-        anim.enemyPose = entry.enemyAction === 'block' ? 'block' : entry.enemyAction;
-        anim.enemyX = entry.enemyAction === 'block' ? 6 : -28;
-        anim.lastNote = entry.note;
-        if (entry.playerDmg > 0) {
-          anim.playerPose = 'hit';
-          anim.flash = 1;
-        }
-        if (entry.enemyDmg > 0) anim.flash = Math.max(anim.flash, 0.7);
-      }
-
-      setTimeout(() => {
-        if (session?.status === 'fighting') {
-          anim.playerPose = 'idle';
-          anim.enemyPose = 'idle';
-        }
-      }, 420);
-
-      if (data.finished) {
-        if (data.won) {
-          anim.enemyPose = 'hit';
-          anim.playerPose = 'punch';
-          showToast(data.awarded > 0 ? '¡KO!' : 'Victoria', data.message, true);
-          hintEl.textContent = data.awarded > 0
-            ? `Premio cobrado. Pulsa SIGUIENTE (cuesta ${mxn(bet())}) para el nivel ${session.level + 1}.`
-            : 'Puedes seguir al siguiente nivel.';
-        } else {
-          anim.playerPose = 'hit';
-          showToast('Derrota', data.message, false);
-          hintEl.textContent = 'REVANCHA cobra otra apuesta · REINICIAR vuelve al nivel 1.';
-        }
-      } else {
-        hintEl.textContent = data.message || 'Siguiente movimiento…';
-      }
-
-      refreshHud();
-    } catch (err) {
-      showToast('Error', err.message || 'Acción inválida', false);
-      anim.playerPose = 'idle';
-      anim.enemyPose = 'idle';
-    } finally {
-      busy = false;
-      refreshHud();
-    }
-  }
-
-  function beginPlay() {
-    if (!isPlayerMode && !machineNumber) {
-      loadBalance();
-      return;
-    }
-    if (credits < bet()) {
       titleEl.textContent = 'Sin saldo';
       subtitleEl.textContent = 'Pide recarga al cajero.';
-      return;
     }
-    playing = true;
-    overlay.classList.add('hidden');
-    session = null;
-    hintEl.textContent = 'Pulsa NIVEL 1 para pagar y pelear. Reiniciar = volver al inicio.';
+  } finally {
+    busy = false;
     refreshHud();
   }
+}
 
-  actionBtn.addEventListener('click', () => {
-    if (!playing) { beginPlay(); return; }
-    if (!session) { startFight(false); return; }
-    if (session.status === 'level_complete') { startFight(false); return; }
-    if (session.status === 'failed') { retryFight(); }
-  });
-
-  restartBtn.addEventListener('click', async () => {
-    if (!playing || busy) return;
-    if (!confirm('¿Reiniciar? Volverás al nivel 1 y perderás el progreso.')) return;
-    await startFight(true);
-  });
-
-  startBtn.addEventListener('click', beginPlay);
-  btnPunch.addEventListener('click', () => doAction('punch'));
-  btnKick.addEventListener('click', () => doAction('kick'));
-  btnBlock.addEventListener('click', () => doAction('block'));
-
-  betDown.addEventListener('click', () => {
-    if (session && session.status === 'fighting') return;
-    betIndex = Math.max(0, betIndex - 1);
+async function retryFight() {
+  if (!session || busy || !assetsReady) return;
+  if (credits < bet()) {
+    overlay.classList.remove('hidden');
+    titleEl.textContent = 'Sin saldo';
+    subtitleEl.textContent = 'Pide recarga para la revancha.';
+    return;
+  }
+  busy = true;
+  refreshHud();
+  try {
+    const data = isPlayerMode
+      ? await PlayerAuth.retryCallePelea(session.sessionId)
+      : await MachineAPI.retryCallePelea(session.sessionId);
+    applySession(data);
+    placeFighters();
+    showToast('Revancha', data.message, null);
+  } catch (err) {
+    showToast('Error', err.message || 'No se pudo reintentar', false);
+  } finally {
+    busy = false;
     refreshHud();
-  });
-  betUp.addEventListener('click', () => {
-    if (session && session.status === 'fighting') return;
-    betIndex = Math.min(BETS.length - 1, betIndex + 1);
-    refreshHud();
-  });
+  }
+}
 
+async function doAction(action) {
+  if (!session || session.status !== 'fighting' || busy || !assetsReady) return;
+  busy = true;
+  refreshHud();
+
+  setPose(playerActor, action === 'block' ? 'block' : action);
+
+  try {
+    const data = isPlayerMode
+      ? await PlayerAuth.actionCallePelea(session.sessionId, action)
+      : await MachineAPI.actionCallePelea(session.sessionId, action);
+
+    credits = data.balance ?? credits;
+    if (data.session) {
+      session = {
+        sessionId: data.session.sessionId,
+        level: data.session.level,
+        prize: data.session.prize,
+        rival: data.session.rival,
+        playerHp: data.session.playerHp,
+        playerMaxHp: data.session.playerMaxHp,
+        enemyHp: data.session.enemyHp,
+        enemyMaxHp: data.session.enemyMaxHp,
+        round: data.session.round,
+        maxRounds: data.session.maxRounds,
+        status: data.session.status,
+        totalWon: data.session.totalWon || 0,
+      };
+    }
+
+    const entry = data.entry;
+    if (entry) {
+      const enemyPose = entry.enemyAction === 'block' ? 'block' : entry.enemyAction;
+      setPose(rivalActor, enemyPose);
+      lastNote = entry.note || lastNote;
+      if (entry.playerDmg > 0) {
+        setPose(playerActor, 'hit');
+        flash = 1;
+        flashLight.intensity = 2.8;
+      }
+      if (entry.enemyDmg > 0) {
+        flash = Math.max(flash, 0.7);
+        flashLight.intensity = Math.max(flashLight.intensity, 2.2);
+      }
+    }
+
+    setTimeout(() => {
+      if (session?.status === 'fighting') {
+        setPose(playerActor, 'idle');
+        setPose(rivalActor, 'idle');
+      }
+    }, 420);
+
+    if (data.finished) {
+      if (data.won) {
+        setPose(rivalActor, 'hit');
+        setPose(playerActor, 'punch');
+        showToast(data.awarded > 0 ? '¡KO!' : 'Victoria', data.message, true);
+        hintEl.textContent = data.awarded > 0
+          ? `Premio cobrado. Pulsa SIGUIENTE (cuesta ${mxn(bet())}) para el nivel ${session.level + 1}.`
+          : 'Puedes seguir al siguiente nivel.';
+      } else {
+        setPose(playerActor, 'hit');
+        showToast('Derrota', data.message, false);
+        hintEl.textContent = 'REVANCHA cobra otra apuesta · REINICIAR vuelve al nivel 1.';
+      }
+    } else {
+      hintEl.textContent = data.message || 'Siguiente movimiento…';
+    }
+
+    refreshHud();
+  } catch (err) {
+    showToast('Error', err.message || 'Acción inválida', false);
+    setPose(playerActor, 'idle');
+    setPose(rivalActor, 'idle');
+  } finally {
+    busy = false;
+    refreshHud();
+  }
+}
+
+function beginPlay() {
+  if (!assetsReady) {
+    showToast('Espera', 'Aún cargan los luchadores GLB…', null);
+    return;
+  }
+  if (!isPlayerMode && !machineNumber) {
+    loadBalance();
+    return;
+  }
+  if (credits < bet()) {
+    titleEl.textContent = 'Sin saldo';
+    subtitleEl.textContent = 'Pide recarga al cajero.';
+    return;
+  }
+  playing = true;
+  overlay.classList.add('hidden');
+  session = null;
+  hintEl.textContent = 'Pulsa NIVEL 1 para pagar y pelear. Reiniciar = volver al inicio.';
+  placeFighters();
+  refreshHud();
+}
+
+function loop() {
+  const dt = Math.min(0.05, clock.getDelta());
+  for (const m of mixers) m.update(dt);
+  applyBonePose(playerActor, dt);
+  applyBonePose(rivalActor, dt);
+
+  if (flash > 0) {
+    flash -= dt * 2.2;
+    flashLight.intensity = Math.max(0, flash * 2.5);
+  } else {
+    flashLight.intensity *= 0.85;
+  }
+
+  // Subtle idle bob when fighting idle
+  const t = clock.elapsedTime;
+  if (playerActor && playerActor.pose === 'idle') {
+    playerActor.root.position.y = Math.sin(t * 3.2) * 0.015;
+  }
+  if (rivalActor && rivalActor.pose === 'idle') {
+    rivalActor.root.position.y = Math.sin(t * 3.2 + 1.2) * 0.015;
+  }
+
+  composer.render();
+  requestAnimationFrame(loop);
+}
+
+actionBtn.addEventListener('click', () => {
+  if (!playing) { beginPlay(); return; }
+  if (!session) { startFight(false); return; }
+  if (session.status === 'level_complete') { startFight(false); return; }
+  if (session.status === 'failed') { retryFight(); }
+});
+
+restartBtn.addEventListener('click', async () => {
+  if (!playing || busy || !assetsReady) return;
+  if (!confirm('¿Reiniciar? Volverás al nivel 1 y perderás el progreso.')) return;
+  await startFight(true);
+});
+
+startBtn.addEventListener('click', beginPlay);
+btnPunch.addEventListener('click', () => doAction('punch'));
+btnKick.addEventListener('click', () => doAction('kick'));
+btnBlock.addEventListener('click', () => doAction('block'));
+
+betDown.addEventListener('click', () => {
+  if (session && session.status === 'fighting') return;
+  betIndex = Math.max(0, betIndex - 1);
+  refreshHud();
+});
+betUp.addEventListener('click', () => {
+  if (session && session.status === 'fighting') return;
+  betIndex = Math.min(BETS.length - 1, betIndex + 1);
+  refreshHud();
+});
+
+function loadGltf(url) {
+  return new Promise((resolve, reject) => {
+    const loader = new GLTFLoader();
+    loader.load(url, resolve, undefined, reject);
+  });
+}
+
+async function boot() {
+  await buildArena();
   refreshHud();
   requestAnimationFrame(loop);
   loadBalance();
-})();
+
+  try {
+    if (loadBanner) loadBanner.textContent = 'Cargando Fighter.glb…';
+    const fighterGltf = await loadGltf('assets/models/Fighter.glb');
+    templates.fighter.scene = fighterGltf.scene;
+    templates.fighter.animations = fighterGltf.animations || [];
+
+    if (loadBanner) loadBanner.textContent = 'Cargando Rival.glb…';
+    let rivalGltf = null;
+    try {
+      rivalGltf = await loadGltf('assets/models/Rival.glb');
+    } catch (e) {
+      console.warn('Rival.glb failed, using Fighter', e);
+      rivalGltf = fighterGltf;
+    }
+    templates.rival.scene = rivalGltf.scene;
+    templates.rival.animations = rivalGltf.animations || [];
+
+    playerActor = createFighter(templates.fighter, 1, null);
+    rivalActor = createFighter(templates.rival, -1, 0xc45c26);
+    if (playerActor) scene.add(playerActor.root);
+    if (rivalActor) scene.add(rivalActor.root);
+    placeFighters();
+
+    assetsReady = true;
+    loadBanner?.classList.add('hidden');
+    hintEl.textContent = 'Luchadores GLB listos · Idle/Walk/Run + arena 3D';
+    refreshHud();
+  } catch (err) {
+    console.error(err);
+    if (loadBanner) loadBanner.textContent = 'Error cargando GLB — recarga la página';
+    showToast('Error 3D', 'No se pudieron cargar los modelos GLB', false);
+  }
+}
+
+boot();

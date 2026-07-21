@@ -38,6 +38,9 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     betDown: document.getElementById('betDown'),
     betUp: document.getElementById('betUp'),
     fireBtn: document.getElementById('fireBtn'),
+    sprintBtn: document.getElementById('sprintBtn'),
+    weaponBtn: document.getElementById('weaponBtn'),
+    weaponName: document.getElementById('weaponName'),
     joystick: document.getElementById('joystick'),
     joyKnob: document.getElementById('joyKnob'),
     toast: document.getElementById('toast'),
@@ -45,6 +48,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     toastText: document.getElementById('toastText'),
     compass: document.getElementById('compass'),
   };
+
+  const WEAPONS = [
+    { id: 'rifle', name: 'ASALTO', dmg: 18, cd: 0.13, speed: 30, mag: 30, reserve: 120, reload: 1.05, spread: 0.01, pellets: 1 },
+    { id: 'smg', name: 'RÁFAGA', dmg: 9, cd: 0.065, speed: 27, mag: 40, reserve: 160, reload: 0.95, spread: 0.045, pellets: 1 },
+    { id: 'shotgun', name: 'ESCOPETA', dmg: 11, cd: 0.55, speed: 22, mag: 8, reserve: 32, reload: 1.35, spread: 0.14, pellets: 6 },
+  ];
+  let weaponIndex = 0;
 
   let credits = 0;
   let betIndex = 0;
@@ -56,8 +66,22 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   let assetsReady = false;
 
   const keys = Object.create(null);
-  const input = { x: 0, y: 0, firing: false };
+  const input = { x: 0, y: 0, firing: false, sprint: false };
   let joyActive = false;
+  let brickTex = null;
+  let grassTex = null;
+  const texLoader = new THREE.TextureLoader();
+  texLoader.load('assets/textures/brick.jpg', (t) => {
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    brickTex = t;
+  });
+  texLoader.load('assets/textures/grass.jpg', (t) => {
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(10, 10);
+    grassTex = t;
+  });
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x7eb6d9);
@@ -123,6 +147,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     ammo: 30,
     reserve: 120,
     reloadT: 0,
+    weaponIndex: 0,
     zoneR: 18,
     zoneMax: 45,
     zoneT: 0,
@@ -131,6 +156,24 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     startedAt: 0,
     clock: new THREE.Clock(),
   };
+
+  function currentWeapon() {
+    return WEAPONS[world.weaponIndex] || WEAPONS[0];
+  }
+
+  function setWeapon(i) {
+    world.weaponIndex = ((i % WEAPONS.length) + WEAPONS.length) % WEAPONS.length;
+    weaponIndex = world.weaponIndex;
+    const w = currentWeapon();
+    world.ammo = Math.min(world.ammo, w.mag);
+    if (els.weaponName) els.weaponName.textContent = w.name;
+    showToast('Arma', w.name, null);
+    refreshHud();
+  }
+
+  function cycleWeapon() {
+    setWeapon(world.weaponIndex + 1);
+  }
 
   function mxn(n) {
     return isPlayerMode ? PlayerAuth.formatPesos(n) : MachineAPI.formatPesos(n);
@@ -266,48 +309,168 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     return false;
   }
 
-  function buildArena(mapSize) {
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(mapSize + 12, mapSize + 12),
-      new THREE.MeshStandardMaterial({ map: makeGroundTexture(), roughness: 0.92, metalness: 0.02 })
+  function makeFacadeTexture(baseHex, accentHex) {
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 512;
+    const g = c.getContext('2d');
+    g.fillStyle = baseHex;
+    g.fillRect(0, 0, 512, 512);
+    // mortar / panel lines
+    g.strokeStyle = 'rgba(0,0,0,0.18)';
+    g.lineWidth = 2;
+    for (let y = 0; y < 512; y += 32) {
+      g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke();
+    }
+    for (let x = 0; x < 512; x += 64) {
+      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 512); g.stroke();
+    }
+    // windows
+    for (let row = 0; row < 7; row++) {
+      for (let col = 0; col < 6; col++) {
+        const lit = Math.random() > 0.35;
+        g.fillStyle = lit ? accentHex : '#1a2430';
+        const wx = 28 + col * 80;
+        const wy = 28 + row * 68;
+        g.fillRect(wx, wy, 44, 38);
+        g.fillStyle = 'rgba(255,255,255,0.12)';
+        g.fillRect(wx + 2, wy + 2, 16, 10);
+        g.strokeStyle = 'rgba(0,0,0,0.35)';
+        g.strokeRect(wx, wy, 44, 38);
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  function addRealBuilding(x, z, w, d, floors, style) {
+    const h = floors * 2.55 + 0.8;
+    const facade = makeFacadeTexture(style.base, style.win);
+    facade.repeat.set(Math.max(1, Math.round(w / 4)), Math.max(1, floors));
+    const wallMat = new THREE.MeshStandardMaterial({
+      map: brickTex ? brickTex.clone() : facade,
+      color: brickTex ? style.tint : 0xffffff,
+      roughness: 0.78,
+      metalness: 0.05,
+    });
+    if (brickTex) {
+      wallMat.map.repeat.set(w * 0.55, h * 0.45);
+      wallMat.map.needsUpdate = true;
+    } else {
+      wallMat.map = facade;
+    }
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    body.position.set(x, h / 2, z);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    worldRoot.add(body);
+
+    // glass strip facade
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x9ad8ff,
+      emissive: 0x1a4a66,
+      emissiveIntensity: 0.45,
+      metalness: 0.55,
+      roughness: 0.12,
+      transparent: true,
+      opacity: 0.85,
+    });
+    for (let f = 0; f < floors; f++) {
+      for (let i = 0; i < Math.max(2, Math.floor(w / 1.6)); i++) {
+        const win = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.95), glassMat);
+        win.position.set(x - w / 2 + 1.1 + i * 1.55, 1.35 + f * 2.55, z + d / 2 + 0.04);
+        worldRoot.add(win);
+        const winB = win.clone();
+        winB.position.z = z - d / 2 - 0.04;
+        winB.rotation.y = Math.PI;
+        worldRoot.add(winB);
+      }
+    }
+
+    // roof parapet + AC units
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x2a3038, roughness: 0.9, metalness: 0.2 });
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.25, 0.28, d + 0.25), roofMat);
+    roof.position.set(x, h + 0.1, z);
+    roof.castShadow = true;
+    worldRoot.add(roof);
+    for (let i = 0; i < 2; i++) {
+      const ac = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 0.45, 0.55),
+        new THREE.MeshStandardMaterial({ color: 0xb0b8c0, metalness: 0.6, roughness: 0.35 })
+      );
+      ac.position.set(x - w * 0.25 + i * w * 0.45, h + 0.45, z - d * 0.15);
+      worldRoot.add(ac);
+    }
+
+    // entrance
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 2.1, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.7, metalness: 0.15 })
     );
+    door.position.set(x, 1.05, z + d / 2 + 0.08);
+    worldRoot.add(door);
+
+    // balcony ledge mid floor
+    if (floors >= 3) {
+      const balc = new THREE.Mesh(
+        new THREE.BoxGeometry(w * 0.7, 0.12, 0.55),
+        new THREE.MeshStandardMaterial({ color: 0xd8dde3, roughness: 0.6, metalness: 0.1 })
+      );
+      balc.position.set(x, 2.55 * 2, z + d / 2 + 0.28);
+      worldRoot.add(balc);
+    }
+
+    world.buildings.push({
+      minX: x - w / 2, maxX: x + w / 2,
+      minZ: z - d / 2, maxZ: z + d / 2,
+    });
+  }
+
+  function buildArena(mapSize) {
+    const groundMat = new THREE.MeshStandardMaterial({
+      map: grassTex || makeGroundTexture(),
+      roughness: 0.92,
+      metalness: 0.02,
+      color: grassTex ? 0xffffff : 0xffffff,
+    });
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(mapSize + 14, mapSize + 14), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     worldRoot.add(ground);
 
-    const rooms = [
-      { x: -10, z: -8, w: 6, d: 5, h: 4.2 },
-      { x: 9, z: -10, w: 7, d: 5.5, h: 4.8 },
-      { x: -9, z: 9, w: 6.5, d: 5, h: 4 },
-      { x: 10, z: 8, w: 6, d: 5, h: 4.4 },
-      { x: 0, z: 0, w: 5, d: 4, h: 3.4 },
+    // asphalt roads
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.95, metalness: 0.05 });
+    const roadX = new THREE.Mesh(new THREE.PlaneGeometry(mapSize + 4, 4.2), roadMat);
+    roadX.rotation.x = -Math.PI / 2;
+    roadX.position.y = 0.02;
+    worldRoot.add(roadX);
+    const roadZ = new THREE.Mesh(new THREE.PlaneGeometry(4.2, mapSize + 4), roadMat);
+    roadZ.rotation.x = -Math.PI / 2;
+    roadZ.position.y = 0.025;
+    worldRoot.add(roadZ);
+
+    const styles = [
+      { base: '#c4b7a6', win: '#ffe7a0', tint: 0xd8cfc0 },
+      { base: '#9aa7b5', win: '#b8ecff', tint: 0xb8c2cc },
+      { base: '#b59a88', win: '#fff1c2', tint: 0xc4a892 },
+      { base: '#8f9aa8', win: '#9fe0ff', tint: 0xa8b0bc },
     ];
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xe8eef2, roughness: 0.65, metalness: 0.05 });
-    const winMat = new THREE.MeshStandardMaterial({
-      color: 0x9fe0ff, emissive: 0x2a7098, emissiveIntensity: 0.55, roughness: 0.15, metalness: 0.35,
-    });
+    const layout = [
+      { x: -11, z: -9, w: 7.5, d: 6, floors: 4, s: 0 },
+      { x: 10, z: -10, w: 8, d: 6.5, floors: 5, s: 1 },
+      { x: -10, z: 10, w: 7, d: 6, floors: 3, s: 2 },
+      { x: 11, z: 9, w: 7.2, d: 5.8, floors: 4, s: 3 },
+      { x: -1, z: -12, w: 5.5, d: 4.8, floors: 3, s: 1 },
+      { x: 0, z: 12, w: 6, d: 5, floors: 4, s: 0 },
+    ];
+    layout.forEach((b) => addRealBuilding(b.x, b.z, b.w, b.d, b.floors, styles[b.s]));
 
-    rooms.forEach((r) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(r.w, r.h, r.d), wallMat);
-      mesh.position.set(r.x, r.h / 2, r.z);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      worldRoot.add(mesh);
-      for (let i = 0; i < 3; i++) {
-        const win = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.6), winMat);
-        win.position.set(r.x - r.w / 2 + 1.25 + i * 1.45, 1.7, r.z + r.d / 2 + 0.03);
-        worldRoot.add(win);
-      }
-      world.buildings.push({
-        minX: r.x - r.w / 2, maxX: r.x + r.w / 2,
-        minZ: r.z - r.d / 2, maxZ: r.z + r.d / 2,
-      });
-    });
-
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       const tx = rand(-mapSize / 2 + 2, mapSize / 2 - 2);
       const tz = rand(-mapSize / 2 + 2, mapSize / 2 - 2);
-      if (blocked(tx, tz, 1.2) || Math.hypot(tx, tz) < 6) continue;
+      if (blocked(tx, tz, 1.2) || Math.hypot(tx, tz) < 7) continue;
       const trunk = new THREE.Mesh(
         new THREE.CylinderGeometry(0.12, 0.18, 1.2, 8),
         new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.9 })
@@ -363,9 +526,12 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     world.zoneT = 0;
     world.zoneR = 18;
     world.kills = 0;
-    world.ammo = 30;
-    world.reserve = 120;
+    world.weaponIndex = weaponIndex;
+    const wpn = currentWeapon();
+    world.ammo = wpn.mag;
+    world.reserve = wpn.reserve;
     world.reloadT = 0;
+    if (els.weaponName) els.weaponName.textContent = wpn.name;
     world.startedAt = performance.now();
     missionEnded = false;
     buildArena(world.mapSize);
@@ -380,9 +546,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       hp: data.playerHp,
       maxHp: data.playerMaxHp,
       angle: Math.PI,
-      speed: 7.2,
+      walkSpeed: 6.4,
+      runSpeed: 11.2,
       shootCd: 0,
       moving: false,
+      sprinting: false,
     };
 
     world.enemies = [];
@@ -426,10 +594,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     return best;
   }
 
-  function fireBullet(owner, ally, dmg, speed) {
-    const dir = new THREE.Vector3(Math.sin(owner.angle), 0, Math.cos(owner.angle));
+  function fireBullet(owner, ally, dmg, speed, yawOffset) {
+    const yaw = owner.angle + (yawOffset || 0);
+    const dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.07, 8, 8),
+      new THREE.SphereGeometry(ally ? 0.06 : 0.07, 8, 8),
       new THREE.MeshStandardMaterial({
         color: ally ? 0xd4ff4d : 0xff8a1e,
         emissive: ally ? 0xa0ff20 : 0xff5500,
@@ -437,20 +606,28 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
         toneMapped: false,
       })
     );
-    mesh.position.set(owner.x + dir.x * 0.7, 1.35, owner.z + dir.z * 0.7);
+    mesh.position.set(owner.x + dir.x * 0.85, 1.4, owner.z + dir.z * 0.85);
     worldRoot.add(mesh);
     world.bullets.push({
       mesh,
       x: mesh.position.x,
-      y: 1.35,
+      y: 1.4,
       z: mesh.position.z,
       vx: dir.x * speed,
       vz: dir.z * speed,
       ally,
       dmg,
-      life: 1.2,
+      life: 1.15,
       r: 0.12,
     });
+  }
+
+  function firePlayerWeapon(p) {
+    const w = currentWeapon();
+    for (let i = 0; i < w.pellets; i++) {
+      const spread = (Math.random() - 0.5) * w.spread * 2;
+      fireBullet(p, true, w.dmg, w.speed, spread);
+    }
   }
 
   function removeBullet(b) {
@@ -552,31 +729,30 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     const mag = Math.hypot(wx, wz);
     if (mag > 1) { wx /= mag; wz /= mag; }
 
-    let nx = p.x + wx * p.speed * dt;
-    let nz = p.z + wz * p.speed * dt;
+    const wantSprint = input.sprint || keys.shift;
+    p.sprinting = wantSprint && mag > 0.15;
+    const speed = p.sprinting ? p.runSpeed : p.walkSpeed;
+    if (els.sprintBtn) els.sprintBtn.classList.toggle('active', !!p.sprinting);
+
+    let nx = p.x + wx * speed * dt;
+    let nz = p.z + wz * speed * dt;
     nx = Math.max(-half, Math.min(half, nx));
     nz = Math.max(-half, Math.min(half, nz));
     if (!blocked(nx, p.z, p.r)) p.x = nx;
     if (!blocked(p.x, nz, p.r)) p.z = nz;
 
     p.moving = mag > 0.12;
-    setAnim(p, p.moving ? (mag > 0.75 ? 'run' : 'walk') : 'idle');
-
-    const target = nearestEnemy(p);
-    if (target) {
-      const desired = Math.atan2(target.x - p.x, target.z - p.z);
-      let diff = desired - p.angle;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      p.angle += diff * Math.min(1, 8 * dt * (0.4 + world.aimAssist));
-    } else if (mag > 0.1) {
+    // Face and shoot forward (movement direction); keep last facing when idle
+    if (mag > 0.1) {
       p.angle = Math.atan2(wx, wz);
     }
+    setAnim(p, p.moving ? (p.sprinting ? 'run' : 'walk') : 'idle');
 
     if (world.reloadT > 0) {
       world.reloadT -= dt;
       if (world.reloadT <= 0) {
-        const need = 30 - world.ammo;
+        const w = currentWeapon();
+        const need = w.mag - world.ammo;
         const take = Math.min(need, world.reserve);
         world.ammo += take;
         world.reserve -= take;
@@ -585,13 +761,14 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
     p.shootCd = Math.max(0, p.shootCd - dt);
     const wantFire = input.firing || keys[' '] || keys.enter;
+    const wpn = currentWeapon();
     if (wantFire && p.shootCd <= 0 && world.reloadT <= 0) {
       if (world.ammo > 0) {
         world.ammo -= 1;
-        p.shootCd = 0.13;
-        fireBullet(p, true, 18, 28);
-        if (world.ammo === 0 && world.reserve > 0) world.reloadT = 1.1;
-      } else if (world.reserve > 0) world.reloadT = 1.1;
+        p.shootCd = wpn.cd;
+        firePlayerWeapon(p);
+        if (world.ammo === 0 && world.reserve > 0) world.reloadT = wpn.reload;
+      } else if (world.reserve > 0) world.reloadT = wpn.reload;
     }
 
     for (const e of world.enemies) {
@@ -748,6 +925,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     }
 
     els.ammoText.textContent = world.ammo + '/' + world.reserve;
+    if (els.weaponName) els.weaponName.textContent = currentWeapon().name;
     els.killCount.textContent = String(world.kills);
     const alive = (world.player && world.player.hp > 0 ? 1 : 0) + world.enemies.filter((e) => e.hp > 0).length;
     els.aliveCount.textContent = world.running ? String(alive) : '0';
@@ -919,16 +1097,37 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   }
 
   window.addEventListener('keydown', (e) => {
-    keys[e.key.toLowerCase()] = true;
-    if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) e.preventDefault();
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+    if (k === 'shift') input.sprint = true;
+    if (k === '1') setWeapon(0);
+    if (k === '2') setWeapon(1);
+    if (k === '3') setWeapon(2);
+    if (k === 'q' || k === 'e') { e.preventDefault(); cycleWeapon(); }
+    if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
   });
-  window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+  window.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    keys[k] = false;
+    if (k === 'shift') input.sprint = false;
+  });
 
   renderer.domElement.addEventListener('mousedown', () => { input.firing = true; });
   window.addEventListener('mouseup', () => { input.firing = false; });
   els.fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); input.firing = true; }, { passive: false });
   els.fireBtn.addEventListener('touchend', () => { input.firing = false; });
   els.fireBtn.addEventListener('mousedown', (e) => { e.preventDefault(); input.firing = true; });
+  if (els.sprintBtn) {
+    const down = (e) => { e.preventDefault(); input.sprint = true; els.sprintBtn.classList.add('active'); };
+    const up = () => { input.sprint = false; els.sprintBtn.classList.remove('active'); };
+    els.sprintBtn.addEventListener('touchstart', down, { passive: false });
+    els.sprintBtn.addEventListener('touchend', up);
+    els.sprintBtn.addEventListener('mousedown', down);
+    els.sprintBtn.addEventListener('mouseup', up);
+  }
+  if (els.weaponBtn) {
+    els.weaponBtn.addEventListener('click', (e) => { e.preventDefault(); cycleWeapon(); });
+  }
 
   function setJoyFromEvent(clientX, clientY) {
     const rect = els.joystick.getBoundingClientRect();

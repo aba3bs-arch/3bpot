@@ -9,11 +9,19 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Sans:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="app">
     <header class="hud">
-      <div class="brand">CALLE PELEA</div>
+      <div class="brand">CALLE PELEA <span class="badge3d">GLB</span></div>
       <div class="stats">
         <span>Máq. <strong id="machineLabel">—</strong></span>
         <span>Saldo <strong id="credits">$0</strong></span>
@@ -44,7 +52,10 @@
       </div>
     </div>
 
-    <canvas id="game" width="960" height="420" aria-label="Arena de pelea"></canvas>
+    <div class="stage">
+      <div id="view3d" class="view3d" aria-label="Arena 3D Calle Pelea"></div>
+      <div class="load-banner" id="loadBanner">Cargando luchadores GLB…</div>
+    </div>
 
     <p class="hint" id="hint">Golpe, patada o bloqueo. Más nivel = rival más duro y premio mayor.</p>
 
@@ -75,7 +86,7 @@
         </div>
         <h1 id="title">CALLE PELEA</h1>
         <p id="subtitle">
-          Combate arcade por niveles con luchadores realistas. Cada ronda eliges golpe, patada o bloqueo.
+          Combate arcade 3D con luchadores GLB reales (Idle/Walk/Run). Cada ronda eliges golpe, patada o bloqueo.
           Cuanto más alto el nivel, más fuerte el rival y más grande el premio.
         </p>
         <div class="panel-actions">
@@ -92,6 +103,6 @@
   </div>
   <script src="/shared/machine-client.js"></script>
   <script src="/shared/player-auth.js"></script>
-  <script src="js/game.js"></script>
+  <script type="module" src="js/game.js"></script>
 </body>
 </html>
