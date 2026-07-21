@@ -241,22 +241,17 @@ html, body {
 }
 .hp-col span { font-size: 0.8rem; font-weight: 700; }
 
-.weapon-box {
+.right-controls {
+  pointer-events: none;
   position: absolute;
-  right: 0.7rem;
-  bottom: 0.7rem;
-  background: rgba(0, 0, 0, 0.55);
-  padding: 0.5rem 0.7rem;
-  border-radius: 0.65rem;
-  border-left: 3px solid var(--orange);
-  text-align: right;
-  line-height: 1.2;
-  backdrop-filter: blur(10px);
+  right: 1.1rem;
+  bottom: 4.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+  z-index: 4;
 }
-.w-name { display: block; font-family: "Orbitron", sans-serif; font-size: 0.68rem; color: var(--orange); letter-spacing: 0.06em; }
-.w-ammo { font-size: 1rem; font-weight: 700; }
-
-.touch-layer { position: absolute; inset: 0; pointer-events: none; }
 
 .joystick {
   pointer-events: auto;
@@ -268,9 +263,27 @@ html, body {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  display: none;
+  display: block;
   backdrop-filter: blur(6px);
+  z-index: 4;
 }
+
+.weapon-box {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.65rem;
+  border-left: 3px solid var(--orange);
+  text-align: right;
+  line-height: 1.2;
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 4;
+}
+.weapon-box:hover { border-left-color: var(--lime); }
 
 .joy-knob {
   position: absolute;
@@ -300,17 +313,6 @@ html, body {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 24px rgba(255, 154, 46, 0.25);
 }
 
-.right-controls {
-  pointer-events: none;
-  position: absolute;
-  right: 1.1rem;
-  bottom: 4.4rem;
-  display: none;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.45rem;
-}
-
 .util-btn {
   pointer-events: auto;
   border: 1px solid rgba(255, 255, 255, 0.22);
@@ -331,10 +333,8 @@ html, body {
   box-shadow: 0 0 0 1px rgba(184, 240, 0, 0.35);
 }
 
-@media (max-width: 900px), (pointer: coarse) {
-  .joystick { display: block; }
-  .right-controls { display: flex; }
-}
+.w-name { display: block; font-family: "Orbitron", sans-serif; font-size: 0.68rem; color: var(--orange); letter-spacing: 0.06em; }
+.w-ammo { font-size: 1rem; font-weight: 700; }
 
 .hint {
   width: min(1100px, 100%);

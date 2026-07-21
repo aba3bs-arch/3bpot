@@ -57,7 +57,7 @@ scene.background = new THREE.Color(0x6a9fc4);
 scene.fog = new THREE.Fog(0x8eb8d4, 8, 28);
 
 const camera = new THREE.PerspectiveCamera(42, 16 / 7, 0.1, 80);
-camera.position.set(0, 1.8, 4.2);
+camera.position.set(0, 1.55, 3.15);
 camera.lookAt(0, 1.0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -92,6 +92,23 @@ scene.add(fill);
 const flashLight = new THREE.PointLight(0xffe08a, 0, 8, 2);
 flashLight.position.set(0, 2.2, 1.5);
 scene.add(flashLight);
+
+const impactMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.22, 12, 12),
+  new THREE.MeshStandardMaterial({
+    color: 0xffe066, emissive: 0xff9900, emissiveIntensity: 4, toneMapped: false,
+  })
+);
+impactMesh.visible = false;
+scene.add(impactMesh);
+
+function showImpact() {
+  impactMesh.position.set(0, 1.2, 0.2);
+  impactMesh.visible = true;
+  impactMesh.scale.setScalar(1.6);
+  flashLight.intensity = 3.2;
+  setTimeout(() => { impactMesh.visible = false; }, 160);
+}
 
 const arenaRoot = new THREE.Group();
 scene.add(arenaRoot);
@@ -379,7 +396,14 @@ function findBone(root, names) {
 function createFighter(template, facingSign, tintHex) {
   if (!template.scene) return null;
   const root = SkeletonUtils.clone(template.scene);
-  root.scale.setScalar(1.0);
+  // Normalize height so Soldier/Xbot match in the ring
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const targetH = 1.85;
+  const s = size.y > 0.1 ? targetH / size.y : 1;
+  root.scale.setScalar(s);
   root.rotation.y = facingSign > 0 ? Math.PI / 2 : -Math.PI / 2;
 
   root.traverse((o) => {
@@ -459,19 +483,23 @@ function setPose(actor, pose) {
   }
   if (pose === 'punch' || pose === 'kick') {
     setAnim(actor, 'run');
-    actor.offsetX = 0.35 * actor.facingSign;
-    actor.offsetY = pose === 'kick' ? 0.05 : 0.02;
-    actor.lean = 0.35;
+    // Big lunge so fists/legs visibly connect in the center
+    actor.offsetX = (pose === 'kick' ? 0.72 : 0.78) * actor.facingSign;
+    actor.offsetY = pose === 'kick' ? 0.08 : 0.04;
+    actor.lean = 0.55;
+    actor.poseT = 0.55;
   } else if (pose === 'block') {
     setAnim(actor, 'idle');
-    actor.offsetX = -0.12 * actor.facingSign;
-    actor.offsetY = -0.18;
-    actor.lean = -0.15;
+    actor.offsetX = -0.08 * actor.facingSign;
+    actor.offsetY = -0.12;
+    actor.lean = -0.12;
+    actor.poseT = 0.5;
   } else if (pose === 'hit') {
     setAnim(actor, 'idle');
-    actor.offsetX = -0.28 * actor.facingSign;
-    actor.offsetY = 0.02;
-    actor.lean = -0.4;
+    actor.offsetX = -0.42 * actor.facingSign;
+    actor.offsetY = 0.04;
+    actor.lean = -0.55;
+    actor.poseT = 0.5;
   }
 }
 
@@ -482,7 +510,7 @@ function applyBonePose(actor, dt) {
     setPose(actor, 'idle');
   }
 
-  const t = Math.max(0, Math.min(1, actor.poseT / 0.42));
+  const t = Math.max(0, Math.min(1, actor.poseT / 0.55));
   const ease = t * t * (3 - 2 * t);
   const ox = actor.offsetX * ease;
   const oy = actor.offsetY * ease;
@@ -544,15 +572,17 @@ function applyBonePose(actor, dt) {
 }
 
 function placeFighters() {
+  // Close range so punches/kicks actually connect
+  const gap = 0.52;
   if (playerActor) {
-    playerActor.baseX = -1.4;
-    playerActor.root.position.set(-1.4, 0, 0);
+    playerActor.baseX = -gap;
+    playerActor.root.position.set(-gap, 0, 0);
     playerActor.root.rotation.y = Math.PI / 2;
     setPose(playerActor, 'idle');
   }
   if (rivalActor) {
-    rivalActor.baseX = 1.4;
-    rivalActor.root.position.set(1.4, 0, 0);
+    rivalActor.baseX = gap;
+    rivalActor.root.position.set(gap, 0, 0);
     rivalActor.root.rotation.y = -Math.PI / 2;
     setPose(rivalActor, 'idle');
   }
@@ -696,6 +726,9 @@ async function doAction(action) {
   refreshHud();
 
   setPose(playerActor, action === 'block' ? 'block' : action);
+  if (action === 'punch' || action === 'kick') {
+    setTimeout(showImpact, 120);
+  }
 
   try {
     const data = isPlayerMode
@@ -733,6 +766,7 @@ async function doAction(action) {
       if (entry.enemyDmg > 0) {
         flash = Math.max(flash, 0.7);
         flashLight.intensity = Math.max(flashLight.intensity, 2.2);
+        showImpact();
       }
     }
 
@@ -741,7 +775,7 @@ async function doAction(action) {
         setPose(playerActor, 'idle');
         setPose(rivalActor, 'idle');
       }
-    }, 420);
+    }, 560);
 
     if (data.finished) {
       if (data.won) {

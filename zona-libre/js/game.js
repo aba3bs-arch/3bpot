@@ -161,13 +161,17 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     return WEAPONS[world.weaponIndex] || WEAPONS[0];
   }
 
-  function setWeapon(i) {
+  function setWeapon(i, silent) {
     world.weaponIndex = ((i % WEAPONS.length) + WEAPONS.length) % WEAPONS.length;
     weaponIndex = world.weaponIndex;
     const w = currentWeapon();
-    world.ammo = Math.min(world.ammo, w.mag);
+    if (world.running) {
+      world.ammo = w.mag;
+      world.reserve = Math.max(world.reserve, w.reserve);
+      world.reloadT = 0;
+    }
     if (els.weaponName) els.weaponName.textContent = w.name;
-    showToast('Arma', w.name, null);
+    if (!silent) showToast('Arma', w.name, null);
     refreshHud();
   }
 
@@ -254,12 +258,20 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     const mixer = new THREE.AnimationMixer(root);
     const actions = {};
     soldierTemplate.animations.forEach((clip) => {
-      actions[clip.name] = mixer.clipAction(clip);
+      const action = mixer.clipAction(clip);
+      action.enabled = true;
+      action.setEffectiveWeight(1);
+      actions[clip.name] = action;
     });
-    const idle = actions.Idle || Object.values(actions)[0];
-    const walk = actions.Walk || actions.Run || idle;
-    const run = actions.Run || walk;
-    if (idle) idle.play();
+    const idle = actions.Idle || actions.idle || Object.values(actions)[0];
+    const walk = actions.Walk || actions.walk || actions.Run || idle;
+    const run = actions.Run || actions.run || walk;
+    if (idle) {
+      idle.play();
+      idle.setLoop(THREE.LoopRepeat);
+    }
+    if (walk) walk.setLoop(THREE.LoopRepeat);
+    if (run) run.setLoop(THREE.LoopRepeat);
 
     const hpBar = new THREE.Mesh(
       new THREE.PlaneGeometry(0.9, 0.08),
@@ -458,12 +470,12 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       { base: '#8f9aa8', win: '#9fe0ff', tint: 0xa8b0bc },
     ];
     const layout = [
-      { x: -11, z: -9, w: 7.5, d: 6, floors: 4, s: 0 },
-      { x: 10, z: -10, w: 8, d: 6.5, floors: 5, s: 1 },
-      { x: -10, z: 10, w: 7, d: 6, floors: 3, s: 2 },
-      { x: 11, z: 9, w: 7.2, d: 5.8, floors: 4, s: 3 },
-      { x: -1, z: -12, w: 5.5, d: 4.8, floors: 3, s: 1 },
-      { x: 0, z: 12, w: 6, d: 5, floors: 4, s: 0 },
+      { x: -14, z: -12, w: 7.5, d: 6, floors: 4, s: 0 },
+      { x: 14, z: -12, w: 8, d: 6.5, floors: 5, s: 1 },
+      { x: -14, z: 12, w: 7, d: 6, floors: 3, s: 2 },
+      { x: 14, z: 12, w: 7.2, d: 5.8, floors: 4, s: 3 },
+      { x: -2, z: -16, w: 5.5, d: 4.8, floors: 3, s: 1 },
+      { x: 2, z: 16, w: 6, d: 5, floors: 4, s: 0 },
     ];
     layout.forEach((b) => addRealBuilding(b.x, b.z, b.w, b.d, b.floors, styles[b.s]));
 
@@ -546,8 +558,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       hp: data.playerHp,
       maxHp: data.playerMaxHp,
       angle: Math.PI,
-      walkSpeed: 6.4,
-      runSpeed: 11.2,
+      walkSpeed: 7.5,
+      runSpeed: 13.5,
       shootCd: 0,
       moving: false,
       sprinting: false,
@@ -639,7 +651,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   function syncActor(actor) {
     actor.root.position.x = actor.x;
     actor.root.position.z = actor.z;
-    actor.root.rotation.y = actor.angle;
+    // Soldier.glb faces -Z; add PI so walk/run match movement direction
+    actor.root.rotation.y = actor.angle + Math.PI;
     const pct = Math.max(0.01, actor.hp / actor.maxHp);
     actor.hpBar.scale.x = pct;
     actor.hpBar.material.color.setHex(pct > 0.45 ? 0x6dff7a : 0xff4d4d);
@@ -714,23 +727,29 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     const p = world.player;
     const half = world.mapSize / 2 - 0.8;
 
-    let mx = input.x;
-    let mz = input.y;
-    if (keys.w || keys.arrowup) mz -= 1;
-    if (keys.s || keys.arrowdown) mz += 1;
-    if (keys.a || keys.arrowleft) mx -= 1;
-    if (keys.d || keys.arrowright) mx += 1;
+    let mx = 0;
+    let mz = 0;
+    if (keys.KeyW || keys.ArrowUp || keys.w || keys.arrowup) mz -= 1;
+    if (keys.KeyS || keys.ArrowDown || keys.s || keys.arrowdown) mz += 1;
+    if (keys.KeyA || keys.ArrowLeft || keys.a || keys.arrowleft) mx -= 1;
+    if (keys.KeyD || keys.ArrowRight || keys.d || keys.arrowright) mx += 1;
+    mx += input.x;
+    mz += input.y;
 
-    const camYaw = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
-    const cos = Math.cos(camYaw);
-    const sin = Math.sin(camYaw);
-    let wx = mx * cos - mz * sin;
-    let wz = mx * sin + mz * cos;
+    // Camera-relative movement (W = hacia donde mira la cámara)
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1);
+    else forward.normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+    let wx = right.x * mx + forward.x * (-mz);
+    let wz = right.z * mx + forward.z * (-mz);
     const mag = Math.hypot(wx, wz);
     if (mag > 1) { wx /= mag; wz /= mag; }
 
-    const wantSprint = input.sprint || keys.shift;
-    p.sprinting = wantSprint && mag > 0.15;
+    const wantSprint = input.sprint || keys.ShiftLeft || keys.ShiftRight || keys.shift;
+    p.sprinting = wantSprint && mag > 0.12;
     const speed = p.sprinting ? p.runSpeed : p.walkSpeed;
     if (els.sprintBtn) els.sprintBtn.classList.toggle('active', !!p.sprinting);
 
@@ -742,7 +761,6 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     if (!blocked(p.x, nz, p.r)) p.z = nz;
 
     p.moving = mag > 0.12;
-    // Face and shoot forward (movement direction); keep last facing when idle
     if (mag > 0.1) {
       p.angle = Math.atan2(wx, wz);
     }
@@ -760,7 +778,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     }
 
     p.shootCd = Math.max(0, p.shootCd - dt);
-    const wantFire = input.firing || keys[' '] || keys.enter;
+    const wantFire = input.firing || keys[' '] || keys.Space || keys.Enter || keys.enter;
     const wpn = currentWeapon();
     if (wantFire && p.shootCd <= 0 && world.reloadT <= 0) {
       if (world.ammo > 0) {
@@ -779,21 +797,26 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       const dx = p.x - e.x;
       const dz = p.z - e.z;
       const dist = Math.hypot(dx, dz) || 1;
-      e.angle = Math.atan2(dx, dz);
 
       let move = 0;
       if (dist > 9) move = 1;
       else if (dist < 5.5) move = -0.65;
       const sx = -dz / dist * e.strafe * 0.55;
       const sz = dx / dist * e.strafe * 0.55;
-      let ex = e.x + (dx / dist * move + sx) * e.speed * dt;
-      let ez = e.z + (dz / dist * move + sz) * e.speed * dt;
+      const mvx = (dx / dist) * move + sx;
+      const mvz = (dz / dist) * move + sz;
+      let ex = e.x + mvx * e.speed * dt;
+      let ez = e.z + mvz * e.speed * dt;
       ex = Math.max(-half, Math.min(half, ex));
       ez = Math.max(-half, Math.min(half, ez));
       if (!blocked(ex, e.z, e.r)) e.x = ex;
       if (!blocked(e.x, ez, e.r)) e.z = ez;
 
-      setAnim(e, Math.abs(move) > 0.1 ? 'walk' : 'idle');
+      // Face velocity when moving, face player when standing/shooting
+      if (Math.hypot(mvx, mvz) > 0.08) e.angle = Math.atan2(mvx, mvz);
+      else e.angle = Math.atan2(dx, dz);
+
+      setAnim(e, Math.hypot(mvx, mvz) > 0.12 ? (Math.abs(move) > 0.8 ? 'run' : 'walk') : 'idle');
 
       e.shootCd -= dt;
       if (e.shootCd <= 0 && dist < 16) {
@@ -1097,19 +1120,29 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   }
 
   window.addEventListener('keydown', (e) => {
-    const k = e.key.toLowerCase();
-    keys[k] = true;
-    if (k === 'shift') input.sprint = true;
-    if (k === '1') setWeapon(0);
-    if (k === '2') setWeapon(1);
-    if (k === '3') setWeapon(2);
-    if (k === 'q' || k === 'e') { e.preventDefault(); cycleWeapon(); }
-    if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
+    keys[e.code] = true;
+    keys[e.key.toLowerCase()] = true;
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = true;
+    if (e.code === 'Digit1' || e.key === '1') setWeapon(0);
+    if (e.code === 'Digit2' || e.key === '2') setWeapon(1);
+    if (e.code === 'Digit3' || e.key === '3') setWeapon(2);
+    if (e.code === 'KeyQ' || e.code === 'KeyE' || e.key === 'q' || e.key === 'e') {
+      e.preventDefault();
+      cycleWeapon();
+    }
+    if (e.code === 'KeyR') {
+      // reload
+      const w = currentWeapon();
+      if (world.running && world.reloadT <= 0 && world.ammo < w.mag && world.reserve > 0) {
+        world.reloadT = w.reload;
+      }
+    }
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   });
   window.addEventListener('keyup', (e) => {
-    const k = e.key.toLowerCase();
-    keys[k] = false;
-    if (k === 'shift') input.sprint = false;
+    keys[e.code] = false;
+    keys[e.key.toLowerCase()] = false;
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') input.sprint = false;
   });
 
   renderer.domElement.addEventListener('mousedown', () => { input.firing = true; });
@@ -1127,6 +1160,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   }
   if (els.weaponBtn) {
     els.weaponBtn.addEventListener('click', (e) => { e.preventDefault(); cycleWeapon(); });
+  }
+  const weaponBox = document.querySelector('.weapon-box');
+  if (weaponBox) {
+    weaponBox.addEventListener('click', (e) => { e.preventDefault(); cycleWeapon(); });
   }
 
   function setJoyFromEvent(clientX, clientY) {
