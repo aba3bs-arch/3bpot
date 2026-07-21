@@ -1,14 +1,18 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { SkeletonUtils } from 'three/addons/utils/SkeletonUtils.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
 (() => {
   'use strict';
-
-  if (typeof THREE === 'undefined') {
-    document.getElementById('subtitle').textContent = 'No se pudo cargar el motor 3D. Revisa tu conexión.';
-    return;
-  }
 
   const isPlayerMode = new URLSearchParams(location.search).has('player');
   const BETS = [1, 2, 5, 10, 15, 20];
   const viewEl = document.getElementById('view3d');
+  const loadBanner = document.getElementById('loadBanner');
 
   const els = {
     credits: document.getElementById('credits'),
@@ -49,36 +53,29 @@
   let playing = false;
   let session = null;
   let missionEnded = false;
+  let assetsReady = false;
 
   const keys = Object.create(null);
   const input = { x: 0, y: 0, firing: false };
   let joyActive = false;
 
-  const loader = new THREE.TextureLoader();
-  const texHero = loader.load('assets/hero.png');
-  const texRivalA = loader.load('assets/rival-a.png');
-  const texRivalB = loader.load('assets/rival-b.png');
-  [texHero, texRivalA, texRivalB].forEach((t) => {
-    t.colorSpace = THREE.SRGBColorSpace;
-  });
-
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x6fa8d4);
-  scene.fog = new THREE.FogExp2(0x9ec4e0, 0.018);
+  scene.background = new THREE.Color(0x7eb6d9);
+  scene.fog = new THREE.FogExp2(0xa8cce0, 0.016);
 
   const camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 160);
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', alpha: false });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.05;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   viewEl.appendChild(renderer.domElement);
 
-  const hemi = new THREE.HemisphereLight(0xd8ecff, 0x3d5a28, 1.05);
+  const hemi = new THREE.HemisphereLight(0xd8ecff, 0x3d5a28, 1.0);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff1d6, 1.45);
+  const sun = new THREE.DirectionalLight(0xfff1d6, 1.5);
   sun.position.set(22, 34, 12);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -90,12 +87,28 @@
   sun.shadow.camera.bottom = -40;
   sun.shadow.bias = -0.0002;
   scene.add(sun);
-  const rim = new THREE.DirectionalLight(0x88ccff, 0.35);
-  rim.position.set(-18, 10, -12);
-  scene.add(rim);
+  const fill = new THREE.DirectionalLight(0x88ccff, 0.35);
+  fill.position.set(-18, 10, -12);
+  scene.add(fill);
 
   const worldRoot = new THREE.Group();
   scene.add(worldRoot);
+
+  let composer;
+  let bloomPass;
+  function setupComposer() {
+    const w = viewEl.clientWidth || 960;
+    const h = viewEl.clientHeight || Math.round(w * 9 / 16);
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.55, 0.7, 0.85);
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+  }
+  setupComposer();
+
+  const soldierTemplate = { scene: null, animations: [] };
+  const mixers = [];
 
   const world = {
     running: false,
@@ -139,6 +152,8 @@
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
+    composer?.setSize(w, h);
+    bloomPass?.resolution.set(w, h);
   }
   window.addEventListener('resize', resize);
   resize();
@@ -150,7 +165,7 @@
     const g = c.getContext('2d');
     g.fillStyle = '#4a6b38';
     g.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 4000; i++) {
+    for (let i = 0; i < 4200; i++) {
       g.fillStyle = 'rgba(' + (50 + Math.random() * 40) + ',' + (90 + Math.random() * 50) + ',' + (30 + Math.random() * 30) + ',' + (0.15 + Math.random() * 0.35) + ')';
       g.fillRect(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 3, 2 + Math.random() * 3);
     }
@@ -161,72 +176,80 @@
     return tex;
   }
 
-  function makeOperative(faceTex, bodyColor, vestColor) {
-    const g = new THREE.Group();
-    const skin = new THREE.MeshStandardMaterial({ color: 0xe3b392, roughness: 0.55, metalness: 0.05 });
-    const cloth = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.72, metalness: 0.08 });
-    const vestMat = new THREE.MeshStandardMaterial({ color: vestColor, roughness: 0.48, metalness: 0.22 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x2a241c, roughness: 0.8 });
+  function tintSoldier(root, hex) {
+    root.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m, i) => {
+        const clone = m.clone();
+        if (clone.color) {
+          const c = new THREE.Color(hex);
+          clone.color.lerp(c, 0.35);
+        }
+        if (Array.isArray(o.material)) o.material[i] = clone;
+        else o.material = clone;
+      });
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
+  }
 
-    const leftLeg = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.55, 6, 10), dark);
-    leftLeg.position.set(-0.14, 0.48, 0);
-    leftLeg.castShadow = true;
-    const rightLeg = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.55, 6, 10), dark);
-    rightLeg.position.set(0.14, 0.48, 0);
-    rightLeg.castShadow = true;
-    g.add(leftLeg, rightLeg);
+  function createSoldierActor(tintHex) {
+    if (!soldierTemplate.scene) return null;
+    const root = SkeletonUtils.clone(soldierTemplate.scene);
+    root.scale.setScalar(1.05);
+    if (tintHex) tintSoldier(root, tintHex);
+    else {
+      root.traverse((o) => {
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+    }
 
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.5, 8, 12), cloth);
-    torso.position.y = 1.28;
-    torso.castShadow = true;
-    g.add(torso);
-
-    const vest = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.42, 0.36), vestMat);
-    vest.position.y = 1.32;
-    vest.castShadow = true;
-    g.add(vest);
-
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.42, 0.16), new THREE.MeshStandardMaterial({ color: 0x5c4630, roughness: 0.75 }));
-    pack.position.set(0, 1.32, -0.26);
-    g.add(pack);
-
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 24, 24), skin);
-    head.position.y = 1.9;
-    head.castShadow = true;
-    g.add(head);
-
-    const face = new THREE.Mesh(
-      new THREE.CircleGeometry(0.2, 32),
-      new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.4, metalness: 0 })
-    );
-    face.position.set(0, 1.9, 0.18);
-    g.add(face);
-
-    const rifle = new THREE.Mesh(
-      new THREE.BoxGeometry(0.07, 0.07, 0.82),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.65, roughness: 0.35 })
-    );
-    rifle.position.set(0.3, 1.22, 0.36);
-    g.add(rifle);
+    const mixer = new THREE.AnimationMixer(root);
+    const actions = {};
+    soldierTemplate.animations.forEach((clip) => {
+      actions[clip.name] = mixer.clipAction(clip);
+    });
+    const idle = actions.Idle || Object.values(actions)[0];
+    const walk = actions.Walk || actions.Run || idle;
+    const run = actions.Run || walk;
+    if (idle) idle.play();
 
     const hpBar = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.85, 0.07),
+      new THREE.PlaneGeometry(0.9, 0.08),
       new THREE.MeshBasicMaterial({ color: 0x6dff7a, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
     );
-    hpBar.position.y = 2.35;
-    g.add(hpBar);
+    hpBar.position.y = 2.15;
+    root.add(hpBar);
 
-    g.userData = { face, hpBar, leftLeg, rightLeg, body: torso };
-    return g;
+    mixers.push(mixer);
+    return {
+      root,
+      mixer,
+      actions: { idle, walk, run },
+      current: 'idle',
+      hpBar,
+    };
+  }
+
+  function setAnim(actor, name) {
+    if (!actor || actor.current === name) return;
+    const next = actor.actions[name];
+    const prev = actor.actions[actor.current];
+    if (!next) return;
+    next.reset().fadeIn(0.18).play();
+    if (prev && prev !== next) prev.fadeOut(0.18);
+    actor.current = name;
   }
 
   function clearWorld() {
+    while (mixers.length) mixers.pop();
     while (worldRoot.children.length) {
       const c = worldRoot.children[0];
       worldRoot.remove(c);
-      c.traverse?.((o) => {
-        if (o.geometry) o.geometry.dispose?.();
-      });
     }
     world.player = null;
     world.enemies = [];
@@ -234,6 +257,13 @@
     world.buildings = [];
     world.barrels = [];
     world.zoneMesh = null;
+  }
+
+  function blocked(x, z, r) {
+    for (const b of world.buildings) {
+      if (x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ) return true;
+    }
+    return false;
   }
 
   function buildArena(mapSize) {
@@ -245,15 +275,6 @@
     ground.receiveShadow = true;
     worldRoot.add(ground);
 
-    // ambient fill plate
-    const rim = new THREE.Mesh(
-      new THREE.RingGeometry(mapSize * 0.48, mapSize * 0.52, 64),
-      new THREE.MeshBasicMaterial({ color: 0x2a4030, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
-    );
-    rim.rotation.x = -Math.PI / 2;
-    rim.position.y = 0.03;
-    worldRoot.add(rim);
-
     const rooms = [
       { x: -10, z: -8, w: 6, d: 5, h: 4.2 },
       { x: 9, z: -10, w: 7, d: 5.5, h: 4.8 },
@@ -261,9 +282,10 @@
       { x: 10, z: 8, w: 6, d: 5, h: 4.4 },
       { x: 0, z: 0, w: 5, d: 4, h: 3.4 },
     ];
-
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xe8eef2, roughness: 0.65, metalness: 0.05 });
-    const winMat = new THREE.MeshStandardMaterial({ color: 0x7ec8e8, emissive: 0x1a4060, emissiveIntensity: 0.25, roughness: 0.2, metalness: 0.4 });
+    const winMat = new THREE.MeshStandardMaterial({
+      color: 0x9fe0ff, emissive: 0x2a7098, emissiveIntensity: 0.55, roughness: 0.15, metalness: 0.35,
+    });
 
     rooms.forEach((r) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(r.w, r.h, r.d), wallMat);
@@ -282,7 +304,6 @@
       });
     });
 
-    // trees
     for (let i = 0; i < 10; i++) {
       const tx = rand(-mapSize / 2 + 2, mapSize / 2 - 2);
       const tz = rand(-mapSize / 2 + 2, mapSize / 2 - 2);
@@ -308,7 +329,7 @@
       if (blocked(bx, bz, 0.6)) continue;
       const barrel = new THREE.Mesh(
         new THREE.CylinderGeometry(0.35, 0.4, 0.9, 16),
-        new THREE.MeshStandardMaterial({ color: 0xc62828, metalness: 0.45, roughness: 0.35 })
+        new THREE.MeshStandardMaterial({ color: 0xc62828, metalness: 0.45, roughness: 0.35, emissive: 0x401010, emissiveIntensity: 0.25 })
       );
       barrel.position.set(bx, 0.45, bz);
       barrel.castShadow = true;
@@ -325,19 +346,12 @@
 
     const zoneGeo = new THREE.RingGeometry(17.2, 18, 96);
     const zoneMat = new THREE.MeshBasicMaterial({
-      color: 0x5ef0ff, transparent: true, opacity: 0.4, side: THREE.DoubleSide,
+      color: 0x5ef0ff, transparent: true, opacity: 0.45, side: THREE.DoubleSide,
     });
     world.zoneMesh = new THREE.Mesh(zoneGeo, zoneMat);
     world.zoneMesh.rotation.x = -Math.PI / 2;
     world.zoneMesh.position.y = 0.06;
     worldRoot.add(world.zoneMesh);
-  }
-
-  function blocked(x, z, r) {
-    for (const b of world.buildings) {
-      if (x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ) return true;
-    }
-    return false;
   }
 
   function spawnMission(data) {
@@ -357,21 +371,23 @@
     buildArena(world.mapSize);
 
     const half = world.mapSize / 2 - 2;
-    const pMesh = makeOperative(texHero, 0x4a6741, 0x2f5a28);
-    pMesh.position.set(0, 0, 6);
-    worldRoot.add(pMesh);
+    const pActor = createSoldierActor(null);
+    pActor.root.position.set(0, 0, 6);
+    worldRoot.add(pActor.root);
     world.player = {
-      mesh: pMesh,
+      ...pActor,
       x: 0, z: 6, r: 0.45,
       hp: data.playerHp,
       maxHp: data.playerMaxHp,
       angle: Math.PI,
       speed: 7.2,
       shootCd: 0,
+      moving: false,
     };
 
     world.enemies = [];
     const n = data.enemies || 4;
+    const tints = [0xc45c26, 0x8a2f2f, 0x3d5a80, 0x5a3d7a];
     for (let i = 0; i < n; i++) {
       let x; let z; let tries = 0;
       do {
@@ -380,11 +396,12 @@
         tries += 1;
       } while ((Math.hypot(x - world.player.x, z - world.player.z) < 8 || blocked(x, z, 0.5)) && tries < 50);
 
-      const mesh = makeOperative(i % 2 ? texRivalB : texRivalA, 0x6a5a48, 0x8a6a3a);
-      mesh.position.set(x, 0, z);
-      worldRoot.add(mesh);
+      const eActor = createSoldierActor(tints[i % tints.length]);
+      eActor.root.position.set(x, 0, z);
+      worldRoot.add(eActor.root);
       world.enemies.push({
-        mesh, x, z, r: 0.45,
+        ...eActor,
+        x, z, r: 0.45,
         hp: data.enemyHp,
         maxHp: data.enemyHp,
         angle: 0,
@@ -395,7 +412,7 @@
     }
 
     world.running = true;
-    els.hint.textContent = `Nivel ${data.level}: elimina ${n} rivales en 3D · premio ${mxn(data.prize)}`;
+    els.hint.textContent = `Nivel ${data.level}: elimina ${n} rivales GLB · premio ${mxn(data.prize)}`;
   }
 
   function nearestEnemy(from) {
@@ -412,8 +429,13 @@
   function fireBullet(owner, ally, dmg, speed) {
     const dir = new THREE.Vector3(Math.sin(owner.angle), 0, Math.cos(owner.angle));
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 8, 8),
-      new THREE.MeshBasicMaterial({ color: ally ? 0xb8f000 : 0xff8a1e })
+      new THREE.SphereGeometry(0.07, 8, 8),
+      new THREE.MeshStandardMaterial({
+        color: ally ? 0xd4ff4d : 0xff8a1e,
+        emissive: ally ? 0xa0ff20 : 0xff5500,
+        emissiveIntensity: 2.2,
+        toneMapped: false,
+      })
     );
     mesh.position.set(owner.x + dir.x * 0.7, 1.35, owner.z + dir.z * 0.7);
     worldRoot.add(mesh);
@@ -438,13 +460,13 @@
   }
 
   function syncActor(actor) {
-    actor.mesh.position.x = actor.x;
-    actor.mesh.position.z = actor.z;
-    actor.mesh.rotation.y = actor.angle;
+    actor.root.position.x = actor.x;
+    actor.root.position.z = actor.z;
+    actor.root.rotation.y = actor.angle;
     const pct = Math.max(0.01, actor.hp / actor.maxHp);
-    actor.mesh.userData.hpBar.scale.x = pct;
-    actor.mesh.userData.hpBar.material.color.setHex(pct > 0.45 ? 0x22cc44 : 0xff4d4d);
-    actor.mesh.userData.hpBar.lookAt(camera.position);
+    actor.hpBar.scale.x = pct;
+    actor.hpBar.material.color.setHex(pct > 0.45 ? 0x6dff7a : 0xff4d4d);
+    actor.hpBar.quaternion.copy(camera.quaternion);
   }
 
   function updateZoneVisual() {
@@ -522,7 +544,6 @@
     if (keys.a || keys.arrowleft) mx -= 1;
     if (keys.d || keys.arrowright) mx += 1;
 
-    // move relative to camera yaw (approx behind player)
     const camYaw = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
     const cos = Math.cos(camYaw);
     const sin = Math.sin(camYaw);
@@ -538,6 +559,9 @@
     if (!blocked(nx, p.z, p.r)) p.x = nx;
     if (!blocked(p.x, nz, p.r)) p.z = nz;
 
+    p.moving = mag > 0.12;
+    setAnim(p, p.moving ? (mag > 0.75 ? 'run' : 'walk') : 'idle');
+
     const target = nearestEnemy(p);
     if (target) {
       const desired = Math.atan2(target.x - p.x, target.z - p.z);
@@ -548,11 +572,6 @@
     } else if (mag > 0.1) {
       p.angle = Math.atan2(wx, wz);
     }
-
-    // walk bob
-    const bob = world.running && mag > 0.1 ? Math.sin(performance.now() * 0.012) * 0.04 : 0;
-    p.mesh.userData.leftLeg.rotation.x = bob * 8;
-    p.mesh.userData.rightLeg.rotation.x = -bob * 8;
 
     if (world.reloadT > 0) {
       world.reloadT -= dt;
@@ -577,7 +596,7 @@
 
     for (const e of world.enemies) {
       if (e.hp <= 0) {
-        e.mesh.visible = false;
+        e.root.visible = false;
         continue;
       }
       const dx = p.x - e.x;
@@ -596,6 +615,8 @@
       ez = Math.max(-half, Math.min(half, ez));
       if (!blocked(ex, e.z, e.r)) e.x = ex;
       if (!blocked(e.x, ez, e.r)) e.z = ez;
+
+      setAnim(e, Math.abs(move) > 0.1 ? 'walk' : 'idle');
 
       e.shootCd -= dt;
       if (e.shootCd <= 0 && dist < 16) {
@@ -642,7 +663,7 @@
             b.life = 0;
             if (e.hp <= 0) {
               world.kills += 1;
-              e.mesh.visible = false;
+              e.root.visible = false;
             }
             break;
           }
@@ -668,9 +689,8 @@
 
     syncActor(p);
 
-    // third-person camera
-    const back = 7.5;
-    const height = 4.2;
+    const back = 7.8;
+    const height = 4.4;
     const cx = p.x - Math.sin(p.angle) * back;
     const cz = p.z - Math.cos(p.angle) * back;
     camera.position.lerp(new THREE.Vector3(cx, height, cz), 1 - Math.pow(0.001, dt));
@@ -691,39 +711,19 @@
     refreshHud();
   }
 
-  function idleRender() {
-    camera.position.set(10, 9, 14);
+  function idleCamera() {
+    camera.position.set(8, 7, 12);
     camera.lookAt(0, 1, 0);
   }
 
   function loop() {
     const dt = Math.min(0.033, world.clock.getDelta());
+    for (const m of mixers) m.update(dt);
     if (world.running) update(dt);
-    else if (!world.player) idleRender();
-    renderer.render(scene, camera);
+    else idleCamera();
+    composer.render();
     requestAnimationFrame(loop);
   }
-
-  // preview ground
-  (function preview() {
-    const g = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 40),
-      new THREE.MeshStandardMaterial({ color: 0x4d6b3a })
-    );
-    g.rotation.x = -Math.PI / 2;
-    worldRoot.add(g);
-    const demo = makeOperative(texHero, 0x4a6741, 0x2f5a28);
-    demo.position.set(0, 0, 0);
-    worldRoot.add(demo);
-    const r1 = makeOperative(texRivalA, 0x6a5a48, 0x8a6a3a);
-    r1.position.set(2.2, 0, -1.5);
-    r1.rotation.y = -0.6;
-    worldRoot.add(r1);
-    const r2 = makeOperative(texRivalB, 0x6a5a48, 0x8a6a3a);
-    r2.position.set(-2.4, 0, -1.2);
-    r2.rotation.y = 0.7;
-    worldRoot.add(r2);
-  })();
 
   function refreshHud() {
     els.credits.textContent = mxn(credits);
@@ -736,7 +736,7 @@
         ? (PlayerAuth.getUser()?.name || 'Jugador')
         : (machineNumber ? '#' + machineNumber : '—');
     }
-    els.restartBtn.disabled = !session || busy || world.running;
+    els.restartBtn.disabled = !session || busy || world.running || !assetsReady;
 
     if (world.player) {
       const pct = Math.max(0, (world.player.hp / world.player.maxHp) * 100);
@@ -754,7 +754,10 @@
     const left = Math.max(0, Math.ceil(world.zoneMax - world.zoneT));
     els.zoneTimer.textContent = world.running ? String(left).padStart(2, '0') + 's' : '—';
 
-    if (!playing) {
+    if (!assetsReady) {
+      els.actionBtn.textContent = 'CARGANDO…';
+      els.actionBtn.disabled = true;
+    } else if (!playing) {
       els.actionBtn.textContent = 'JUGAR';
       els.actionBtn.disabled = false;
     } else if (!session) {
@@ -831,7 +834,7 @@
   }
 
   async function startMission(restart) {
-    if (!playing || busy || world.running) return;
+    if (!playing || busy || world.running || !assetsReady) return;
     if (!isPlayerMode && !machineNumber) return;
     if (credits < bet()) {
       if (restart && session) {
@@ -873,7 +876,7 @@
   }
 
   async function retryMission() {
-    if (!session || busy || world.running) return;
+    if (!session || busy || world.running || !assetsReady) return;
     if (credits < bet()) {
       els.overlay.classList.remove('hidden');
       els.title.textContent = 'Sin saldo';
@@ -898,6 +901,10 @@
   }
 
   function beginPlay() {
+    if (!assetsReady) {
+      showToast('Cargando', 'Espera a que terminen los modelos 3D', null);
+      return;
+    }
     if (!isPlayerMode && !machineNumber) { loadBalance(); return; }
     if (credits < bet()) {
       els.title.textContent = 'Sin saldo';
@@ -907,7 +914,7 @@
     playing = true;
     els.overlay.classList.add('hidden');
     session = null;
-    els.hint.textContent = 'Pulsa MISIÓN 1 para pagar y entrar a la zona 3D.';
+    els.hint.textContent = 'Pulsa MISIÓN 1 para pagar y entrar a la zona GLB.';
     refreshHud();
   }
 
@@ -959,7 +966,7 @@
     if (session.status === 'failed') { retryMission(); }
   });
   els.restartBtn.addEventListener('click', async () => {
-    if (!playing || busy || world.running) return;
+    if (!playing || busy || world.running || !assetsReady) return;
     if (!confirm('¿Reiniciar? Volverás al nivel 1.')) return;
     await startMission(true);
   });
@@ -967,7 +974,55 @@
   els.betDown.addEventListener('click', () => { if (world.running) return; betIndex = Math.max(0, betIndex - 1); refreshHud(); });
   els.betUp.addEventListener('click', () => { if (world.running) return; betIndex = Math.min(BETS.length - 1, betIndex + 1); refreshHud(); });
 
+  // Preview ground while loading
+  (function preview() {
+    const g = new THREE.Mesh(
+      new THREE.PlaneGeometry(40, 40),
+      new THREE.MeshStandardMaterial({ color: 0x4d6b3a })
+    );
+    g.rotation.x = -Math.PI / 2;
+    worldRoot.add(g);
+  })();
+
   refreshHud();
   requestAnimationFrame(loop);
   loadBalance();
+
+  const loader = new GLTFLoader();
+  loader.load(
+    'assets/models/Soldier.glb',
+    (gltf) => {
+      soldierTemplate.scene = gltf.scene;
+      soldierTemplate.animations = gltf.animations || [];
+      assetsReady = true;
+      loadBanner?.classList.add('hidden');
+      els.hint.textContent = 'Modelos listos · Idle/Walk/Run + bloom activos';
+      // demo soldier in lobby
+      clearWorld();
+      const demo = createSoldierActor(null);
+      if (demo) {
+        demo.root.position.set(0, 0, 0);
+        worldRoot.add(demo.root);
+        setAnim(demo, 'idle');
+      }
+      const rival = createSoldierActor(0xc45c26);
+      if (rival) {
+        rival.root.position.set(2.2, 0, -1.2);
+        rival.root.rotation.y = -0.7;
+        worldRoot.add(rival.root);
+        setAnim(rival, 'idle');
+      }
+      refreshHud();
+    },
+    (ev) => {
+      if (!ev.total) return;
+      const pct = Math.round((ev.loaded / ev.total) * 100);
+      if (loadBanner) loadBanner.textContent = `Cargando modelo GLB… ${pct}%`;
+    },
+    (err) => {
+      console.error(err);
+      if (loadBanner) loadBanner.textContent = 'Error cargando GLB — recarga la página';
+      showToast('Error 3D', 'No se pudo cargar Soldier.glb', false);
+    }
+  );
 })();

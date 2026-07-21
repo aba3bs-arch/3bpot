@@ -132,6 +132,24 @@ html, body {
   height: 100% !important;
 }
 
+.load-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 10, 14, 0.72);
+  color: var(--lime);
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.load-banner.hidden { display: none; }
+
 .hud-overlay { pointer-events: none; position: absolute; inset: 0; }
 
 .compass {
