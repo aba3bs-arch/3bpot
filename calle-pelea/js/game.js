@@ -203,7 +203,7 @@ function refreshHud() {
       : (machineNumber ? '#' + machineNumber : '—');
   }
 
-  restartBtn.disabled = !session || busy || !assetsReady;
+  restartBtn.disabled = !playing || busy || !assetsReady;
   refreshActionBtn();
   setFightButtons(!!session && session.status === 'fighting' && !busy);
 }
@@ -409,7 +409,8 @@ function createFighter(template, facingSign, tintHex) {
   const targetH = 1.85;
   const s = size.y > 0.1 ? targetH / size.y : 1;
   root.scale.setScalar(s);
-  root.rotation.y = facingSign > 0 ? Math.PI / 2 : -Math.PI / 2;
+  // Mixamo Soldier/Xbot: +Z forward — face opponent on the X axis (flip from prior bug)
+  root.rotation.y = facingSign > 0 ? -Math.PI / 2 : Math.PI / 2;
 
   root.traverse((o) => {
     if (!o.isMesh) return;
@@ -582,13 +583,13 @@ function placeFighters() {
   if (playerActor) {
     playerActor.baseX = -gap;
     playerActor.root.position.set(-gap, 0, 0);
-    playerActor.root.rotation.y = Math.PI / 2;
+    playerActor.root.rotation.y = -Math.PI / 2; // face +X toward rival
     setPose(playerActor, 'idle');
   }
   if (rivalActor) {
     rivalActor.baseX = gap;
     rivalActor.root.position.set(gap, 0, 0);
-    rivalActor.root.rotation.y = -Math.PI / 2;
+    rivalActor.root.rotation.y = Math.PI / 2; // face -X toward player
     setPose(rivalActor, 'idle');
   }
 }
@@ -654,13 +655,16 @@ async function startFight(restart) {
   if (!playing || busy || !assetsReady) return;
   if (!isPlayerMode && !machineNumber) return;
 
-  if (credits < bet()) {
-    if (restart && session) {
+  // Don't block on saldo before the call: server may resume a fight without charging.
+  // Only warn early when we clearly need a new paid round.
+  const needsNewBet = restart || !session || session.status === 'level_complete' || session.status === 'failed';
+  if (needsNewBet && credits < bet() && !(session && session.status === 'fighting')) {
+    if (restart) {
       try {
         busy = true;
         if (isPlayerMode) await PlayerAuth.startCallePelea(bet(), true);
         else await MachineAPI.startCallePelea(bet(), true);
-      } catch (_) { /* abandoned */ }
+      } catch (_) { /* abandoned or no session */ }
       finally { busy = false; }
       session = null;
       refreshHud();
@@ -684,12 +688,22 @@ async function startFight(restart) {
       : await MachineAPI.startCallePelea(bet(), restart);
     applySession(data);
     placeFighters();
-    showToast(restart ? 'Nueva partida' : `Nivel ${data.level}`, data.message, true);
+    showToast(
+      data.resumed ? 'Pelea reanudada' : (restart ? 'Nueva partida' : `Nivel ${data.level}`),
+      data.message,
+      true
+    );
     hintEl.textContent = `vs ${data.rival.name} · elige GOLPE, PATADA o BLOQUEO`;
   } catch (err) {
-    showToast('Error', err.message || 'No se pudo iniciar', false);
+    const msg = err.message || 'No se pudo iniciar';
+    if (!restart && /pelea en curso/i.test(msg)) {
+      busy = false;
+      await startFight(true);
+      return;
+    }
+    showToast('Error', msg, false);
     if (restart) session = null;
-    if ((err.message || '').includes('insuficiente')) {
+    if (/insuficiente/i.test(msg)) {
       overlay.classList.remove('hidden');
       titleEl.textContent = 'Sin saldo';
       subtitleEl.textContent = 'Pide recarga al cajero.';

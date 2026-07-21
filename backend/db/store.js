@@ -1078,8 +1078,19 @@ function startFightSession(owner, bet, retentionPercent, { restart = false } = {
         session = null;
     }
 
+    // Resume in-progress fight after refresh / lost client state (no extra charge)
     if (session && session.status === 'fighting') {
-        throw new Error('Ya tienes una pelea en curso — termínala o reinicia');
+        const balance = getFightOwnerBalance(session);
+        const m = session.machine_id ? findMachineById(session.machine_id) : null;
+        const u = session.user_id ? findUserById(session.user_id) : null;
+        return {
+            ...fight.publicFight(session),
+            balance,
+            machine_number: m?.number,
+            user_name: u?.name,
+            resumed: true,
+            message: `Continúa nivel ${session.level} · vs ${session.rival?.name || 'rival'}`,
+        };
     }
 
     let level = 1;
