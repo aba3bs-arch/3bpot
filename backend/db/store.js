@@ -15,7 +15,8 @@ function emptyData() {
         transactions: [],
         game_rounds: [],
         cable_sessions: [],
-        counters: { users: 0, machines: 0, transactions: 0, game_rounds: 0, branches: 0, cable_sessions: 0 },
+        puzzle_sessions: [],
+        counters: { users: 0, machines: 0, transactions: 0, game_rounds: 0, branches: 0, cable_sessions: 0, puzzle_sessions: 0 },
     };
 }
 
@@ -731,6 +732,242 @@ function pullCableSession(sessionId, end, owner) {
     };
 }
 
+/* Rompecabezas — niveles infinitos */
+function ensurePuzzleSessions() {
+    if (!data.puzzle_sessions) data.puzzle_sessions = [];
+    if (!data.counters.puzzle_sessions) data.counters.puzzle_sessions = 0;
+}
+
+function prunePuzzleSessions() {
+    ensurePuzzleSessions();
+    const cutoff = Date.now() - 1000 * 60 * 60 * 6;
+    data.puzzle_sessions = data.puzzle_sessions.filter((s) => {
+        if (s.status === 'playing' || s.status === 'level_complete') return true;
+        return new Date(s.created_at).getTime() > cutoff;
+    });
+}
+
+function findPuzzleSession(id) {
+    ensurePuzzleSessions();
+    return data.puzzle_sessions.find((s) => s.id === parseInt(id, 10)) || null;
+}
+
+function findActivePuzzleSession({ machineId, userId }) {
+    ensurePuzzleSessions();
+    return data.puzzle_sessions.find((s) => {
+        if (machineId && s.machine_id === machineId && (s.status === 'playing' || s.status === 'level_complete')) return true;
+        if (userId && s.user_id === userId && (s.status === 'playing' || s.status === 'level_complete')) return true;
+        return false;
+    }) || null;
+}
+
+function creditPuzzlePrize(session, amount) {
+    if (amount <= 0) return getPuzzleOwnerBalance(session);
+    if (session.machine_id) {
+        const m = findMachineById(session.machine_id);
+        m.balance += amount;
+        addTransaction({
+            machine_id: session.machine_id, type: 'win', amount,
+            balance_after: m.balance, game: 'rompecabezas',
+        });
+        return m.balance;
+    }
+    const u = findUserById(session.user_id);
+    u.game_balance += amount;
+    addTransaction({
+        user_id: session.user_id, type: 'win', amount,
+        balance_after: u.game_balance, game: 'rompecabezas',
+    });
+    return u.game_balance;
+}
+
+function chargePuzzleBet(sessionOwner, bet) {
+    if (sessionOwner.machineId) {
+        const m = findMachineById(sessionOwner.machineId);
+        if (!m || !m.active) throw new Error('Máquina no disponible');
+        if (m.balance < bet) throw new Error('Saldo insuficiente en la máquina');
+        m.balance -= bet;
+        addTransaction({
+            machine_id: sessionOwner.machineId, type: 'bet', amount: -bet,
+            balance_after: m.balance, game: 'rompecabezas',
+        });
+        return { balance: m.balance, machine_number: m.number };
+    }
+    const u = findUserById(sessionOwner.userId);
+    if (!u || u.role !== 'user' || !u.active) throw new Error('Usuario no disponible');
+    if ((u.game_balance || 0) < bet) throw new Error('Saldo insuficiente');
+    u.game_balance -= bet;
+    addTransaction({
+        user_id: sessionOwner.userId, type: 'bet', amount: -bet,
+        balance_after: u.game_balance, game: 'rompecabezas',
+    });
+    return { balance: u.game_balance, user_name: u.name };
+}
+
+function getPuzzleOwnerBalance(session) {
+    if (session.machine_id) return findMachineById(session.machine_id)?.balance ?? 0;
+    return findUserById(session.user_id)?.game_balance ?? 0;
+}
+
+function startPuzzleSession(owner, bet, retentionPercent, { restart = false } = {}) {
+    const puzzle = require('../engines/rompecabezas');
+    if (!puzzle.BETS.includes(bet)) throw new Error('Apuesta inválida');
+
+    ensurePuzzleSessions();
+    prunePuzzleSessions();
+
+    let session = findActivePuzzleSession(owner);
+
+    if (restart && session) {
+        session.status = 'abandoned';
+        addGameRound({
+            machine_id: session.machine_id || null,
+            user_id: session.user_id || null,
+            game: 'rompecabezas',
+            bet: session.bet,
+            payout: session.totalWon || 0,
+            net: (session.totalWon || 0) - (session.betsPaid || session.bet),
+            result_json: JSON.stringify({
+                abandoned: true,
+                levelReached: session.level,
+                totalWon: session.totalWon || 0,
+            }),
+        });
+        persist();
+        session = null;
+    }
+
+    if (session && session.status === 'playing') {
+        throw new Error('Ya tienes un nivel en progreso — termínalo o reinicia');
+    }
+
+    let level = 1;
+    let claimedLevels = [];
+    let totalWon = 0;
+    let betsPaid = 0;
+
+    if (session && session.status === 'level_complete') {
+        level = session.level + 1;
+        claimedLevels = [...(session.claimedLevels || [])];
+        totalWon = session.totalWon || 0;
+        betsPaid = session.betsPaid || session.bet;
+        session.status = 'continued';
+    }
+
+    const charged = chargePuzzleBet(owner, bet);
+    betsPaid += bet;
+
+    const levelData = puzzle.createLevel(level, bet, retentionPercent);
+    const newSession = {
+        id: nextId('puzzle_sessions'),
+        machine_id: owner.machineId || null,
+        user_id: owner.userId || null,
+        bet,
+        betsPaid,
+        level: levelData.level,
+        size: levelData.size,
+        board: levelData.board,
+        prize: levelData.prize,
+        prizeMult: levelData.prizeMult,
+        moves: 0,
+        moveLimit: levelData.moveLimit,
+        prizePaid: false,
+        claimedLevels,
+        totalWon,
+        status: 'playing',
+        created_at: now(),
+    };
+    data.puzzle_sessions.push(newSession);
+    persist();
+
+    return {
+        ...puzzle.publicLevel(newSession),
+        balance: charged.balance,
+        machine_number: charged.machine_number,
+        user_name: charged.user_name,
+        message: level === 1
+            ? `Nivel 1 · premio ${levelData.prize}`
+            : `Nivel ${level} · premio ${levelData.prize}`,
+    };
+}
+
+function movePuzzleSession(sessionId, tileIndex, owner) {
+    const puzzle = require('../engines/rompecabezas');
+    const session = findPuzzleSession(sessionId);
+    if (!session || (session.status !== 'playing' && session.status !== 'failed')) {
+        throw new Error('Partida no encontrada o ya terminada');
+    }
+    if (owner.machineId && session.machine_id !== owner.machineId) throw new Error('Partida no válida');
+    if (owner.userId && session.user_id !== owner.userId) throw new Error('Partida no válida');
+    if (session.status === 'failed') throw new Error('Nivel fallido — reinicia o paga para reintentar');
+
+    const result = puzzle.applyMove(session, tileIndex);
+    let balance = getPuzzleOwnerBalance(session);
+
+    if (result.awarded > 0) {
+        balance = creditPuzzlePrize(session, result.awarded);
+        addGameRound({
+            machine_id: session.machine_id || null,
+            user_id: session.user_id || null,
+            game: 'rompecabezas',
+            bet: session.bet,
+            payout: result.awarded,
+            net: result.awarded - session.bet,
+            result_json: JSON.stringify({
+                level: session.level,
+                prize: result.awarded,
+                moves: session.moves,
+            }),
+        });
+    } else if (result.failed) {
+        addGameRound({
+            machine_id: session.machine_id || null,
+            user_id: session.user_id || null,
+            game: 'rompecabezas',
+            bet: session.bet,
+            payout: 0,
+            net: -session.bet,
+            result_json: JSON.stringify({ level: session.level, failed: true, moves: session.moves }),
+        });
+    }
+
+    persist();
+    return {
+        ...result,
+        session: puzzle.publicLevel(session),
+        balance,
+    };
+}
+
+function retryPuzzleLevel(sessionId, owner, retentionPercent) {
+    const puzzle = require('../engines/rompecabezas');
+    const session = findPuzzleSession(sessionId);
+    if (!session) throw new Error('Partida no encontrada');
+    if (owner.machineId && session.machine_id !== owner.machineId) throw new Error('Partida no válida');
+    if (owner.userId && session.user_id !== owner.userId) throw new Error('Partida no válida');
+    if (session.status !== 'failed') throw new Error('Solo puedes reintentar un nivel fallido');
+
+    const charged = chargePuzzleBet(owner, session.bet);
+    session.betsPaid = (session.betsPaid || session.bet) + session.bet;
+    const levelData = puzzle.createLevel(session.level, session.bet, retentionPercent);
+    session.board = levelData.board;
+    session.prize = levelData.prize;
+    session.prizeMult = levelData.prizeMult;
+    session.moves = 0;
+    session.moveLimit = levelData.moveLimit;
+    session.prizePaid = (session.claimedLevels || []).includes(session.level);
+    session.status = 'playing';
+    persist();
+
+    return {
+        ...puzzle.publicLevel(session),
+        balance: charged.balance,
+        machine_number: charged.machine_number,
+        user_name: charged.user_name,
+        message: `Reintento nivel ${session.level} · cobrado $${session.bet}`,
+    };
+}
+
 /* Transactions */
 function addTransaction(row) {
     const tx = { id: nextId('transactions'), created_at: now(), ...row };
@@ -847,6 +1084,7 @@ function migrateUsernames() {
 
 function seedDefaults() {
     ensureCableSessions();
+    ensurePuzzleSessions();
     seedBranches();
     ensureDefaultBranches();
     migrateUsernames();
@@ -891,7 +1129,7 @@ function createBranch(id, name, password) {
         password_hash: bcrypt.hashSync(finalPwd, 10),
         password_seed: finalPwd === 'sucursal123' ? 'sucursal123' : null,
         password_custom: finalPwd === 'sucursal123' ? 0 : 1,
-        games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria'],
+        games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas'],
         created_at: now(),
     };
     data.branches.push(branch);
@@ -1017,7 +1255,7 @@ function unassignCashier(cashierId) {
 
 function getBranchGames(branchId) {
     const branch = findBranchById(branchId);
-    const defaults = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria'];
+    const defaults = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas'];
     if (!branch) return defaults;
     if (!Array.isArray(branch.games) || !branch.games.length) {
         branch.games = defaults;
@@ -1029,7 +1267,7 @@ function getBranchGames(branchId) {
 function setBranchGames(branchId, games) {
     const branch = findBranchById(branchId);
     if (!branch) throw new Error('Sucursal no encontrada');
-    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria'];
+    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas'];
     const list = (games || []).filter((g) => allowed.includes(g));
     if (!list.length) throw new Error('Selecciona al menos un juego');
     branch.games = list;
@@ -1046,6 +1284,7 @@ function getGamesCatalog() {
         'rascadito': 'Rascadito',
         'desenreda-cable': 'Desenreda Cable',
         'loteria': 'Lotería',
+        'rompecabezas': 'Rompecabezas',
     };
     const ids = Object.keys(labels);
     return ids.map((id) => ({
@@ -1058,7 +1297,7 @@ function getGamesCatalog() {
 }
 
 function removeGameEverywhere(gameId, branchId = null) {
-    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria'];
+    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas'];
     if (!allowed.includes(gameId)) throw new Error('Juego no válido');
 
     const targets = branchId
@@ -1136,7 +1375,7 @@ function ensureDefaultBranches() {
                 active: 1,
                 float_balance: 5000,
                 password_hash: bcrypt.hashSync('sucursal123', 10),
-                games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria'],
+                games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas'],
                 created_at: now(),
             });
             added += 1;
@@ -1145,9 +1384,10 @@ function ensureDefaultBranches() {
     data.branches.forEach((b) => {
         ensureBranchAuth(b);
         if (!Array.isArray(b.games) || !b.games.length) {
-            b.games = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria'];
-        } else if (!b.games.includes('loteria')) {
-            b.games = [...b.games, 'loteria'];
+            b.games = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas'];
+        } else {
+            if (!b.games.includes('loteria')) b.games = [...b.games, 'loteria'];
+            if (!b.games.includes('rompecabezas')) b.games = [...b.games, 'rompecabezas'];
         }
         ensureMachinesForBranch(b.id, 3);
     });
@@ -1184,6 +1424,7 @@ module.exports = {
     creditMachine, creditUser, adjustMachineBalance, playMachine, playUser,
     getTransactions, getStats, getScratchPrizePool,
     startCableSessionMachine, startCableSessionUser, pullCableSession, findCableSession,
+    startPuzzleSession, movePuzzleSession, retryPuzzleLevel, findPuzzleSession,
     listBranches, findBranchById, createBranch, updateBranch, deleteBranch, seedBranches, ensureDefaultBranches, branchStats,
     sanitizeBranch, setBranchPassword, topUpBranch, transferAgentToBranch, ensureBranchAuth, assertBranchMachineAccess,
     ensureMachinesForBranch, assignCashierToBranch, unassignCashier, getBranchGames, setBranchGames,

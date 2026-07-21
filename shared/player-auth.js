@@ -93,9 +93,31 @@ const PlayerAuth = (function () {
         return request('/api/play/user/loteria', { method: 'POST', body: JSON.stringify({ bet }) });
     }
 
+    async function startRompecabezas(bet, restart) {
+        return request('/api/play/user/rompecabezas/start', {
+            method: 'POST',
+            body: JSON.stringify({ bet, restart: !!restart }),
+        });
+    }
+
+    async function moveRompecabezas(sessionId, tileIndex) {
+        return request('/api/play/user/rompecabezas/move', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId, tileIndex }),
+        });
+    }
+
+    async function retryRompecabezas(sessionId) {
+        return request('/api/play/user/rompecabezas/retry', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId }),
+        });
+    }
+
     return {
         login, logout, request, getUser, isLoggedIn, clearSession, formatPesos,
         playSpinWheel, playComicSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito,
         startDesenredaCable, pullDesenredaCable, playLoteria,
+        startRompecabezas, moveRompecabezas, retryRompecabezas,
     };
 })();

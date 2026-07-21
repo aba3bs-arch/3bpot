@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Rompecabezas — 3B Pot</title>
+  <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="hud">
+      <div class="brand">Rompecabezas</div>
+      <div class="stats">
+        <span>Máq. <strong id="machineLabel">—</strong></span>
+        <span>Saldo <strong id="credits">$0</strong></span>
+        <span>Apuesta <strong id="bet">$1</strong></span>
+        <span>Nivel <strong id="level">—</strong></span>
+        <span>Premio <strong id="prize">$0</strong></span>
+        <span>Ganado <strong id="won">$0</strong></span>
+      </div>
+    </header>
+
+    <p class="tagline" id="tagline">Ordena las fichas · cada nivel cobra crédito · premio una vez por nivel</p>
+
+    <div class="board-wrap">
+      <div id="board" class="board" aria-label="Tablero del rompecabezas"></div>
+    </div>
+
+    <div class="meta-row">
+      <span>Movimientos <strong id="moves">0</strong> / <strong id="moveLimit">0</strong></span>
+      <span>Tamaño <strong id="sizeLabel">—</strong></span>
+    </div>
+
+    <div class="mobile-actions">
+      <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
+      <button type="button" id="restartBtn" class="mobile-btn danger" disabled>REINICIAR</button>
+      <button type="button" id="actionBtn" class="mobile-btn action">JUGAR</button>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="betDown" class="ctrl">−</button>
+      <button type="button" id="betUp" class="ctrl">+</button>
+      <p class="hint" id="hint">Elige apuesta y pulsa JUGAR. Al reiniciar vuelves al nivel 1.</p>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="panel">
+        <h1 id="title">Rompecabezas</h1>
+        <p id="subtitle">
+          Niveles infinitos. Cada nivel cuesta tu apuesta (el saldo se agota).
+          Cuanto más alto el nivel, mayor el premio — solo se cobra una vez por nivel.
+          Si reinicias, empiezas otra vez desde el nivel 1.
+        </p>
+        <div class="panel-actions">
+          <a class="btn-link" href="/inicio/" data-inicio-link>Volver a juegos</a>
+          <button type="button" id="startBtn">Comenzar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast hidden" id="toast">
+      <strong id="toastTitle">—</strong>
+      <span id="toastText">—</span>
+    </div>
+  </div>
+  <script src="/shared/machine-client.js"></script>
+  <script src="/shared/player-auth.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

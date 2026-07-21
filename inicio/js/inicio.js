@@ -29,6 +29,7 @@
     'rascadito': { href: '/rascadito/', icon: '🎫', name: 'Rascadito' },
     'desenreda-cable': { href: '/desenreda-cable/', icon: '🔌', name: 'Desenreda Cable' },
     'loteria': { href: '/loteria/', icon: '🎴', name: 'Lotería' },
+    'rompecabezas': { href: '/rompecabezas/', icon: '🧩', name: 'Rompecabezas' },
   };
 
   function showError(el, msg) {

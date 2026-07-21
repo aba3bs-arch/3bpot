@@ -173,6 +173,41 @@ const MachineAPI = (function () {
         });
     }
 
+    async function startRompecabezas(bet, restart, machineNumber, branchId) {
+        return request('/api/play/rompecabezas/start', {
+            method: 'POST',
+            body: JSON.stringify({
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+                bet,
+                restart: !!restart,
+            }),
+        });
+    }
+
+    async function moveRompecabezas(sessionId, tileIndex, machineNumber, branchId) {
+        return request('/api/play/rompecabezas/move', {
+            method: 'POST',
+            body: JSON.stringify({
+                sessionId,
+                tileIndex,
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+            }),
+        });
+    }
+
+    async function retryRompecabezas(sessionId, machineNumber, branchId) {
+        return request('/api/play/rompecabezas/retry', {
+            method: 'POST',
+            body: JSON.stringify({
+                sessionId,
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+            }),
+        });
+    }
+
     function clearBinding() {
         localStorage.removeItem(KEY);
         localStorage.removeItem(BRANCH_KEY);
@@ -233,6 +268,7 @@ const MachineAPI = (function () {
         clearBinding, isLinked, bindTerminal, loginBranch, listMachines,
         getPortal, getMachine, spinWheel, spinSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito, getScratchPool,
         startDesenredaCable, pullDesenredaCable, playLoteria,
+        startRompecabezas, moveRompecabezas, retryRompecabezas,
         formatPesos, requireMachine, wireInicioLinks, apiBase,
     };
 })();

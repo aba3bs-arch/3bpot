@@ -7,6 +7,7 @@ const lagunaAnzuelo = require('../engines/laguna-anzuelo');
 const rascadito = require('../engines/rascadito');
 const desenredaCable = require('../engines/desenreda-cable');
 const loteria = require('../engines/loteria');
+const rompecabezas = require('../engines/rompecabezas');
 const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
@@ -242,6 +243,114 @@ router.post('/user/desenreda-cable/pull', authRequired, (req, res) => {
         res.json(out);
     } catch (e) {
         res.status(400).json({ error: e.message });
+    }
+});
+
+function validatePuzzleBet(bet) {
+    return rompecabezas.BETS.includes(bet);
+}
+
+function puzzleOwnerFromMachine(req) {
+    const machineNumber = parseInt(req.body.machineNumber, 10);
+    const branchId = req.body.branch_id || req.body.branch || null;
+    if (!machineNumber) throw Object.assign(new Error('Número de máquina requerido'), { status: 400 });
+    if (!branchId) throw Object.assign(new Error('Sucursal requerida'), { status: 400 });
+    const machine = store.findMachineByNumber(machineNumber, branchId);
+    if (!machine || !machine.active) throw Object.assign(new Error('Máquina no disponible'), { status: 404 });
+    return { machineId: machine.id };
+}
+
+router.post('/rompecabezas/start', (req, res) => {
+    const bet = parseInt(req.body.bet, 10);
+    const restart = !!req.body.restart;
+    const settings = store.getSettings();
+    if (!validatePuzzleBet(bet)) {
+        return res.status(400).json({ error: 'Apuesta: $1, $2, $5, $10, $15 o $20' });
+    }
+    try {
+        const owner = puzzleOwnerFromMachine(req);
+        const out = store.startPuzzleSession(owner, bet, settings.retention_percent, { restart });
+        res.json(out);
+    } catch (e) {
+        const status = e.status || (e.message.includes('insuficiente') ? 402 : 400);
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/rompecabezas/move', (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    const tileIndex = req.body.tileIndex;
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const owner = puzzleOwnerFromMachine(req);
+        const out = store.movePuzzleSession(sessionId, tileIndex, owner);
+        res.json(out);
+    } catch (e) {
+        const status = e.status || 400;
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/rompecabezas/retry', (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    const settings = store.getSettings();
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const owner = puzzleOwnerFromMachine(req);
+        const out = store.retryPuzzleLevel(sessionId, owner, settings.retention_percent);
+        res.json(out);
+    } catch (e) {
+        const status = e.status || (e.message.includes('insuficiente') ? 402 : 400);
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/user/rompecabezas/start', authRequired, (req, res) => {
+    const bet = parseInt(req.body.bet, 10);
+    const restart = !!req.body.restart;
+    const settings = store.getSettings();
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Solo jugadores' });
+    if (!validatePuzzleBet(bet)) {
+        return res.status(400).json({ error: 'Apuesta: $1, $2, $5, $10, $15 o $20' });
+    }
+    try {
+        const out = store.startPuzzleSession(
+            { userId: req.user.id },
+            bet,
+            settings.retention_percent,
+            { restart }
+        );
+        res.json(out);
+    } catch (e) {
+        const status = e.message.includes('insuficiente') ? 402 : 400;
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/user/rompecabezas/move', authRequired, (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    const tileIndex = req.body.tileIndex;
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Solo jugadores' });
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const out = store.movePuzzleSession(sessionId, tileIndex, { userId: req.user.id });
+        res.json(out);
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+router.post('/user/rompecabezas/retry', authRequired, (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    const settings = store.getSettings();
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Solo jugadores' });
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const out = store.retryPuzzleLevel(sessionId, { userId: req.user.id }, settings.retention_percent);
+        res.json(out);
+    } catch (e) {
+        const status = e.message.includes('insuficiente') ? 402 : 400;
+        res.status(status).json({ error: e.message });
     }
 });
 
