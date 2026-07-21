@@ -47,6 +47,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     toastTitle: document.getElementById('toastTitle'),
     toastText: document.getElementById('toastText'),
     compass: document.getElementById('compass'),
+    hitMarker: document.getElementById('hitMarker'),
+    dmgFlash: document.getElementById('dmgFlash'),
   };
 
   const WEAPONS = [
@@ -155,7 +157,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     enemyDmg: 8,
     startedAt: 0,
     clock: new THREE.Clock(),
+    hitFlashT: 0,
+    muzzleLight: null,
   };
+
+  const aim = { yaw: Math.PI, mouseLook: false };
+  const tmpCamPos = new THREE.Vector3();
+  const tmpLook = new THREE.Vector3();
 
   function currentWeapon() {
     return WEAPONS[world.weaponIndex] || WEAPONS[0];
@@ -177,6 +185,31 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
   function cycleWeapon() {
     setWeapon(world.weaponIndex + 1);
+  }
+
+  function pulseHitMarker() {
+    if (!els.hitMarker) return;
+    els.hitMarker.classList.remove('hidden');
+    clearTimeout(pulseHitMarker._t);
+    pulseHitMarker._t = setTimeout(() => els.hitMarker.classList.add('hidden'), 120);
+  }
+
+  function pulseDamage() {
+    world.hitFlashT = 0.28;
+    if (els.dmgFlash) els.dmgFlash.classList.add('on');
+  }
+
+  function spawnMuzzle(x, z, angle) {
+    if (!world.muzzleLight) {
+      world.muzzleLight = new THREE.PointLight(0xffcc66, 0, 6, 2);
+      worldRoot.add(world.muzzleLight);
+    }
+    world.muzzleLight.position.set(
+      x + Math.sin(angle) * 0.9,
+      1.45,
+      z + Math.cos(angle) * 0.9
+    );
+    world.muzzleLight.intensity = 3.2;
   }
 
   function mxn(n) {
@@ -554,16 +587,19 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     worldRoot.add(pActor.root);
     world.player = {
       ...pActor,
-      x: 0, z: 6, r: 0.45,
+      x: 0, z: 6, r: 0.4,
       hp: data.playerHp,
       maxHp: data.playerMaxHp,
       angle: Math.PI,
-      walkSpeed: 7.5,
-      runSpeed: 13.5,
+      walkSpeed: 8.2,
+      runSpeed: 14.5,
+      vx: 0,
+      vz: 0,
       shootCd: 0,
       moving: false,
       sprinting: false,
     };
+    aim.yaw = Math.PI;
 
     world.enemies = [];
     const n = data.enemies || 4;
@@ -610,27 +646,28 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     const yaw = owner.angle + (yawOffset || 0);
     const dir = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(ally ? 0.06 : 0.07, 8, 8),
+      new THREE.SphereGeometry(ally ? 0.055 : 0.065, 8, 8),
       new THREE.MeshStandardMaterial({
         color: ally ? 0xd4ff4d : 0xff8a1e,
         emissive: ally ? 0xa0ff20 : 0xff5500,
-        emissiveIntensity: 2.2,
+        emissiveIntensity: 2.4,
         toneMapped: false,
       })
     );
-    mesh.position.set(owner.x + dir.x * 0.85, 1.4, owner.z + dir.z * 0.85);
+    mesh.position.set(owner.x + dir.x * 0.9, 1.42, owner.z + dir.z * 0.9);
     worldRoot.add(mesh);
+    if (ally) spawnMuzzle(owner.x, owner.z, yaw);
     world.bullets.push({
       mesh,
       x: mesh.position.x,
-      y: 1.4,
+      y: 1.42,
       z: mesh.position.z,
       vx: dir.x * speed,
       vz: dir.z * speed,
       ally,
       dmg,
-      life: 1.15,
-      r: 0.12,
+      life: 1.2,
+      r: ally ? 0.14 : 0.16,
     });
   }
 
@@ -735,36 +772,53 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     if (keys.KeyD || keys.ArrowRight || keys.d || keys.arrowright) mx += 1;
     mx += input.x;
     mz += input.y;
+    const inputMag = Math.hypot(mx, mz);
+    if (inputMag > 1) { mx /= inputMag; mz /= inputMag; }
 
-    // Camera-relative movement (W = hacia donde mira la cámara)
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1);
-    else forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    let wx = right.x * mx + forward.x * (-mz);
-    let wz = right.z * mx + forward.z * (-mz);
-    const mag = Math.hypot(wx, wz);
-    if (mag > 1) { wx /= mag; wz /= mag; }
+    // Precise aim-relative movement (mouse turns aim; WASD strafe/forward)
+    const cosA = Math.cos(aim.yaw);
+    const sinA = Math.sin(aim.yaw);
+    let wishX = sinA * (-mz) + cosA * mx;
+    let wishZ = cosA * (-mz) - sinA * mx;
+    const wishMag = Math.hypot(wishX, wishZ);
+    if (wishMag > 1e-4) { wishX /= wishMag; wishZ /= wishMag; }
 
     const wantSprint = input.sprint || keys.ShiftLeft || keys.ShiftRight || keys.shift;
-    p.sprinting = wantSprint && mag > 0.12;
-    const speed = p.sprinting ? p.runSpeed : p.walkSpeed;
+    p.sprinting = wantSprint && wishMag > 0.1;
+    const maxSpeed = p.sprinting ? p.runSpeed : p.walkSpeed;
     if (els.sprintBtn) els.sprintBtn.classList.toggle('active', !!p.sprinting);
 
-    let nx = p.x + wx * speed * dt;
-    let nz = p.z + wz * speed * dt;
+    const targetVx = wishX * maxSpeed * (wishMag > 0.05 ? 1 : 0);
+    const targetVz = wishZ * maxSpeed * (wishMag > 0.05 ? 1 : 0);
+    const accel = wishMag > 0.05 ? (p.sprinting ? 70 : 55) : 90;
+    p.vx += Math.sign(targetVx - p.vx) * Math.min(Math.abs(targetVx - p.vx), accel * dt);
+    p.vz += Math.sign(targetVz - p.vz) * Math.min(Math.abs(targetVz - p.vz), accel * dt);
+    if (wishMag < 0.05) {
+      p.vx *= Math.max(0, 1 - 14 * dt);
+      p.vz *= Math.max(0, 1 - 14 * dt);
+      if (Math.abs(p.vx) < 0.05) p.vx = 0;
+      if (Math.abs(p.vz) < 0.05) p.vz = 0;
+    }
+
+    let nx = p.x + p.vx * dt;
+    let nz = p.z + p.vz * dt;
     nx = Math.max(-half, Math.min(half, nx));
     nz = Math.max(-half, Math.min(half, nz));
-    if (!blocked(nx, p.z, p.r)) p.x = nx;
-    if (!blocked(p.x, nz, p.r)) p.z = nz;
+    if (!blocked(nx, p.z, p.r)) p.x = nx; else p.vx = 0;
+    if (!blocked(p.x, nz, p.r)) p.z = nz; else p.vz = 0;
 
-    p.moving = mag > 0.12;
-    if (mag > 0.1) {
-      p.angle = Math.atan2(wx, wz);
+    const speedNow = Math.hypot(p.vx, p.vz);
+    p.moving = speedNow > 0.35;
+    // Face aim direction (shoot where you look); soft-turn body toward move when sprinting
+    if (p.sprinting && speedNow > 1) {
+      const moveYaw = Math.atan2(p.vx, p.vz);
+      let d = moveYaw - aim.yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      aim.yaw += d * Math.min(1, 10 * dt);
     }
-    setAnim(p, p.moving ? (p.sprinting ? 'run' : 'walk') : 'idle');
+    p.angle = aim.yaw;
+    setAnim(p, p.moving ? (p.sprinting || speedNow > 9 ? 'run' : 'walk') : 'idle');
 
     if (world.reloadT > 0) {
       world.reloadT -= dt;
@@ -780,6 +834,18 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     p.shootCd = Math.max(0, p.shootCd - dt);
     const wantFire = input.firing || keys[' '] || keys.Space || keys.Enter || keys.enter;
     const wpn = currentWeapon();
+    // Light aim-assist toward nearest foe while firing (keeps feel pro, not sticky)
+    if (wantFire) {
+      const tgt = nearestEnemy(p);
+      if (tgt) {
+        const desired = Math.atan2(tgt.x - p.x, tgt.z - p.z);
+        let diff = desired - aim.yaw;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        if (Math.abs(diff) < 0.55) aim.yaw += diff * Math.min(1, 6 * dt * (0.35 + (world.aimAssist || 0.2)));
+        p.angle = aim.yaw;
+      }
+    }
     if (wantFire && p.shootCd <= 0 && world.reloadT <= 0) {
       if (world.ammo > 0) {
         world.ammo -= 1;
@@ -799,10 +865,12 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       const dist = Math.hypot(dx, dz) || 1;
 
       let move = 0;
-      if (dist > 9) move = 1;
-      else if (dist < 5.5) move = -0.65;
-      const sx = -dz / dist * e.strafe * 0.55;
-      const sz = dx / dist * e.strafe * 0.55;
+      if (dist > 11) move = 1;
+      else if (dist < 6) move = -0.55;
+      else move = 0.15;
+      // Flank / strafe while keeping LOS to player
+      const sx = -dz / dist * e.strafe * 0.7;
+      const sz = dx / dist * e.strafe * 0.7;
       const mvx = (dx / dist) * move + sx;
       const mvz = (dz / dist) * move + sz;
       let ex = e.x + mvx * e.speed * dt;
@@ -812,16 +880,24 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       if (!blocked(ex, e.z, e.r)) e.x = ex;
       if (!blocked(e.x, ez, e.r)) e.z = ez;
 
-      // Face velocity when moving, face player when standing/shooting
-      if (Math.hypot(mvx, mvz) > 0.08) e.angle = Math.atan2(mvx, mvz);
-      else e.angle = Math.atan2(dx, dz);
+      // Always face / shoot AT the player (with lead)
+      const leadT = dist / 26;
+      const aimDx = dx + p.vx * leadT;
+      const aimDz = dz + p.vz * leadT;
+      const toPlayer = Math.atan2(aimDx, aimDz);
+      e.angle = toPlayer;
 
-      setAnim(e, Math.hypot(mvx, mvz) > 0.12 ? (Math.abs(move) > 0.8 ? 'run' : 'walk') : 'idle');
+      setAnim(e, Math.hypot(mvx, mvz) > 0.15 ? (Math.abs(move) > 0.7 ? 'run' : 'walk') : 'idle');
 
       e.shootCd -= dt;
-      if (e.shootCd <= 0 && dist < 16) {
-        e.shootCd = rand(0.55, 1.1);
-        fireBullet(e, false, world.enemyDmg, 20);
+      const canSee = dist < 22 && dist > 1.2;
+      if (e.shootCd <= 0 && canSee) {
+        // More aggressive as level rises; slight inaccuracy
+        const inacc = Math.max(0.02, 0.12 - (session?.level || 1) * 0.008);
+        e.angle = toPlayer + (Math.random() - 0.5) * inacc;
+        e.shootCd = rand(0.35, 0.75);
+        fireBullet(e, false, world.enemyDmg, 24 + Math.min(8, (session?.level || 1) * 0.4));
+        e.angle = toPlayer;
       }
       syncActor(e);
     }
@@ -848,7 +924,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
             const victims = [world.player, ...world.enemies];
             for (const v of victims) {
               if (!v || v.hp <= 0) continue;
-              if (Math.hypot(v.x - barrel.x, v.z - barrel.z) < 3.2) v.hp -= 28;
+              if (Math.hypot(v.x - barrel.x, v.z - barrel.z) < 3.2) {
+                v.hp -= 28;
+                if (v === world.player) pulseDamage();
+              }
             }
           }
           break;
@@ -861,6 +940,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
           if (Math.hypot(e.x - b.x, e.z - b.z) < e.r + b.r) {
             e.hp -= b.dmg;
             b.life = 0;
+            pulseHitMarker();
             if (e.hp <= 0) {
               world.kills += 1;
               e.root.visible = false;
@@ -872,6 +952,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
         if (Math.hypot(world.player.x - b.x, world.player.z - b.z) < world.player.r + b.r) {
           world.player.hp -= b.dmg;
           b.life = 0;
+          pulseDamage();
         }
       }
     }
@@ -885,18 +966,36 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     const zProg = Math.min(1, world.zoneT / world.zoneMax);
     world.zoneR = 18 * (1 - zProg) + 6 * zProg;
     updateZoneVisual();
-    if (Math.hypot(p.x, p.z) > world.zoneR) p.hp -= 14 * dt;
+    if (Math.hypot(p.x, p.z) > world.zoneR) {
+      p.hp -= 14 * dt;
+      if (Math.random() < dt * 2) pulseDamage();
+    }
+
+    if (world.hitFlashT > 0) {
+      world.hitFlashT -= dt;
+      if (world.hitFlashT <= 0 && els.dmgFlash) els.dmgFlash.classList.remove('on');
+    }
+    if (world.muzzleLight && world.muzzleLight.intensity > 0) {
+      world.muzzleLight.intensity *= Math.max(0, 1 - 18 * dt);
+    }
 
     syncActor(p);
 
-    const back = 7.8;
-    const height = 4.4;
-    const cx = p.x - Math.sin(p.angle) * back;
-    const cz = p.z - Math.cos(p.angle) * back;
-    camera.position.lerp(new THREE.Vector3(cx, height, cz), 1 - Math.pow(0.001, dt));
-    camera.lookAt(p.x, 1.4, p.z);
+    // Tighter cinematic camera behind aim
+    const back = p.sprinting ? 6.6 : 7.2;
+    const height = p.sprinting ? 3.9 : 4.15;
+    const cx = p.x - Math.sin(aim.yaw) * back;
+    const cz = p.z - Math.cos(aim.yaw) * back;
+    const camLerp = 1 - Math.pow(0.0002, dt);
+    tmpCamPos.set(cx, height, cz);
+    camera.position.lerp(tmpCamPos, camLerp);
+    tmpLook.set(p.x + Math.sin(aim.yaw) * 2.5, 1.35, p.z + Math.cos(aim.yaw) * 2.5);
+    camera.lookAt(tmpLook);
+    const targetFov = p.sprinting ? 60 : 55;
+    camera.fov += (targetFov - camera.fov) * Math.min(1, 8 * dt);
+    camera.updateProjectionMatrix();
 
-    const heading = ((p.angle * 180) / Math.PI + 360) % 360;
+    const heading = ((aim.yaw * 180) / Math.PI + 360) % 360;
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
     const di = Math.round(heading / 45) % 8;
     els.compass.textContent = dirs[(di + 7) % 8] + ' · ' + dirs[di] + ' · ' + dirs[(di + 1) % 8];
@@ -1147,6 +1246,38 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
   renderer.domElement.addEventListener('mousedown', () => { input.firing = true; });
   window.addEventListener('mouseup', () => { input.firing = false; });
+  renderer.domElement.addEventListener('mousemove', (e) => {
+    if (!world.running) return;
+    // Drag with LMB or any movement while firing / holding RMB
+    if (e.buttons === 1 || e.buttons === 2 || input.firing) {
+      aim.yaw -= e.movementX * 0.0032;
+    }
+  });
+  renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Touch look: horizontal drag on the 3D view (not on joystick)
+  let lookTouchId = null;
+  let lookLastX = 0;
+  renderer.domElement.addEventListener('touchstart', (e) => {
+    if (!world.running || lookTouchId !== null) return;
+    const t = e.changedTouches[0];
+    lookTouchId = t.identifier;
+    lookLastX = t.clientX;
+  }, { passive: true });
+  renderer.domElement.addEventListener('touchmove', (e) => {
+    if (lookTouchId === null) return;
+    for (const t of e.changedTouches) {
+      if (t.identifier !== lookTouchId) continue;
+      aim.yaw -= (t.clientX - lookLastX) * 0.0045;
+      lookLastX = t.clientX;
+    }
+  }, { passive: true });
+  const endLook = (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === lookTouchId) lookTouchId = null;
+    }
+  };
+  renderer.domElement.addEventListener('touchend', endLook);
+  renderer.domElement.addEventListener('touchcancel', endLook);
   els.fireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); input.firing = true; }, { passive: false });
   els.fireBtn.addEventListener('touchend', () => { input.firing = false; });
   els.fireBtn.addEventListener('mousedown', (e) => { e.preventDefault(); input.firing = true; });

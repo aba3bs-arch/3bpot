@@ -152,6 +152,62 @@ html, body {
 
 .hud-overlay { pointer-events: none; position: absolute; inset: 0; }
 
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid rgba(232, 255, 120, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  opacity: 0.9;
+}
+.crosshair::before,
+.crosshair::after {
+  content: "";
+  position: absolute;
+  background: rgba(232, 255, 120, 0.9);
+}
+.crosshair::before {
+  left: 50%;
+  top: -6px;
+  width: 2px;
+  height: 30px;
+  margin-left: -1px;
+}
+.crosshair::after {
+  top: 50%;
+  left: -6px;
+  height: 2px;
+  width: 30px;
+  margin-top: -1px;
+}
+
+.hit-marker {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border: 2px solid #ff4d4d;
+  transform: rotate(45deg);
+  opacity: 0.95;
+}
+.hit-marker.hidden { display: none; }
+
+.dmg-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(180, 0, 0, 0.55) 100%);
+  opacity: 0;
+  transition: opacity 0.08s linear;
+  pointer-events: none;
+}
+.dmg-flash.on { opacity: 1; }
+
 .compass {
   position: absolute;
   top: 0.7rem;

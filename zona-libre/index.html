@@ -41,6 +41,9 @@
       <div class="load-banner" id="loadBanner">Cargando modelos 3D y efectos…</div>
 
       <div class="hud-overlay">
+        <div class="crosshair" id="crosshair" aria-hidden="true"></div>
+        <div class="hit-marker hidden" id="hitMarker"></div>
+        <div class="dmg-flash" id="dmgFlash"></div>
         <div class="compass" id="compass">N · NE · E</div>
         <div class="zone-timer">Zona segura: <strong id="zoneTimer">—</strong></div>
         <div class="alive-box">
@@ -74,7 +77,7 @@
       </div>
     </div>
 
-    <p class="hint" id="hint">WASD mover · Shift/CORRER · clic en arma o 1/2/3 · disparo de frente</p>
+    <p class="hint" id="hint">WASD preciso · mouse/arrastre girar · Shift sprint · rivales te disparan</p>
 
     <div class="mobile-actions">
       <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
@@ -85,7 +88,7 @@
     <div class="controls">
       <button type="button" id="betDown" class="ctrl">−</button>
       <button type="button" id="betUp" class="ctrl">+</button>
-      <p class="tip">WASD · Shift correr · 1/2/3 armas · clic/DISPARO frontal · cámara TPP</p>
+      <p class="tip">WASD preciso · mouse girar · Shift sprint · 1/2/3 armas · clic disparar</p>
     </div>
 
     <div class="overlay" id="overlay">
