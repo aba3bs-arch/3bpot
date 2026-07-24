@@ -27,6 +27,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     killCount: document.getElementById('killCount'),
     hpFill: document.getElementById('hpFill'),
     hpText: document.getElementById('hpText'),
+    epFill: document.getElementById('epFill'),
+    epText: document.getElementById('epText'),
     ammoText: document.getElementById('ammoText'),
     overlay: document.getElementById('overlay'),
     title: document.getElementById('title'),
@@ -53,6 +55,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     compass: document.getElementById('compass'),
     hitMarker: document.getElementById('hitMarker'),
     dmgFlash: document.getElementById('dmgFlash'),
+    weaponSlots: document.getElementById('weaponSlots'),
   };
 
   const WEAPONS = [
@@ -91,36 +94,39 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   });
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x7eb6d9);
-  scene.fog = new THREE.FogExp2(0xa8cce0, 0.016);
+  scene.background = new THREE.Color(0x9ec8e8);
+  scene.fog = new THREE.FogExp2(0xb8d4e8, 0.011);
 
-  const camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 160);
+  const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 280);
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.12;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   viewEl.appendChild(renderer.domElement);
 
-  const hemi = new THREE.HemisphereLight(0xd8ecff, 0x3d5a28, 1.0);
+  const hemi = new THREE.HemisphereLight(0xe8f4ff, 0x4a6b32, 1.15);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff1d6, 1.5);
-  sun.position.set(22, 34, 12);
+  const sun = new THREE.DirectionalLight(0xfff3dd, 1.65);
+  sun.position.set(28, 42, 16);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 2;
-  sun.shadow.camera.far = 90;
-  sun.shadow.camera.left = -40;
-  sun.shadow.camera.right = 40;
-  sun.shadow.camera.top = 40;
-  sun.shadow.camera.bottom = -40;
+  sun.shadow.camera.far = 110;
+  sun.shadow.camera.left = -48;
+  sun.shadow.camera.right = 48;
+  sun.shadow.camera.top = 48;
+  sun.shadow.camera.bottom = -48;
   sun.shadow.bias = -0.0002;
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0x88ccff, 0.35);
-  fill.position.set(-18, 10, -12);
+  const fill = new THREE.DirectionalLight(0xa8d4ff, 0.4);
+  fill.position.set(-22, 14, -16);
   scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffe0b0, 0.25);
+  rim.position.set(0, 8, -30);
+  scene.add(rim);
 
   const worldRoot = new THREE.Group();
   scene.add(worldRoot);
@@ -232,8 +238,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
   }
 
   function resize() {
-    const w = viewEl.clientWidth || 960;
-    const h = viewEl.clientHeight || Math.round(w * 9 / 16);
+    const w = viewEl.clientWidth || window.innerWidth || 960;
+    const h = viewEl.clientHeight || window.innerHeight || Math.round(w * 9 / 16);
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
@@ -479,6 +485,159 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     });
   }
 
+  function addPine(x, z, scale) {
+    const s = scale || 1;
+    const group = new THREE.Group();
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1 * s, 0.16 * s, 1.1 * s, 7),
+      new THREE.MeshStandardMaterial({ color: 0x4a3220, roughness: 0.92 })
+    );
+    trunk.position.y = 0.55 * s;
+    trunk.castShadow = true;
+    group.add(trunk);
+    const green = new THREE.MeshStandardMaterial({ color: 0x2f6b35, roughness: 0.88 });
+    for (let i = 0; i < 3; i++) {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry((1.1 - i * 0.22) * s, 1.35 * s, 8), green);
+      cone.position.y = (1.35 + i * 0.85) * s;
+      cone.castShadow = true;
+      group.add(cone);
+    }
+    group.position.set(x, 0, z);
+    worldRoot.add(group);
+  }
+
+  function addHill(x, z, r, h) {
+    const hill = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x4d7340, roughness: 0.95, flatShading: true })
+    );
+    hill.position.set(x, 0, z);
+    hill.scale.y = h / r;
+    hill.receiveShadow = true;
+    hill.castShadow = true;
+    worldRoot.add(hill);
+  }
+
+  function addScenicBackdrop(mapSize) {
+    // Soft sky dome gradient
+    const skyGeo = new THREE.SphereGeometry(220, 32, 16);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        topColor: { value: new THREE.Color(0xb8d8f0) },
+        midColor: { value: new THREE.Color(0xd8eaf5) },
+        bottomColor: { value: new THREE.Color(0xe8f0e4) },
+      },
+      vertexShader: `
+        varying vec3 vW;
+        void main() {
+          vec4 w = modelMatrix * vec4(position, 1.0);
+          vW = normalize(w.xyz);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 midColor;
+        uniform vec3 bottomColor;
+        varying vec3 vW;
+        void main() {
+          float h = clamp(vW.y * 0.5 + 0.5, 0.0, 1.0);
+          vec3 col = mix(bottomColor, midColor, smoothstep(0.0, 0.45, h));
+          col = mix(col, topColor, smoothstep(0.4, 1.0, h));
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    worldRoot.add(sky);
+
+    // Lake beyond +Z edge
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(160, 90),
+      new THREE.MeshStandardMaterial({
+        color: 0x3a7ea8,
+        metalness: 0.65,
+        roughness: 0.22,
+        transparent: true,
+        opacity: 0.92,
+      })
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.set(0, -0.08, mapSize / 2 + 38);
+    worldRoot.add(water);
+
+    // Shore strip
+    const shore = new THREE.Mesh(
+      new THREE.PlaneGeometry(mapSize + 30, 10),
+      new THREE.MeshStandardMaterial({ color: 0xc2b280, roughness: 1 })
+    );
+    shore.rotation.x = -Math.PI / 2;
+    shore.position.set(0, 0.03, mapSize / 2 + 6);
+    worldRoot.add(shore);
+
+    // Wooden pier into water
+    const plankMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.9 });
+    for (let i = 0; i < 14; i++) {
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.12, 0.85), plankMat);
+      plank.position.set(3.5, 0.2, mapSize / 2 + 4 + i * 0.95);
+      plank.castShadow = true;
+      plank.receiveShadow = true;
+      worldRoot.add(plank);
+    }
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x4a3220, roughness: 0.92 });
+    [[2.2, 0], [4.8, 0], [2.2, 10], [4.8, 10]].forEach(([ox, oz]) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 1.4, 6), postMat);
+      post.position.set(ox + 1.5, 0.5, mapSize / 2 + 5 + oz);
+      worldRoot.add(post);
+    });
+
+    // Distant cabin
+    const cabin = new THREE.Mesh(
+      new THREE.BoxGeometry(4.5, 2.6, 3.5),
+      new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.88 })
+    );
+    cabin.position.set(-18, 1.3, mapSize / 2 + 22);
+    cabin.castShadow = true;
+    worldRoot.add(cabin);
+    const roof = new THREE.Mesh(
+      new THREE.ConeGeometry(3.6, 1.6, 4),
+      new THREE.MeshStandardMaterial({ color: 0x5a3a28, roughness: 0.9 })
+    );
+    roof.position.set(-18, 3.3, mapSize / 2 + 22);
+    roof.rotation.y = Math.PI / 4;
+    worldRoot.add(roof);
+
+    // Hills around perimeter
+    addHill(-38, -10, 14, 9);
+    addHill(40, -16, 16, 11);
+    addHill(-32, 28, 12, 8);
+    addHill(36, 34, 15, 10);
+    addHill(0, -40, 18, 7);
+    addHill(-48, 12, 11, 7);
+
+    // Pine forest on hills / shore
+    for (let i = 0; i < 28; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = mapSize / 2 + 8 + Math.random() * 28;
+      const px = Math.cos(ang) * dist;
+      const pz = Math.sin(ang) * dist;
+      if (pz > mapSize / 2 + 2 && Math.abs(px) < 8) continue; // keep pier clear
+      addPine(px, pz, 0.85 + Math.random() * 0.7);
+    }
+
+    // Foreground rocks near shore
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x6a6e72, roughness: 0.95, flatShading: true });
+    for (let i = 0; i < 6; i++) {
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.7 + Math.random() * 1.2, 0), rockMat);
+      rock.position.set(rand(-16, 16), 0.2, mapSize / 2 + rand(1, 5));
+      rock.rotation.set(Math.random(), Math.random(), Math.random());
+      rock.castShadow = true;
+      worldRoot.add(rock);
+    }
+  }
+
   function buildArena(mapSize) {
     const groundMat = new THREE.MeshStandardMaterial({
       map: grassTex || makeGroundTexture(),
@@ -490,6 +649,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     worldRoot.add(ground);
+
+    addScenicBackdrop(mapSize);
 
     // asphalt roads
     const roadMat = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.95, metalness: 0.05 });
@@ -518,23 +679,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     ];
     layout.forEach((b) => addRealBuilding(b.x, b.z, b.w, b.d, b.floors, styles[b.s]));
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 10; i++) {
       const tx = rand(-mapSize / 2 + 2, mapSize / 2 - 2);
       const tz = rand(-mapSize / 2 + 2, mapSize / 2 - 2);
       if (blocked(tx, tz, 1.2) || Math.hypot(tx, tz) < 7) continue;
-      const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.12, 0.18, 1.2, 8),
-        new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.9 })
-      );
-      trunk.position.set(tx, 0.6, tz);
-      trunk.castShadow = true;
-      const leaves = new THREE.Mesh(
-        new THREE.SphereGeometry(0.85, 12, 12),
-        new THREE.MeshStandardMaterial({ color: 0x3d7a3a, roughness: 0.85 })
-      );
-      leaves.position.set(tx, 1.7, tz);
-      leaves.castShadow = true;
-      worldRoot.add(trunk, leaves);
+      addPine(tx, tz, 0.75 + Math.random() * 0.45);
     }
 
     for (let i = 0; i < 7; i++) {
@@ -616,6 +765,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       shootCd: 0,
       moving: false,
       sprinting: false,
+      stamina: 200,
       muzzleY: 1.42,
     };
     aim.yaw = Math.PI;
@@ -936,7 +1086,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     if (!(keys.KeyZ || keys.z)) keys._zLatch = false;
 
     // Slide: sprint + crouch
-    const wantSprint = !!(input.sprint || keys.ShiftLeft || keys.ShiftRight || keys.shift);
+    let wantSprint = !!(input.sprint || keys.ShiftLeft || keys.ShiftRight || keys.shift);
     if (wantCrouch && wantSprint && wishMag > 0.2 && p.stance !== 'prone' && !p.action && p.grounded) {
       startPlayerAction(p, 'slide');
     } else if (wantCrouch && !p.action && p.stance !== 'prone') {
@@ -982,6 +1132,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       }
     }
 
+    if (wantSprint && wishMag > 0.1 && p.stance === 'stand' && !p.action && p.grounded) {
+      // stamina drain for EP bar
+      p.stamina = Math.max(0, (p.stamina != null ? p.stamina : 200) - 28 * dt);
+      if (p.stamina <= 0) wantSprint = false;
+    } else {
+      p.stamina = Math.min(200, (p.stamina != null ? p.stamina : 200) + 22 * dt);
+    }
     p.sprinting = wantSprint && wishMag > 0.1 && p.stance === 'stand' && !p.action && p.grounded;
     if (els.sprintBtn) els.sprintBtn.classList.toggle('active', !!p.sprinting);
     if (els.crouchBtn) els.crouchBtn.classList.toggle('active', p.stance === 'crouch' || p.action === 'slide');
@@ -1242,10 +1399,16 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     camera.fov += (targetFov - camera.fov) * Math.min(1, 10 * dt);
     camera.updateProjectionMatrix();
 
-    const heading = ((aim.yaw * 180) / Math.PI + 360) % 360;
-    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
-    const di = Math.round(heading / 45) % 8;
-    els.compass.textContent = dirs[(di + 7) % 8] + ' · ' + dirs[di] + ' · ' + dirs[(di + 1) % 8];
+    const deg = ((-aim.yaw * 180 / Math.PI) % 360 + 360) % 360;
+    const mid = Math.round(deg / 15) * 15;
+    if (els.compass) {
+      els.compass.innerHTML =
+        '<span>' + ((mid + 345) % 360) + '</span>' +
+        '<span>' + ((mid + 350) % 360) + '</span>' +
+        '<span class="c-mid">' + (mid % 360) + '</span>' +
+        '<span>' + ((mid + 15) % 360) + '</span>' +
+        '<span>' + ((mid + 30) % 360) + '</span>';
+    }
 
     if (p.hp <= 0) {
       p.hp = 0;
@@ -1288,18 +1451,33 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       const pct = Math.max(0, (world.player.hp / world.player.maxHp) * 100);
       els.hpFill.style.width = pct + '%';
       els.hpText.textContent = Math.ceil(world.player.hp) + '/' + world.player.maxHp;
+      if (els.epFill) {
+        const epMax = 200;
+        const ep = Math.max(0, Math.min(epMax, world.player.stamina != null ? world.player.stamina : epMax));
+        els.epFill.style.width = ((ep / epMax) * 100) + '%';
+        if (els.epText) els.epText.textContent = Math.ceil(ep) + '/' + epMax;
+      }
     } else {
       els.hpFill.style.width = '100%';
-      els.hpText.textContent = '—';
+      els.hpText.textContent = '200/200';
+      if (els.epFill) els.epFill.style.width = '100%';
+      if (els.epText) els.epText.textContent = '200/200';
     }
 
     els.ammoText.textContent = world.ammo + '/' + world.reserve;
     if (els.weaponName) els.weaponName.textContent = currentWeapon().name;
+    if (els.weaponSlots) {
+      els.weaponSlots.querySelectorAll('.w-slot').forEach((el) => {
+        el.classList.toggle('is-active', parseInt(el.dataset.weapon, 10) === world.weaponIndex);
+      });
+    }
     els.killCount.textContent = String(world.kills);
     const alive = (world.player && world.player.hp > 0 ? 1 : 0) + world.enemies.filter((e) => e.hp > 0).length;
     els.aliveCount.textContent = world.running ? String(alive) : '0';
     const left = Math.max(0, Math.ceil(world.zoneMax - world.zoneT));
-    els.zoneTimer.textContent = world.running ? String(left).padStart(2, '0') + 's' : '—';
+    const mm = String(Math.floor(left / 60)).padStart(2, '0');
+    const ss = String(left % 60).padStart(2, '0');
+    els.zoneTimer.textContent = world.running ? (mm + ':' + ss) : '00:00';
 
     if (!assetsReady) {
       els.actionBtn.textContent = 'CARGANDO…';
@@ -1575,7 +1753,17 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
     });
   }
   if (els.weaponBtn) {
+    if (els.weaponBtn) {
     els.weaponBtn.addEventListener('click', (e) => { e.preventDefault(); cycleWeapon(); });
+  }
+  if (els.weaponSlots) {
+    els.weaponSlots.addEventListener('click', (e) => {
+      const slot = e.target.closest('.w-slot');
+      if (!slot) return;
+      e.preventDefault();
+      setWeapon(parseInt(slot.dataset.weapon, 10));
+    });
+  }
   }
   const weaponBox = document.querySelector('.weapon-box');
   if (weaponBox) {
@@ -1648,22 +1836,25 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
       soldierTemplate.animations = gltf.animations || [];
       assetsReady = true;
       loadBanner?.classList.add('hidden');
-      els.hint.textContent = 'Modelos listos · Idle/Walk/Run + bloom activos';
-      // demo soldier in lobby
+      if (els.hint) els.hint.textContent = 'Listo · C agachar · Z suelo · Space salto · Shift sprint';
+      // Scenic lobby preview (Free Fire vibe)
       clearWorld();
+      buildArena(42);
       const demo = createSoldierActor(null);
       if (demo) {
-        demo.root.position.set(0, 0, 0);
+        demo.root.position.set(0, 0, 4);
         worldRoot.add(demo.root);
         setAnim(demo, 'idle');
       }
       const rival = createSoldierActor(0xc45c26);
       if (rival) {
-        rival.root.position.set(2.2, 0, -1.2);
-        rival.root.rotation.y = -0.7;
+        rival.root.position.set(2.4, 0, 2.5);
+        rival.root.rotation.y = -0.85;
         worldRoot.add(rival.root);
         setAnim(rival, 'idle');
       }
+      camera.position.set(8, 5.5, 2);
+      camera.lookAt(2, 1.2, 18);
       refreshHud();
     },
     (ev) => {

@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Zona Libre PRO — 3B Pot</title>
+  <title>Zona Libre — 3B Pot</title>
   <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   <script type="importmap">
   {
@@ -20,48 +20,74 @@
 </head>
 <body>
   <div id="app">
-    <header class="top-hud">
-      <div class="brand-block">
-        <img class="hero-face" src="assets/hero.png" alt="Operativo" />
-        <div>
-          <div class="brand">ZONA LIBRE <span class="badge3d">GLB</span></div>
-          <div class="sub">Máq. <strong id="machineLabel">—</strong> · Saldo <strong id="credits">$0</strong></div>
-        </div>
-      </div>
-      <div class="mission-stats">
-        <span>Apuesta <strong id="bet">$1</strong></span>
-        <span>Nivel <strong id="level">—</strong></span>
-        <span>Premio <strong id="prize">$0</strong></span>
-        <span>Ganado <strong id="won">$0</strong></span>
-      </div>
-    </header>
-
-    <div class="stage">
+    <div class="stage" id="stage">
       <div id="view3d" class="view3d" aria-label="Arena 3D Zona Libre"></div>
-      <div class="load-banner" id="loadBanner">Cargando modelos 3D y efectos…</div>
+      <div class="load-banner" id="loadBanner">Preparando zona de combate…</div>
 
       <div class="hud-overlay">
-        <div class="crosshair" id="crosshair" aria-hidden="true"></div>
-        <div class="hit-marker hidden" id="hitMarker"></div>
-        <div class="dmg-flash" id="dmgFlash"></div>
-        <div class="compass" id="compass">N · NE · E</div>
-        <div class="zone-timer">Zona segura: <strong id="zoneTimer">—</strong></div>
-        <div class="alive-box">
-          <div>VIVOS <strong id="aliveCount">0</strong></div>
-          <div>BAJAS <strong id="killCount">0</strong></div>
-        </div>
-
-        <div class="hp-wrap">
-          <img class="mini-face" src="assets/hero.png" alt="" />
-          <div class="hp-col">
-            <div class="hp-bar"><i id="hpFill"></i></div>
-            <span id="hpText">—</span>
+        <!-- Top compass strip (Free Fire style) -->
+        <div class="compass-bar" id="compassBar">
+          <div class="compass-track" id="compass">
+            <span>240</span><span class="c-mid">255</span><span>270</span><span>285</span><span>300</span>
           </div>
         </div>
 
-        <div class="weapon-box">
-          <span class="w-name" id="weaponName">ASALTO</span>
-          <span class="w-ammo" id="ammoText">30/120</span>
+        <div class="match-banner">
+          <span class="match-banner__tag">ZONA LIBRE</span>
+          <strong class="match-banner__time" id="zoneTimer">00:00</strong>
+        </div>
+
+        <div class="top-right">
+          <div class="brand-chip">ZONA LIBRE</div>
+          <div class="weapon-slots" id="weaponSlots">
+            <button type="button" class="w-slot is-active" data-weapon="0" id="slot0">
+              <span class="w-slot__icon">🔫</span>
+              <span class="w-slot__name" id="weaponName">ASALTO</span>
+              <span class="w-slot__ammo" id="ammoText">30/120</span>
+            </button>
+            <button type="button" class="w-slot" data-weapon="1" id="slot1">
+              <span class="w-slot__icon">💥</span>
+              <span class="w-slot__name">RÁFAGA</span>
+            </button>
+            <button type="button" class="w-slot" data-weapon="2" id="slot2">
+              <span class="w-slot__icon">🎯</span>
+              <span class="w-slot__name">ESCOPETA</span>
+            </button>
+          </div>
+          <div class="alive-pill">
+            <span>VIVOS <strong id="aliveCount">0</strong></span>
+            <span>BAJAS <strong id="killCount">0</strong></span>
+          </div>
+        </div>
+
+        <div class="crosshair" id="crosshair" aria-hidden="true"></div>
+        <div class="hit-marker hidden" id="hitMarker"></div>
+        <div class="dmg-flash" id="dmgFlash"></div>
+
+        <!-- Bottom-left HP / EP -->
+        <div class="vitals">
+          <img class="vitals__face" src="assets/hero.png" alt="" />
+          <div class="vitals__bars">
+            <div class="bar bar--ep">
+              <i id="epFill" style="width:100%"></i>
+              <span id="epText">200/200</span>
+            </div>
+            <div class="bar bar--hp">
+              <i id="hpFill"></i>
+              <span id="hpText">—</span>
+            </div>
+          </div>
+          <div class="vitals__gear" aria-hidden="true">
+            <span class="gear">⛑️</span>
+            <span class="gear">🎒</span>
+          </div>
+        </div>
+
+        <div class="mission-strip">
+          <span>Máq. <strong id="machineLabel">—</strong></span>
+          <span>Saldo <strong id="credits">$0</strong></span>
+          <span>Nivel <strong id="level">—</strong></span>
+          <span>Premio <strong id="prize">$0</strong></span>
         </div>
       </div>
 
@@ -70,30 +96,30 @@
           <div class="joy-knob" id="joyKnob"></div>
         </div>
         <div class="right-controls">
-          <button type="button" class="util-btn" id="sprintBtn">CORRER</button>
-          <button type="button" class="util-btn" id="crouchBtn">AGACHAR</button>
-          <button type="button" class="util-btn" id="proneBtn">SUELO</button>
-          <button type="button" class="util-btn" id="jumpBtn">SALTO</button>
-          <button type="button" class="util-btn" id="dodgeBtn">ESQUIVA</button>
-          <button type="button" class="util-btn" id="weaponBtn">ARMA</button>
-          <button type="button" class="fire-btn" id="fireBtn">DISPARO</button>
+          <button type="button" class="circ-btn" id="sprintBtn" title="Correr"><span>🏃</span></button>
+          <button type="button" class="circ-btn" id="weaponBtn" title="Cambiar arma"><span>🔄</span></button>
+          <button type="button" class="circ-btn" id="crouchBtn" title="Agachar"><span>🧎</span></button>
+          <button type="button" class="circ-btn" id="proneBtn" title="Tirarse"><span>⬇️</span></button>
+          <button type="button" class="circ-btn" id="jumpBtn" title="Saltar"><span>⬆️</span></button>
+          <button type="button" class="circ-btn" id="dodgeBtn" title="Esquivar"><span>💨</span></button>
+          <button type="button" class="fire-btn" id="fireBtn" title="Disparar"><span class="fire-btn__ring"></span></button>
         </div>
+      </div>
+
+      <div class="bottom-bar">
+        <a class="bbtn" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
+        <div class="bet-group">
+          <button type="button" id="betDown" class="bbtn tiny">−</button>
+          <span class="bet-label">Apuesta <strong id="bet">$1</strong></span>
+          <button type="button" id="betUp" class="bbtn tiny">+</button>
+        </div>
+        <button type="button" id="restartBtn" class="bbtn danger" disabled>Reiniciar</button>
+        <button type="button" id="actionBtn" class="bbtn primary">JUGAR</button>
       </div>
     </div>
 
-    <p class="hint" id="hint">C agachar · Z tirarse · Space salto · Shift sprint · F/Alt esquiva · mouse girar</p>
-
-    <div class="mobile-actions">
-      <a class="mobile-btn menu" id="menuBtn" href="/inicio/" data-inicio-link>← Menú</a>
-      <button type="button" id="restartBtn" class="mobile-btn danger" disabled>REINICIAR</button>
-      <button type="button" id="actionBtn" class="mobile-btn action">JUGAR</button>
-    </div>
-
-    <div class="controls">
-      <button type="button" id="betDown" class="ctrl">−</button>
-      <button type="button" id="betUp" class="ctrl">+</button>
-      <p class="tip">C/Ctrl agachar · Z suelo/dive · Space salto · Shift+C slide · F esquiva · 1/2/3 armas</p>
-    </div>
+    <p class="hint" id="hint" hidden>C agachar · Z suelo · Space salto · Shift sprint · F esquiva</p>
+    <span id="won" hidden>0</span>
 
     <div class="overlay" id="overlay">
       <div class="panel">
@@ -102,13 +128,13 @@
           <img src="assets/rival-a.png" alt="" />
           <img src="assets/rival-b.png" alt="" />
         </div>
-        <h1 id="title">ZONA LIBRE GLB</h1>
+        <h1 id="title">ZONA LIBRE</h1>
         <p id="subtitle">
-          Modelos 3D reales con animaciones Idle/Walk/Run, post-procesado bloom
-          e iluminación cinematográfica. Escala niveles y cobra premios mayores.
+          Combate táctico en tercera persona. Limpia la zona, sobrevive al cierre
+          y cobra premios por cada misión.
         </p>
         <div class="panel-actions">
-          <a class="btn-link" href="/inicio/" data-inicio-link>Volver a juegos</a>
+          <a class="btn-link" href="/inicio/" data-inicio-link>Volver</a>
           <button type="button" id="startBtn">Entrar a la zona</button>
         </div>
       </div>
