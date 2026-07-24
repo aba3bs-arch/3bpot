@@ -16,6 +16,7 @@
   const actionBtn = document.getElementById("actionBtn");
   const menuBtn = document.getElementById("menuBtn");
   const machineLabel = document.getElementById("machineLabel");
+  const betHud = document.getElementById("betHud");
   const AudioFX = window.RanchoAudio;
 
   const W = canvas.width;
@@ -59,6 +60,7 @@
   function refreshHud() {
     creditsEl.textContent = mxn(credits);
     betEl.textContent = mxn(bet());
+    if (betHud) betHud.textContent = mxn(bet());
     winEl.textContent = mxn(state.lastWin);
     if (machineLabel) machineLabel.textContent = machineNumber ? "#" + machineNumber : "—";
     refreshActionBtn();
@@ -1173,61 +1175,69 @@
     const bob = Math.sin(state.horseBob) * 2.5;
     if (state.playerPose === "celebrate") {
       const waveLift = Math.sin(state.horseBob * 7) * 14;
-      return { x: W * 0.5 - 40, y: H - 168 + bob - waveLift };
+      return { x: W * 0.5 + 36, y: H - 200 + bob - waveLift };
     }
-    // Mano del lazo hacia el corral (arriba)
-    return { x: W * 0.5 + 8, y: H - 168 + bob };
+    return { x: W * 0.5 + 34, y: H - 200 + bob };
   }
 
-  /** Vaquero de espaldas al público, mirando al corral/vacas. En celebra se gira y saluda. */
-  function drawCowboyFacingCows(opts) {
+  /** Vaquero de frente al jugador (no de espaldas). Celebra con brazos arriba. */
+  function drawCowboyFront(opts) {
     const celebrate = !!(opts && opts.celebrate);
     const bob = Math.sin(state.horseBob * (celebrate ? 3 : 2.1)) * (celebrate ? 5 : 2.8);
-    const armSway = Math.sin(state.horseBob * 2.2) * 0.18;
-    const wave = Math.sin(state.horseBob * 8) * 0.65;
+    const armSway = Math.sin(state.horseBob * 2.2) * 0.16;
+    const wave = Math.sin(state.horseBob * 8) * 0.55;
     const cx = W * 0.5;
     const cy = H - 6 + bob;
     const outline = "#2a1810";
     const skin = "#f2c49a";
+    const shirt = "#ff7a3a";
+    const pants = "#3d2a1a";
 
     ctx.save();
     ctx.translate(cx, cy);
 
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.beginPath();
-    ctx.ellipse(0, 10, 48, 11, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 10, 46, 11, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // Piernas + botas (frente)
+    ctx.beginPath();
+    roundRect(-18, -36, 14, 28, 5);
+    fillStrokePath(pants, outline, 2);
+    ctx.beginPath();
+    roundRect(4, -36, 14, 28, 5);
+    fillStrokePath(pants, outline, 2);
+    ctx.beginPath();
+    roundRect(-20, -16, 18, 11, 4);
+    fillStrokePath("#1a1008", outline, 1.8);
+    ctx.beginPath();
+    roundRect(2, -16, 18, 11, 4);
+    fillStrokePath("#1a1008", outline, 1.8);
+
+    // Torso de frente
+    ctx.beginPath();
+    ctx.ellipse(0, -54, 28, 30, 0, 0, Math.PI * 2);
+    fillStrokePath(shirt, outline, 2.4);
+    ctx.beginPath();
+    ctx.moveTo(-12, -78);
+    ctx.lineTo(12, -78);
+    ctx.lineTo(8, -40);
+    ctx.lineTo(-8, -40);
+    ctx.closePath();
+    fillStrokePath("#3a7bd5", outline, 1.6);
+    ctx.fillStyle = "#5c3d28";
+    ctx.fillRect(-24, -38, 48, 8);
+    ctx.fillStyle = "#f5c518";
+    ctx.fillRect(-7, -39, 14, 10);
+
     if (celebrate) {
-      // Frente al público, ovacionando
-      ctx.beginPath();
-      roundRect(-18, -36, 14, 28, 5);
-      fillStrokePath("#3d2a1a", outline, 2);
-      ctx.beginPath();
-      roundRect(4, -36, 14, 28, 5);
-      fillStrokePath("#3d2a1a", outline, 2);
-      ctx.beginPath();
-      roundRect(-20, -16, 18, 10, 4);
-      fillStrokePath("#1a1008", outline, 1.8);
-      ctx.beginPath();
-      roundRect(2, -16, 18, 10, 4);
-      fillStrokePath("#1a1008", outline, 1.8);
-
-      ctx.beginPath();
-      ctx.ellipse(0, -52, 28, 30, 0, 0, Math.PI * 2);
-      fillStrokePath("#ff7a3a", outline, 2.4);
-      ctx.fillStyle = "#5c3d28";
-      ctx.fillRect(-24, -38, 48, 8);
-      ctx.fillStyle = "#f5c518";
-      ctx.fillRect(-7, -39, 14, 10);
-
-      // Brazos arriba saludando
       ctx.save();
       ctx.translate(-26, -68);
       ctx.rotate(-1.55 + wave);
       ctx.beginPath();
       roundRect(-6, -34, 13, 36, 6);
-      fillStrokePath("#ff7a3a", outline, 2);
+      fillStrokePath(shirt, outline, 2);
       ctx.beginPath();
       ctx.arc(1, -36, 9, 0, Math.PI * 2);
       fillStrokePath(skin, outline, 1.8);
@@ -1238,149 +1248,100 @@
       ctx.rotate(1.55 - wave);
       ctx.beginPath();
       roundRect(-7, -34, 13, 36, 6);
-      fillStrokePath("#ff7a3a", outline, 2);
+      fillStrokePath(shirt, outline, 2);
       ctx.beginPath();
       ctx.arc(0, -36, 9, 0, Math.PI * 2);
       fillStrokePath(skin, outline, 1.8);
       ctx.restore();
-
-      ctx.beginPath();
-      ctx.arc(0, -92, 24, 0, Math.PI * 2);
-      fillStrokePath(skin, outline, 2.4);
-      ctx.fillStyle = "#fff";
-      ctx.beginPath();
-      ctx.ellipse(-8, -94, 7.5, 8.5, 0, 0, Math.PI * 2);
-      ctx.ellipse(8, -94, 7.5, 8.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#1a1008";
-      ctx.beginPath();
-      ctx.arc(-6, -93, 3.4, 0, Math.PI * 2);
-      ctx.arc(10, -93, 3.4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#c45c40";
-      ctx.lineWidth = 2.8;
-      ctx.beginPath();
-      ctx.arc(0, -84, 9, 0.2, Math.PI - 0.2);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.ellipse(0, -108, 44, 11, 0, 0, Math.PI * 2);
-      fillStrokePath("#3d2a1a", outline, 2.4);
-      ctx.beginPath();
-      roundRect(-18, -136, 36, 32, 7);
-      fillStrokePath("#5c3d28", outline, 2.2);
-      ctx.fillStyle = "#f5c518";
-      ctx.fillRect(-18, -112, 36, 5);
-
-      ctx.fillStyle = "#f5c518";
-      ctx.font = "900 18px Nunito, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("¡OLE!", 0, -148);
-      ctx.fillText("👏", -42, -120);
-      ctx.fillText("👏", 42, -120);
     } else {
-      // De espaldas, mirando al corral (arriba)
-      ctx.beginPath();
-      roundRect(-16, -34, 13, 26, 5);
-      fillStrokePath("#2e1f14", outline, 2);
-      ctx.beginPath();
-      roundRect(3, -34, 13, 26, 5);
-      fillStrokePath("#2e1f14", outline, 2);
-      ctx.beginPath();
-      roundRect(-18, -16, 17, 10, 4);
-      fillStrokePath("#14100a", outline, 1.8);
-      ctx.beginPath();
-      roundRect(1, -16, 17, 10, 4);
-      fillStrokePath("#14100a", outline, 1.8);
-
-      // torso de espalda
-      ctx.beginPath();
-      ctx.ellipse(0, -54, 27, 29, 0, 0, Math.PI * 2);
-      fillStrokePath("#e86a2e", outline, 2.4);
-      // pliegues espalda
-      ctx.strokeStyle = "rgba(0,0,0,0.18)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, -78);
-      ctx.quadraticCurveTo(-2, -54, 0, -30);
-      ctx.stroke();
-      ctx.fillStyle = "#5c3d28";
-      ctx.fillRect(-24, -40, 48, 8);
-      ctx.fillStyle = "#f5c518";
-      ctx.fillRect(-6, -41, 12, 10);
-
-      // brazo izquierdo (lazo) levantado hacia vacas
+      // Brazo izquierdo en cadera
       ctx.save();
-      ctx.translate(-24, -70);
-      ctx.rotate(-0.95 + armSway);
-      ctx.beginPath();
-      roundRect(-7, -8, 13, 34, 6);
-      fillStrokePath("#e86a2e", outline, 2);
-      ctx.beginPath();
-      ctx.arc(0, -10, 8, 0, Math.PI * 2);
-      fillStrokePath(skin, outline, 1.8);
-      // lazo
-      if (!state.lassos.length) {
-        ctx.strokeStyle = "#d4a017";
-        ctx.lineWidth = 3.6;
-        ctx.beginPath();
-        ctx.ellipse(2, -28, 16, 10, -0.4, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.ellipse(2, -28, 9, 5.5, -0.4, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // brazo derecho
-      ctx.save();
-      ctx.translate(24, -66);
-      ctx.rotate(0.55 - armSway * 0.5);
+      ctx.translate(-24, -66);
+      ctx.rotate(0.55 + armSway * 0.4);
       ctx.beginPath();
       roundRect(-6, 0, 12, 28, 6);
-      fillStrokePath("#e86a2e", outline, 2);
+      fillStrokePath(shirt, outline, 2);
       ctx.beginPath();
       ctx.arc(0, 28, 7, 0, Math.PI * 2);
       fillStrokePath(skin, outline, 1.8);
       ctx.restore();
 
-      // cabeza vista de 3/4 desde atrás (mirando arriba/corral)
+      // Brazo derecho con lazo
+      ctx.save();
+      ctx.translate(24, -70);
+      ctx.rotate(-0.85 + armSway);
       ctx.beginPath();
-      ctx.arc(2, -96, 22, 0, Math.PI * 2);
-      fillStrokePath(skin, outline, 2.4);
-      // oreja
+      roundRect(-7, -8, 13, 34, 6);
+      fillStrokePath(shirt, outline, 2);
       ctx.beginPath();
-      ctx.ellipse(20, -96, 5, 8, 0.2, 0, Math.PI * 2);
-      fillStrokePath(skin, outline, 1.5);
-      // perfil: un ojo mirando al corral
-      ctx.fillStyle = "#fff";
-      ctx.beginPath();
-      ctx.ellipse(10, -98, 5.5, 6.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = outline;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.fillStyle = "#1a1008";
-      ctx.beginPath();
-      ctx.arc(12, -97, 2.8, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(0, -10, 8, 0, Math.PI * 2);
+      fillStrokePath(skin, outline, 1.8);
+      if (!state.lassos.length) {
+        ctx.strokeStyle = "#d4a017";
+        ctx.lineWidth = 3.6;
+        ctx.beginPath();
+        ctx.ellipse(2, -28, 16, 10, -0.35, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(2, -28, 9, 5.5, -0.35, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
-      // sombrero
-      ctx.beginPath();
-      ctx.ellipse(0, -112, 40, 10, 0, 0, Math.PI * 2);
-      fillStrokePath("#3d2a1a", outline, 2.4);
-      ctx.beginPath();
-      roundRect(-16, -138, 32, 28, 6);
-      fillStrokePath("#5c3d28", outline, 2.2);
+    // Cabeza de frente
+    ctx.beginPath();
+    ctx.arc(0, -94, 24, 0, Math.PI * 2);
+    fillStrokePath(skin, outline, 2.4);
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.ellipse(-8, -96, 7.5, 8.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(8, -96, 7.5, 8.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1a1008";
+    ctx.beginPath();
+    ctx.arc(-6, -95, 3.4, 0, Math.PI * 2);
+    ctx.arc(10, -95, 3.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(-7.5, -97, 1.4, 0, Math.PI * 2);
+    ctx.arc(8.5, -97, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#c45c40";
+    ctx.lineWidth = 2.8;
+    ctx.beginPath();
+    ctx.arc(0, -86, 9, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+    ctx.strokeStyle = "#5c3d28";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-10, -88);
+    ctx.quadraticCurveTo(0, -84, 10, -88);
+    ctx.stroke();
+
+    // Sombrero
+    ctx.beginPath();
+    ctx.ellipse(0, -110, 44, 11, 0, 0, Math.PI * 2);
+    fillStrokePath("#3d2a1a", outline, 2.4);
+    ctx.beginPath();
+    roundRect(-18, -138, 36, 32, 7);
+    fillStrokePath("#5c3d28", outline, 2.2);
+    ctx.fillStyle = "#f5c518";
+    ctx.fillRect(-18, -114, 36, 5);
+
+    if (celebrate) {
       ctx.fillStyle = "#f5c518";
-      ctx.fillRect(-16, -116, 32, 5);
+      ctx.font = "900 18px 'Exo 2', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("OLE!", 0, -150);
     }
 
     ctx.restore();
   }
 
   function drawPlayer() {
-    drawCowboyFacingCows({ celebrate: state.playerPose === "celebrate" });
+    drawCowboyFront({ celebrate: state.playerPose === "celebrate" });
   }
 
   function drawFx() {
