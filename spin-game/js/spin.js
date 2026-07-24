@@ -8,13 +8,13 @@
     const MAX_BET = 500;
 
     const SEGMENTS = [
-        { label: '0×', multiplier: 0, color: '#1a1d26', colorEnd: '#2d3344', weight: 28 },
-        { label: '0.5×', multiplier: 0.5, color: '#3d4a63', colorEnd: '#505e77', weight: 18 },
-        { label: '1×', multiplier: 1, color: '#2a3550', colorEnd: '#3d4f6f', weight: 16 },
-        { label: '2×', multiplier: 2, color: '#c42a34', colorEnd: '#e73843', weight: 14 },
-        { label: '3×', multiplier: 3, color: '#a8222c', colorEnd: '#d43040', weight: 10 },
-        { label: '5×', multiplier: 5, color: '#d4920a', colorEnd: '#ffc857', weight: 7 },
-        { label: '10×', multiplier: 10, color: '#e73843', colorEnd: '#ff6b6b', weight: 4 },
+        { label: '0×', multiplier: 0, color: '#1a1214', colorEnd: '#2a1c20', weight: 28 },
+        { label: '0.5×', multiplier: 0.5, color: '#3a2a20', colorEnd: '#5a4030', weight: 18 },
+        { label: '1×', multiplier: 1, color: '#2a4038', colorEnd: '#3d5e52', weight: 16 },
+        { label: '2×', multiplier: 2, color: '#8b1e2d', colorEnd: '#c42a3a', weight: 14 },
+        { label: '3×', multiplier: 3, color: '#6a1520', colorEnd: '#a8222c', weight: 10 },
+        { label: '5×', multiplier: 5, color: '#a8842a', colorEnd: '#e8c76a', weight: 7 },
+        { label: '10×', multiplier: 10, color: '#c42a3a', colorEnd: '#ff6b6b', weight: 4 },
         { label: '20×', multiplier: 20, color: '#b8860b', colorEnd: '#ffd700', weight: 3 },
     ];
 

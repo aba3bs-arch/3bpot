@@ -254,41 +254,6 @@ const MachineAPI = (function () {
         });
     }
 
-    async function startZonaLibre(bet, restart, machineNumber, branchId) {
-        return request('/api/play/zona-libre/start', {
-            method: 'POST',
-            body: JSON.stringify({
-                machineNumber: machineNumber || getMachineNumber(),
-                branch_id: branchId || getBranchId(),
-                bet,
-                restart: !!restart,
-            }),
-        });
-    }
-
-    async function completeZonaLibre(sessionId, payload, machineNumber, branchId) {
-        return request('/api/play/zona-libre/complete', {
-            method: 'POST',
-            body: JSON.stringify({
-                sessionId,
-                ...payload,
-                machineNumber: machineNumber || getMachineNumber(),
-                branch_id: branchId || getBranchId(),
-            }),
-        });
-    }
-
-    async function retryZonaLibre(sessionId, machineNumber, branchId) {
-        return request('/api/play/zona-libre/retry', {
-            method: 'POST',
-            body: JSON.stringify({
-                sessionId,
-                machineNumber: machineNumber || getMachineNumber(),
-                branch_id: branchId || getBranchId(),
-            }),
-        });
-    }
-
     function clearBinding() {
         localStorage.removeItem(KEY);
         localStorage.removeItem(BRANCH_KEY);
@@ -351,7 +316,6 @@ const MachineAPI = (function () {
         startDesenredaCable, pullDesenredaCable, playLoteria,
         startRompecabezas, moveRompecabezas, retryRompecabezas,
         startCallePelea, actionCallePelea, retryCallePelea,
-        startZonaLibre, completeZonaLibre, retryZonaLibre,
         formatPesos, requireMachine, wireInicioLinks, apiBase,
     };
 })();

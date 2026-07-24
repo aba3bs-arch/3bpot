@@ -20,9 +20,7 @@ function emptyData() {
         zone_sessions: [],
         counters: {
             users: 0, machines: 0, transactions: 0, game_rounds: 0, branches: 0,
-            cable_sessions: 0, puzzle_sessions: 0, fight_sessions: 0, zone_sessions: 0,
-        },
-    };
+            cable_sessions: 0, puzzle_sessions: 0, fight_sessions: 0, zone_sessions: 0}};
 }
 
 let data = emptyData();
@@ -137,8 +135,7 @@ function createUser(username, passwordHash, name, role = 'cashier', branchId = n
         float_balance: ['cashier', 'agent'].includes(role) ? 0 : 0,
         game_balance: role === 'user' ? 0 : 0,
         active: 1,
-        created_at: now(),
-    };
+        created_at: now()};
     data.users.push(user);
     persist();
     return user;
@@ -213,8 +210,7 @@ function creditPlayer(userId, amount, opts = {}) {
         cash_cents: amount * 100,
         payment_method: opts.paymentMethod || 'efectivo',
         note: opts.note || `Crédito portal a ${u.name}`,
-        admin_id: opts.adminId || opts.agentId || null,
-    });
+        admin_id: opts.adminId || opts.agentId || null});
     persist();
     return { user: sanitizeUser(u), balance: u.game_balance };
 }
@@ -233,8 +229,7 @@ function sanitizeUser(u) {
         parent_id: u.parent_id || null,
         float_balance: u.float_balance || 0,
         game_balance: u.game_balance || 0,
-        active: u.active, created_at: u.created_at,
-    };
+        active: u.active, created_at: u.created_at};
 }
 
 function setUserActive(id, active) {
@@ -300,8 +295,7 @@ function topUpCashier(cashierId, amount, adminId, note) {
     c.float_balance = (c.float_balance || 0) + amount;
     addTransaction({
         user_id: cashierId, type: 'float_topup', amount, balance_after: c.float_balance,
-        note: note || 'Inyección admin', admin_id: adminId,
-    });
+        note: note || 'Inyección admin', admin_id: adminId});
     persist();
     return c.float_balance;
 }
@@ -313,8 +307,7 @@ function topUpAgent(agentId, amount, adminId, note) {
     a.float_balance = (a.float_balance || 0) + amount;
     addTransaction({
         user_id: agentId, type: 'float_topup', amount, balance_after: a.float_balance,
-        note: note || 'Inyección admin a agente', admin_id: adminId,
-    });
+        note: note || 'Inyección admin a agente', admin_id: adminId});
     persist();
     return a.float_balance;
 }
@@ -330,8 +323,7 @@ function transferAgentToCashier(agentId, cashierId, amount, note) {
     c.float_balance = (c.float_balance || 0) + amount;
     addTransaction({
         user_id: cashierId, type: 'float_transfer', amount, balance_after: c.float_balance,
-        note: note || `Transferencia de agente ${a.name}`, admin_id: agentId,
-    });
+        note: note || `Transferencia de agente ${a.name}`, admin_id: agentId});
     persist();
     return c.float_balance;
 }
@@ -370,8 +362,7 @@ function createMachine(number, name, branchId = null) {
         branch_id: branchId,
         balance: 0,
         active: 1,
-        created_at: now(),
-    };
+        created_at: now()};
     data.machines.push(machine);
     persist();
     return machine;
@@ -469,8 +460,7 @@ function creditMachine(machineId, amount, opts = {}) {
         cash_cents: opts.cashCents ?? amount * 100,
         payment_method: opts.paymentMethod || 'efectivo',
         note: opts.note || `Venta a máquina #${m.number}`,
-        admin_id: opts.adminId || null,
-    });
+        admin_id: opts.adminId || null});
     persist();
     return { machine: m, balance: m.balance };
 }
@@ -481,8 +471,7 @@ function adjustMachineBalance(machineId, amount, adminId, note) {
     m.balance = Math.max(0, m.balance + amount);
     addTransaction({
         machine_id: machineId, type: amount >= 0 ? 'admin_credit' : 'admin_debit',
-        amount, balance_after: m.balance, note, admin_id: adminId,
-    });
+        amount, balance_after: m.balance, note, admin_id: adminId});
     persist();
     return m.balance;
 }
@@ -512,8 +501,7 @@ function creditUser(userId, amount, opts = {}) {
         cash_cents: opts.cashCents ?? amount * 100,
         payment_method: opts.paymentMethod || 'efectivo',
         note: opts.note || `Recarga a ${u.name}`,
-        admin_id: opts.adminId || null,
-    });
+        admin_id: opts.adminId || null});
     persist();
     return { user: sanitizeUser(u), balance: u.game_balance };
 }
@@ -586,8 +574,7 @@ function getScratchPrizePool(branchId = null, userId = null) {
         scratchPaid,
         poolCap,
         available,
-        retentionPercent: data.settings.retention_percent || 15,
-    };
+        retentionPercent: data.settings.retention_percent || 15};
 }
 
 function ensureCableSessions() {
@@ -631,8 +618,7 @@ function startCableSessionMachine(machineId, bet, knots) {
         accumulated: 0,
         wrongPulls: 0,
         status: 'active',
-        created_at: now(),
-    };
+        created_at: now()};
     data.cable_sessions.push(session);
     persist();
     return { session, balance: m.balance, machine_number: m.number };
@@ -660,8 +646,7 @@ function startCableSessionUser(userId, bet, knots) {
         accumulated: 0,
         wrongPulls: 0,
         status: 'active',
-        created_at: now(),
-    };
+        created_at: now()};
     data.cable_sessions.push(session);
     persist();
     return { session, balance: u.game_balance, user_name: u.name };
@@ -678,8 +663,7 @@ function finalizeCableSession(session, pullResult) {
         failed: !!pullResult.failed,
         wrongPulls: session.wrongPulls,
         knotsTotal: session.knots.length,
-        knotsUntied: session.knots.filter((k) => k.untied).length,
-    };
+        knotsUntied: session.knots.filter((k) => k.untied).length};
 
     if (session.machine_id) {
         const m = findMachineById(session.machine_id);
@@ -733,8 +717,7 @@ function pullCableSession(sessionId, end, owner) {
         accumulated: session.accumulated,
         balance,
         payout: finalize?.payout ?? session.accumulated,
-        net: finalize?.net,
-    };
+        net: finalize?.net};
 }
 
 /* Rompecabezas — niveles infinitos */
@@ -773,16 +756,14 @@ function creditPuzzlePrize(session, amount) {
         m.balance += amount;
         addTransaction({
             machine_id: session.machine_id, type: 'win', amount,
-            balance_after: m.balance, game: 'rompecabezas',
-        });
+            balance_after: m.balance, game: 'rompecabezas'});
         return m.balance;
     }
     const u = findUserById(session.user_id);
     u.game_balance += amount;
     addTransaction({
         user_id: session.user_id, type: 'win', amount,
-        balance_after: u.game_balance, game: 'rompecabezas',
-    });
+        balance_after: u.game_balance, game: 'rompecabezas'});
     return u.game_balance;
 }
 
@@ -794,8 +775,7 @@ function chargePuzzleBet(sessionOwner, bet) {
         m.balance -= bet;
         addTransaction({
             machine_id: sessionOwner.machineId, type: 'bet', amount: -bet,
-            balance_after: m.balance, game: 'rompecabezas',
-        });
+            balance_after: m.balance, game: 'rompecabezas'});
         return { balance: m.balance, machine_number: m.number };
     }
     const u = findUserById(sessionOwner.userId);
@@ -804,8 +784,7 @@ function chargePuzzleBet(sessionOwner, bet) {
     u.game_balance -= bet;
     addTransaction({
         user_id: sessionOwner.userId, type: 'bet', amount: -bet,
-        balance_after: u.game_balance, game: 'rompecabezas',
-    });
+        balance_after: u.game_balance, game: 'rompecabezas'});
     return { balance: u.game_balance, user_name: u.name };
 }
 
@@ -835,9 +814,7 @@ function startPuzzleSession(owner, bet, retentionPercent, { restart = false } = 
             result_json: JSON.stringify({
                 abandoned: true,
                 levelReached: session.level,
-                totalWon: session.totalWon || 0,
-            }),
-        });
+                totalWon: session.totalWon || 0})});
         persist();
         session = null;
     }
@@ -880,8 +857,7 @@ function startPuzzleSession(owner, bet, retentionPercent, { restart = false } = 
         claimedLevels,
         totalWon,
         status: 'playing',
-        created_at: now(),
-    };
+        created_at: now()};
     data.puzzle_sessions.push(newSession);
     persist();
 
@@ -892,8 +868,7 @@ function startPuzzleSession(owner, bet, retentionPercent, { restart = false } = 
         user_name: charged.user_name,
         message: level === 1
             ? `Nivel 1 · premio ${levelData.prize}`
-            : `Nivel ${level} · premio ${levelData.prize}`,
-    };
+            : `Nivel ${level} · premio ${levelData.prize}`};
 }
 
 function movePuzzleSession(sessionId, tileIndex, owner) {
@@ -921,9 +896,7 @@ function movePuzzleSession(sessionId, tileIndex, owner) {
             result_json: JSON.stringify({
                 level: session.level,
                 prize: result.awarded,
-                moves: session.moves,
-            }),
-        });
+                moves: session.moves})});
     } else if (result.failed) {
         addGameRound({
             machine_id: session.machine_id || null,
@@ -932,16 +905,14 @@ function movePuzzleSession(sessionId, tileIndex, owner) {
             bet: session.bet,
             payout: 0,
             net: -session.bet,
-            result_json: JSON.stringify({ level: session.level, failed: true, moves: session.moves }),
-        });
+            result_json: JSON.stringify({ level: session.level, failed: true, moves: session.moves })});
     }
 
     persist();
     return {
         ...result,
         session: puzzle.publicLevel(session),
-        balance,
-    };
+        balance};
 }
 
 function retryPuzzleLevel(sessionId, owner, retentionPercent) {
@@ -969,8 +940,7 @@ function retryPuzzleLevel(sessionId, owner, retentionPercent) {
         balance: charged.balance,
         machine_number: charged.machine_number,
         user_name: charged.user_name,
-        message: `Reintento nivel ${session.level} · cobrado $${session.bet}`,
-    };
+        message: `Reintento nivel ${session.level} · cobrado $${session.bet}`};
 }
 
 /* Calle Pelea — combates por niveles */
@@ -1009,16 +979,14 @@ function creditFightPrize(session, amount) {
         m.balance += amount;
         addTransaction({
             machine_id: session.machine_id, type: 'win', amount,
-            balance_after: m.balance, game: 'calle-pelea',
-        });
+            balance_after: m.balance, game: 'calle-pelea'});
         return m.balance;
     }
     const u = findUserById(session.user_id);
     u.game_balance += amount;
     addTransaction({
         user_id: session.user_id, type: 'win', amount,
-        balance_after: u.game_balance, game: 'calle-pelea',
-    });
+        balance_after: u.game_balance, game: 'calle-pelea'});
     return u.game_balance;
 }
 
@@ -1030,8 +998,7 @@ function chargeFightBet(owner, bet) {
         m.balance -= bet;
         addTransaction({
             machine_id: owner.machineId, type: 'bet', amount: -bet,
-            balance_after: m.balance, game: 'calle-pelea',
-        });
+            balance_after: m.balance, game: 'calle-pelea'});
         return { balance: m.balance, machine_number: m.number };
     }
     const u = findUserById(owner.userId);
@@ -1040,8 +1007,7 @@ function chargeFightBet(owner, bet) {
     u.game_balance -= bet;
     addTransaction({
         user_id: owner.userId, type: 'bet', amount: -bet,
-        balance_after: u.game_balance, game: 'calle-pelea',
-    });
+        balance_after: u.game_balance, game: 'calle-pelea'});
     return { balance: u.game_balance, user_name: u.name };
 }
 
@@ -1071,9 +1037,7 @@ function startFightSession(owner, bet, retentionPercent, { restart = false } = {
             result_json: JSON.stringify({
                 abandoned: true,
                 levelReached: session.level,
-                totalWon: session.totalWon || 0,
-            }),
-        });
+                totalWon: session.totalWon || 0})});
         persist();
         session = null;
     }
@@ -1089,8 +1053,7 @@ function startFightSession(owner, bet, retentionPercent, { restart = false } = {
             machine_number: m?.number,
             user_name: u?.name,
             resumed: true,
-            message: `Continúa nivel ${session.level} · vs ${session.rival?.name || 'rival'}`,
-        };
+            message: `Continúa nivel ${session.level} · vs ${session.rival?.name || 'rival'}`};
     }
 
     let level = 1;
@@ -1121,8 +1084,7 @@ function startFightSession(owner, bet, retentionPercent, { restart = false } = {
         claimedLevels,
         totalWon,
         status: 'fighting',
-        created_at: now(),
-    };
+        created_at: now()};
     data.fight_sessions.push(newSession);
     persist();
 
@@ -1131,8 +1093,7 @@ function startFightSession(owner, bet, retentionPercent, { restart = false } = {
         balance: charged.balance,
         machine_number: charged.machine_number,
         user_name: charged.user_name,
-        message: `Nivel ${level} · vs ${fightData.rival.name} · premio $${fightData.prize}`,
-    };
+        message: `Nivel ${level} · vs ${fightData.rival.name} · premio $${fightData.prize}`};
 }
 
 function actionFightSession(sessionId, playerAction, owner) {
@@ -1160,9 +1121,7 @@ function actionFightSession(sessionId, playerAction, owner) {
                 level: session.level,
                 prize: result.awarded,
                 rival: session.rival?.name,
-                rounds: session.round,
-            }),
-        });
+                rounds: session.round})});
     } else if (result.finished && !result.won) {
         addGameRound({
             machine_id: session.machine_id || null,
@@ -1171,16 +1130,14 @@ function actionFightSession(sessionId, playerAction, owner) {
             bet: session.bet,
             payout: 0,
             net: -session.bet,
-            result_json: JSON.stringify({ level: session.level, failed: true, rounds: session.round }),
-        });
+            result_json: JSON.stringify({ level: session.level, failed: true, rounds: session.round })});
     }
 
     persist();
     return {
         ...result,
         session: fight.publicFight(session),
-        balance,
-    };
+        balance};
 }
 
 function retryFightLevel(sessionId, owner, retentionPercent) {
@@ -1210,8 +1167,7 @@ function retryFightLevel(sessionId, owner, retentionPercent) {
         prizePaid: (session.claimedLevels || []).includes(session.level),
         playerHistory: [],
         log: [],
-        status: 'fighting',
-    });
+        status: 'fighting'});
     persist();
 
     return {
@@ -1219,236 +1175,7 @@ function retryFightLevel(sessionId, owner, retentionPercent) {
         balance: charged.balance,
         machine_number: charged.machine_number,
         user_name: charged.user_name,
-        message: `Revanche nivel ${session.level} · cobrado $${session.bet}`,
-    };
-}
-
-/* Zona Libre — misiones BR por niveles */
-function ensureZoneSessions() {
-    if (!data.zone_sessions) data.zone_sessions = [];
-    if (!data.counters.zone_sessions) data.counters.zone_sessions = 0;
-}
-
-function pruneZoneSessions() {
-    ensureZoneSessions();
-    const cutoff = Date.now() - 1000 * 60 * 60 * 6;
-    data.zone_sessions = data.zone_sessions.filter((s) => {
-        if (s.status === 'active' || s.status === 'level_complete') return true;
-        return new Date(s.created_at).getTime() > cutoff;
-    });
-}
-
-function findZoneSession(id) {
-    ensureZoneSessions();
-    return data.zone_sessions.find((s) => s.id === parseInt(id, 10)) || null;
-}
-
-function findActiveZoneSession({ machineId, userId }) {
-    ensureZoneSessions();
-    return data.zone_sessions.find((s) => {
-        if (machineId && s.machine_id === machineId && (s.status === 'active' || s.status === 'level_complete')) return true;
-        if (userId && s.user_id === userId && (s.status === 'active' || s.status === 'level_complete')) return true;
-        return false;
-    }) || null;
-}
-
-function creditZonePrize(session, amount) {
-    if (amount <= 0) return getZoneOwnerBalance(session);
-    if (session.machine_id) {
-        const m = findMachineById(session.machine_id);
-        m.balance += amount;
-        addTransaction({
-            machine_id: session.machine_id, type: 'win', amount,
-            balance_after: m.balance, game: 'zona-libre',
-        });
-        return m.balance;
-    }
-    const u = findUserById(session.user_id);
-    u.game_balance += amount;
-    addTransaction({
-        user_id: session.user_id, type: 'win', amount,
-        balance_after: u.game_balance, game: 'zona-libre',
-    });
-    return u.game_balance;
-}
-
-function chargeZoneBet(owner, bet) {
-    if (owner.machineId) {
-        const m = findMachineById(owner.machineId);
-        if (!m || !m.active) throw new Error('Máquina no disponible');
-        if (m.balance < bet) throw new Error('Saldo insuficiente en la máquina');
-        m.balance -= bet;
-        addTransaction({
-            machine_id: owner.machineId, type: 'bet', amount: -bet,
-            balance_after: m.balance, game: 'zona-libre',
-        });
-        return { balance: m.balance, machine_number: m.number };
-    }
-    const u = findUserById(owner.userId);
-    if (!u || u.role !== 'user' || !u.active) throw new Error('Usuario no disponible');
-    if ((u.game_balance || 0) < bet) throw new Error('Saldo insuficiente');
-    u.game_balance -= bet;
-    addTransaction({
-        user_id: owner.userId, type: 'bet', amount: -bet,
-        balance_after: u.game_balance, game: 'zona-libre',
-    });
-    return { balance: u.game_balance, user_name: u.name };
-}
-
-function getZoneOwnerBalance(session) {
-    if (session.machine_id) return findMachineById(session.machine_id)?.balance ?? 0;
-    return findUserById(session.user_id)?.game_balance ?? 0;
-}
-
-function startZoneSession(owner, bet, retentionPercent, { restart = false } = {}) {
-    const zone = require('../engines/zona-libre');
-    if (!zone.BETS.includes(bet)) throw new Error('Apuesta inválida');
-
-    ensureZoneSessions();
-    pruneZoneSessions();
-
-    let session = findActiveZoneSession(owner);
-
-    if (restart && session) {
-        session.status = 'abandoned';
-        addGameRound({
-            machine_id: session.machine_id || null,
-            user_id: session.user_id || null,
-            game: 'zona-libre',
-            bet: session.bet,
-            payout: session.totalWon || 0,
-            net: (session.totalWon || 0) - (session.betsPaid || session.bet),
-            result_json: JSON.stringify({
-                abandoned: true,
-                levelReached: session.level,
-                totalWon: session.totalWon || 0,
-            }),
-        });
-        persist();
-        session = null;
-    }
-
-    if (session && session.status === 'active') {
-        throw new Error('Ya tienes una misión activa — termínala o reinicia');
-    }
-
-    let level = 1;
-    let claimedLevels = [];
-    let totalWon = 0;
-    let betsPaid = 0;
-
-    if (session && session.status === 'level_complete') {
-        level = session.level + 1;
-        claimedLevels = [...(session.claimedLevels || [])];
-        totalWon = session.totalWon || 0;
-        betsPaid = session.betsPaid || session.bet;
-        session.status = 'continued';
-    }
-
-    const charged = chargeZoneBet(owner, bet);
-    betsPaid += bet;
-
-    const mission = zone.missionForLevel(level, bet, retentionPercent);
-    const newSession = {
-        id: nextId('zone_sessions'),
-        machine_id: owner.machineId || null,
-        user_id: owner.userId || null,
-        betsPaid,
-        ...mission,
-        kills: 0,
-        claimedLevels,
-        totalWon,
-        prizePaid: false,
-        status: 'active',
-        created_at: now(),
-        started_at: Date.now(),
-    };
-    data.zone_sessions.push(newSession);
-    persist();
-
-    return {
-        ...zone.publicMission(newSession),
-        balance: charged.balance,
-        machine_number: charged.machine_number,
-        user_name: charged.user_name,
-        message: `Nivel ${level} · ${mission.enemies} enemigos · premio $${mission.prize}`,
-    };
-}
-
-function completeZoneSession(sessionId, payload, owner) {
-    const zone = require('../engines/zona-libre');
-    const session = findZoneSession(sessionId);
-    if (!session || session.status !== 'active') {
-        throw new Error('Misión no encontrada o ya terminada');
-    }
-    if (owner.machineId && session.machine_id !== owner.machineId) throw new Error('Partida no válida');
-    if (owner.userId && session.user_id !== owner.userId) throw new Error('Partida no válida');
-
-    const result = zone.completeMission(session, payload);
-    let balance = getZoneOwnerBalance(session);
-
-    if (result.awarded > 0) {
-        balance = creditZonePrize(session, result.awarded);
-        addGameRound({
-            machine_id: session.machine_id || null,
-            user_id: session.user_id || null,
-            game: 'zona-libre',
-            bet: session.bet,
-            payout: result.awarded,
-            net: result.awarded - session.bet,
-            result_json: JSON.stringify({
-                level: session.level,
-                prize: result.awarded,
-                kills: session.kills,
-            }),
-        });
-    } else if (!result.won) {
-        addGameRound({
-            machine_id: session.machine_id || null,
-            user_id: session.user_id || null,
-            game: 'zona-libre',
-            bet: session.bet,
-            payout: 0,
-            net: -session.bet,
-            result_json: JSON.stringify({ level: session.level, failed: true, kills: session.kills }),
-        });
-    }
-
-    persist();
-    return {
-        ...result,
-        session: zone.publicMission(session),
-        balance,
-    };
-}
-
-function retryZoneLevel(sessionId, owner, retentionPercent) {
-    const zone = require('../engines/zona-libre');
-    const session = findZoneSession(sessionId);
-    if (!session) throw new Error('Partida no encontrada');
-    if (owner.machineId && session.machine_id !== owner.machineId) throw new Error('Partida no válida');
-    if (owner.userId && session.user_id !== owner.userId) throw new Error('Partida no válida');
-    if (session.status !== 'failed') throw new Error('Solo puedes reintentar una misión fallida');
-
-    const charged = chargeZoneBet(owner, session.bet);
-    session.betsPaid = (session.betsPaid || session.bet) + session.bet;
-    const mission = zone.missionForLevel(session.level, session.bet, retentionPercent);
-    Object.assign(session, {
-        ...mission,
-        kills: 0,
-        prizePaid: (session.claimedLevels || []).includes(session.level),
-        status: 'active',
-        started_at: Date.now(),
-    });
-    persist();
-
-    return {
-        ...zone.publicMission(session),
-        balance: charged.balance,
-        machine_number: charged.machine_number,
-        user_name: charged.user_name,
-        message: `Reintento nivel ${session.level} · cobrado $${session.bet}`,
-    };
+        message: `Revanche nivel ${session.level} · cobrado $${session.bet}`};
 }
 
 /* Transactions */
@@ -1511,8 +1238,7 @@ function getStats() {
         houseToday: betsToday - winsToday,
         retention: data.settings.retention_percent,
         cashiers: data.users.filter((u) => u.role === 'cashier' && u.active).length,
-        branches: data.branches.filter((b) => b.active).length,
-    };
+        branches: data.branches.filter((b) => b.active).length};
 }
 
 function ensureAdminUser() {
@@ -1569,7 +1295,6 @@ function seedDefaults() {
     ensureCableSessions();
     ensurePuzzleSessions();
     ensureFightSessions();
-    ensureZoneSessions();
     seedBranches();
     ensureDefaultBranches();
     migrateUsernames();
@@ -1614,9 +1339,8 @@ function createBranch(id, name, password) {
         password_hash: bcrypt.hashSync(finalPwd, 10),
         password_seed: finalPwd === 'sucursal123' ? 'sucursal123' : null,
         password_custom: finalPwd === 'sucursal123' ? 0 : 1,
-        games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'],
-        created_at: now(),
-    };
+        games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea'],
+        created_at: now()};
     data.branches.push(branch);
     ensureMachinesForBranch(cleanId, 3);
     persist();
@@ -1635,8 +1359,7 @@ function sanitizeBranch(b) {
         active: b.active,
         games: getBranchGames(b.id),
         created_at: b.created_at,
-        has_password: !!b.password_hash,
-    };
+        has_password: !!b.password_hash};
 }
 
 function ensureBranchAuth(branch) {
@@ -1679,8 +1402,7 @@ function topUpBranch(branchId, amount, adminId, note) {
     branch.float_balance = (branch.float_balance || 0) + amount;
     addTransaction({
         branch_id: branchId, type: 'float_topup', amount, balance_after: branch.float_balance,
-        note: note || 'Inyección admin a sucursal', admin_id: adminId,
-    });
+        note: note || 'Inyección admin a sucursal', admin_id: adminId});
     persist();
     return branch.float_balance;
 }
@@ -1696,8 +1418,7 @@ function transferAgentToBranch(agentId, branchId, amount, note) {
     branch.float_balance = (branch.float_balance || 0) + amount;
     addTransaction({
         branch_id: branchId, type: 'float_transfer', amount, balance_after: branch.float_balance,
-        note: note || `Transferencia de agente ${a.name}`, admin_id: agentId,
-    });
+        note: note || `Transferencia de agente ${a.name}`, admin_id: agentId});
     persist();
     return branch.float_balance;
 }
@@ -1740,7 +1461,7 @@ function unassignCashier(cashierId) {
 
 function getBranchGames(branchId) {
     const branch = findBranchById(branchId);
-    const defaults = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+    const defaults = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea'];
     if (!branch) return defaults;
     if (!Array.isArray(branch.games) || !branch.games.length) {
         branch.games = defaults;
@@ -1752,7 +1473,7 @@ function getBranchGames(branchId) {
 function setBranchGames(branchId, games) {
     const branch = findBranchById(branchId);
     if (!branch) throw new Error('Sucursal no encontrada');
-    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea'];
     const list = (games || []).filter((g) => allowed.includes(g));
     if (!list.length) throw new Error('Selecciona al menos un juego');
     branch.games = list;
@@ -1771,21 +1492,18 @@ function getGamesCatalog() {
         'desenreda-cable': 'Desenreda Cable',
         'loteria': 'Lotería',
         'rompecabezas': 'Rompecabezas',
-        'calle-pelea': 'Calle Pelea',
-        'zona-libre': 'Zona Libre',
-    };
+        'calle-pelea': 'Calle Pelea'};
     const ids = Object.keys(labels);
     return ids.map((id) => ({
         id,
         name: labels[id],
         branches: listBranches()
             .filter((b) => getBranchGames(b.id).includes(id))
-            .map((b) => ({ id: b.id, name: b.name })),
-    }));
+            .map((b) => ({ id: b.id, name: b.name }))}));
 }
 
 function removeGameEverywhere(gameId, branchId = null) {
-    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea'];
     if (!allowed.includes(gameId)) throw new Error('Juego no válido');
 
     const targets = branchId
@@ -1816,8 +1534,7 @@ function removeGameEverywhere(gameId, branchId = null) {
         catalog: getGamesCatalog(),
         message: branchId
             ? `Juego quitado de la sucursal`
-            : `Juego quitado de ${updated} sucursal(es)` + (skipped ? ` · ${skipped} omitida(s)` : ''),
-    };
+            : `Juego quitado de ${updated} sucursal(es)` + (skipped ? ` · ${skipped} omitida(s)` : '')};
 }
 
 function updateBranch(id, updates = {}) {
@@ -1863,21 +1580,19 @@ function ensureDefaultBranches() {
                 active: 1,
                 float_balance: 5000,
                 password_hash: bcrypt.hashSync('sucursal123', 10),
-                games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'],
-                created_at: now(),
-            });
+                games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea'],
+                created_at: now()});
             added += 1;
         }
     });
     data.branches.forEach((b) => {
         ensureBranchAuth(b);
         if (!Array.isArray(b.games) || !b.games.length) {
-            b.games = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+            b.games = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea'];
         } else {
             if (!b.games.includes('loteria')) b.games = [...b.games, 'loteria'];
             if (!b.games.includes('rompecabezas')) b.games = [...b.games, 'rompecabezas'];
             if (!b.games.includes('calle-pelea')) b.games = [...b.games, 'calle-pelea'];
-            if (!b.games.includes('zona-libre')) b.games = [...b.games, 'zona-libre'];
             if (!b.games.includes('crystal-wins')) b.games = [...b.games, 'crystal-wins'];
         }
         ensureMachinesForBranch(b.id, 3);
@@ -1900,8 +1615,7 @@ function branchStats(branchId) {
     return {
         machines: machines.length,
         machineBalance: machines.reduce((s, m) => s + m.balance, 0),
-        float_balance: branch?.float_balance || 0,
-    };
+        float_balance: branch?.float_balance || 0};
 }
 
 module.exports = {
@@ -1917,9 +1631,7 @@ module.exports = {
     startCableSessionMachine, startCableSessionUser, pullCableSession, findCableSession,
     startPuzzleSession, movePuzzleSession, retryPuzzleLevel, findPuzzleSession,
     startFightSession, actionFightSession, retryFightLevel, findFightSession,
-    startZoneSession, completeZoneSession, retryZoneLevel, findZoneSession,
     listBranches, findBranchById, createBranch, updateBranch, deleteBranch, seedBranches, ensureDefaultBranches, branchStats,
     sanitizeBranch, setBranchPassword, topUpBranch, transferAgentToBranch, ensureBranchAuth, assertBranchMachineAccess,
     ensureMachinesForBranch, assignCashierToBranch, unassignCashier, getBranchGames, setBranchGames,
-    getGamesCatalog, removeGameEverywhere,
-};
+    getGamesCatalog, removeGameEverywhere};
