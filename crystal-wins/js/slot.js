@@ -63,7 +63,7 @@
         winFlash: document.getElementById('winFlash'),
         backLink: document.getElementById('backLink'),
         plines: [...document.querySelectorAll('.pline')],
-        winMeter: document.querySelector('.meter--win'),
+        winMeter: document.querySelector('.hud__screen--win'),
     };
 
     function formatMoney(n) {
@@ -88,7 +88,7 @@
     function setWin(amount) {
         lastWin = amount;
         els.winDisplay.textContent = String(amount);
-        if (amount > 0) {
+        if (amount > 0 && els.winMeter) {
             els.winMeter.classList.remove('is-hit');
             void els.winMeter.offsetWidth;
             els.winMeter.classList.add('is-hit');
@@ -126,10 +126,9 @@
     }
 
     function symHtml(sym) {
-        if (sym.seven || sym.id === 'seven') {
-            return `<span class="sym sym--seven">777</span>`;
-        }
-        return `<span class="sym">${sym.emoji}</span>`;
+        const id = sym.id || 'cherry';
+        const art = window.CrystalSymbols ? CrystalSymbols.render(id) : (sym.emoji || '?');
+        return `<div class="sym-wrap">${art}</div>`;
     }
 
     function renderReels(g, animate) {
@@ -310,7 +309,7 @@
                     showModal('¡CRYSTAL JACKPOT!', formatMoney(payout));
                 }
             } else {
-                setHint('Sin premio — prueba otra vez', false);
+                setHint('', false);
                 showToast(formatMoney(net), 'lose');
             }
 
@@ -318,7 +317,7 @@
         } catch (err) {
             showToast(err.message || 'Error al girar', 'lose');
             stopAuto();
-            setHint('3 iguales en línea horizontal o diagonal = premio', false);
+            setHint('', false);
         }
 
         isSpinning = false;
@@ -382,6 +381,9 @@
             return;
         }
     } else if (!MachineAPI.getMachineNumber()) {
+        // Still paint reels so the cabinet isn't empty while redirecting
+        grid = generateGrid();
+        renderReels(grid, false);
         MachineAPI.requireMachine();
         return;
     }
