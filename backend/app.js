@@ -45,7 +45,7 @@ app.use('/api/cajero', cajeroRoutes);
 app.use('/api/play', playRoutes);
 
 if (!isServerless) {
-    const staticDirs = ['shared', 'admin', 'agente', 'cajero', 'portal', 'inicio', 'spin-game', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+    const staticDirs = ['shared', 'admin', 'agente', 'cajero', 'portal', 'inicio', 'spin-game', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
     staticDirs.forEach((dir) => app.use(`/${dir}`, express.static(path.join(ROOT, dir))));
     app.get('/', (_req, res) => res.redirect('/portal/'));
 }

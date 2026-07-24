@@ -2,6 +2,7 @@ const express = require('express');
 const store = require('../db/store');
 const spinWheel = require('../engines/spin-wheel');
 const comicSlot = require('../engines/comic-slot');
+const crystalWins = require('../engines/crystal-wins');
 const ranchoLazo = require('../engines/rancho-lazo');
 const lagunaAnzuelo = require('../engines/laguna-anzuelo');
 const rascadito = require('../engines/rascadito');
@@ -101,6 +102,7 @@ function playGame(req, res, engine, gameName) {
 
 router.post('/spin-wheel', (req, res) => playGame(req, res, spinWheel, 'spin-wheel'));
 router.post('/comic-slot', (req, res) => playGame(req, res, comicSlot, 'comic-slot'));
+router.post('/crystal-wins', (req, res) => playGame(req, res, crystalWins, 'crystal-wins'));
 router.post('/rancho-lazo', (req, res) => playGame(req, res, ranchoLazo, 'rancho-lazo'));
 router.post('/laguna-anzuelo', (req, res) => playGame(req, res, lagunaAnzuelo, 'laguna-anzuelo'));
 
@@ -579,6 +581,7 @@ function playUserGame(req, res, engine, gameName) {
 
 router.post('/user/spin-wheel', authRequired, (req, res) => playUserGame(req, res, spinWheel, 'spin-wheel'));
 router.post('/user/comic-slot', authRequired, (req, res) => playUserGame(req, res, comicSlot, 'comic-slot'));
+router.post('/user/crystal-wins', authRequired, (req, res) => playUserGame(req, res, crystalWins, 'crystal-wins'));
 router.post('/user/rancho-lazo', authRequired, (req, res) => playUserGame(req, res, ranchoLazo, 'rancho-lazo'));
 router.post('/user/laguna-anzuelo', authRequired, (req, res) => playUserGame(req, res, lagunaAnzuelo, 'laguna-anzuelo'));
 router.post('/user/rascadito', authRequired, (req, res) => playScratchUserGame(req, res, 'rascadito'));

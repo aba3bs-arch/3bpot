@@ -66,6 +66,10 @@ const PlayerAuth = (function () {
         return request('/api/play/user/comic-slot', { method: 'POST', body: JSON.stringify({ bet }) });
     }
 
+    async function playCrystalWins(bet) {
+        return request('/api/play/user/crystal-wins', { method: 'POST', body: JSON.stringify({ bet }) });
+    }
+
     async function playRanchoLazo(bet) {
         return request('/api/play/user/rancho-lazo', { method: 'POST', body: JSON.stringify({ bet }) });
     }
@@ -158,7 +162,7 @@ const PlayerAuth = (function () {
 
     return {
         login, logout, request, getUser, isLoggedIn, clearSession, formatPesos,
-        playSpinWheel, playComicSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito,
+        playSpinWheel, playComicSlot, playCrystalWins, playRanchoLazo, playLagunaAnzuelo, playRascadito,
         startDesenredaCable, pullDesenredaCable, playLoteria,
         startRompecabezas, moveRompecabezas, retryRompecabezas,
         startCallePelea, actionCallePelea, retryCallePelea,

@@ -1614,7 +1614,7 @@ function createBranch(id, name, password) {
         password_hash: bcrypt.hashSync(finalPwd, 10),
         password_seed: finalPwd === 'sucursal123' ? 'sucursal123' : null,
         password_custom: finalPwd === 'sucursal123' ? 0 : 1,
-        games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'],
+        games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'],
         created_at: now(),
     };
     data.branches.push(branch);
@@ -1740,7 +1740,7 @@ function unassignCashier(cashierId) {
 
 function getBranchGames(branchId) {
     const branch = findBranchById(branchId);
-    const defaults = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+    const defaults = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
     if (!branch) return defaults;
     if (!Array.isArray(branch.games) || !branch.games.length) {
         branch.games = defaults;
@@ -1752,7 +1752,7 @@ function getBranchGames(branchId) {
 function setBranchGames(branchId, games) {
     const branch = findBranchById(branchId);
     if (!branch) throw new Error('Sucursal no encontrada');
-    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
     const list = (games || []).filter((g) => allowed.includes(g));
     if (!list.length) throw new Error('Selecciona al menos un juego');
     branch.games = list;
@@ -1764,6 +1764,7 @@ function getGamesCatalog() {
     const labels = {
         'spin-wheel': 'Ruleta',
         'comic-slot': 'Comic Slot',
+        'crystal-wins': 'Crystal Wins',
         'rancho-lazo': 'Rancho Lazo',
         'laguna-anzuelo': 'Laguna Anzuelo',
         'rascadito': 'Rascadito',
@@ -1784,7 +1785,7 @@ function getGamesCatalog() {
 }
 
 function removeGameEverywhere(gameId, branchId = null) {
-    const allowed = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
     if (!allowed.includes(gameId)) throw new Error('Juego no válido');
 
     const targets = branchId
@@ -1862,7 +1863,7 @@ function ensureDefaultBranches() {
                 active: 1,
                 float_balance: 5000,
                 password_hash: bcrypt.hashSync('sucursal123', 10),
-                games: ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'],
+                games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'],
                 created_at: now(),
             });
             added += 1;
@@ -1871,12 +1872,13 @@ function ensureDefaultBranches() {
     data.branches.forEach((b) => {
         ensureBranchAuth(b);
         if (!Array.isArray(b.games) || !b.games.length) {
-            b.games = ['spin-wheel', 'comic-slot', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
+            b.games = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'desenreda-cable', 'loteria', 'rompecabezas', 'calle-pelea', 'zona-libre'];
         } else {
             if (!b.games.includes('loteria')) b.games = [...b.games, 'loteria'];
             if (!b.games.includes('rompecabezas')) b.games = [...b.games, 'rompecabezas'];
             if (!b.games.includes('calle-pelea')) b.games = [...b.games, 'calle-pelea'];
             if (!b.games.includes('zona-libre')) b.games = [...b.games, 'zona-libre'];
+            if (!b.games.includes('crystal-wins')) b.games = [...b.games, 'crystal-wins'];
         }
         ensureMachinesForBranch(b.id, 3);
     });

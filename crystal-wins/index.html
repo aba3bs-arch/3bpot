@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3B Pot — Crystal Wins</title>
+    <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/slot.css">
+</head>
+<body>
+    <div class="stage">
+        <header class="topbar">
+            <a class="topbar__back" id="backLink" href="/inicio/">← Juegos</a>
+            <div class="topbar__meta">
+                <span class="topbar__chip">Máq. <strong id="machineNum">—</strong></span>
+                <span class="topbar__chip topbar__chip--balance">Saldo <strong id="balance">$0</strong></span>
+            </div>
+        </header>
+
+        <div class="game">
+            <h1 class="game__title" aria-label="Crystal Wins">
+                <span class="game__title-glow">Crystal Wins</span>
+            </h1>
+
+            <div class="game__board">
+                <div class="reels-frame" id="reelsFrame">
+                    <div class="payline-layer" aria-hidden="true">
+                        <span class="pline pline--h0" data-line="0"></span>
+                        <span class="pline pline--h1" data-line="1"></span>
+                        <span class="pline pline--h2" data-line="2"></span>
+                        <span class="pline pline--d0" data-line="3"></span>
+                        <span class="pline pline--d1" data-line="4"></span>
+                    </div>
+                    <div class="reels" id="reels">
+                        <div class="reel" data-reel="0"><div class="reel__strip"></div></div>
+                        <div class="reel" data-reel="1"><div class="reel__strip"></div></div>
+                        <div class="reel" data-reel="2"><div class="reel__strip"></div></div>
+                    </div>
+                    <div class="win-flash" id="winFlash" hidden></div>
+                </div>
+
+                <aside class="controls">
+                    <button type="button" class="ctrl ctrl--auto" id="autoBtn" title="Auto">
+                        <span class="ctrl__icon" aria-hidden="true">
+                            <svg viewBox="0 0 48 48" width="28" height="28"><path fill="currentColor" d="M24 8a16 16 0 1 1-11.3 4.7l3.2 3.2A11.5 11.5 0 1 0 24 12.5V8zm0 0l-7 7h4v6h6v-6h4l-7-7z"/></svg>
+                        </span>
+                        <span class="ctrl__label">AUTO</span>
+                    </button>
+
+                    <button type="button" class="spin" id="spinBtn" title="Girar">
+                        <span class="spin__ring"></span>
+                        <span class="spin__core">
+                            <svg viewBox="0 0 64 64" width="42" height="42" aria-hidden="true">
+                                <path fill="#fff" d="M32 10a22 22 0 1 1-15.6 6.4l4.4 4.4A15.5 15.5 0 1 0 32 16.5V10zm0 0l-10 10h6v8h8v-8h6L32 10z"/>
+                            </svg>
+                        </span>
+                    </button>
+
+                    <button type="button" class="ctrl ctrl--turbo" id="turboBtn" title="Turbo">
+                        <span class="ctrl__icon" aria-hidden="true">⚡</span>
+                        <span class="ctrl__label" id="turboLabel">OFF</span>
+                    </button>
+                </aside>
+            </div>
+
+            <div class="meters">
+                <div class="meter">
+                    <button type="button" class="meter__adj" id="betMinus" aria-label="Bajar apuesta">−</button>
+                    <div class="meter__box">
+                        <span class="meter__label">APUESTA</span>
+                        <span class="meter__value" id="betDisplay">10</span>
+                    </div>
+                    <button type="button" class="meter__adj" id="betPlus" aria-label="Subir apuesta">+</button>
+                </div>
+                <div class="meter meter--win">
+                    <div class="meter__box">
+                        <span class="meter__label">GANANCIA</span>
+                        <span class="meter__value" id="winDisplay">0</span>
+                    </div>
+                </div>
+                <div class="lines-badge">5 LÍNEAS</div>
+            </div>
+
+            <p class="hint" id="hint">3 iguales en línea horizontal o diagonal = premio</p>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" hidden>
+        <span id="toastMsg"></span>
+    </div>
+
+    <div class="modal" id="modal" hidden>
+        <div class="modal__backdrop"></div>
+        <div class="modal__card">
+            <div class="modal__title" id="modalTitle">¡PREMIO!</div>
+            <div class="modal__amount" id="modalAmount">$0</div>
+            <button type="button" class="modal__btn" id="modalClose">Continuar</button>
+        </div>
+    </div>
+
+    <script src="/shared/machine-client.js"></script>
+    <script src="/shared/player-auth.js"></script>
+    <script src="js/slot.js"></script>
+</body>
+</html>

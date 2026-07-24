@@ -21,9 +21,10 @@
   let pendingBranch = null;
   let deferredInstall = null;
 
-  const gameMeta = {
+    const gameMeta = {
     'spin-wheel': { href: '/spin-game/', icon: '🎡', name: 'Ruleta' },
     'comic-slot': { href: '/comic-slot/', icon: '🎰', name: 'Comic Slot' },
+    'crystal-wins': { href: '/crystal-wins/', icon: '💎', name: 'Crystal Wins' },
     'rancho-lazo': { href: '/rancho-lazo/', icon: '🤠', name: 'Rancho Lazo' },
     'laguna-anzuelo': { href: '/laguna-anzuelo/', icon: '🎣', name: 'Laguna Anzuelo' },
     'rascadito': { href: '/rascadito/', icon: '🎫', name: 'Rascadito' },

@@ -101,6 +101,17 @@ const MachineAPI = (function () {
         });
     }
 
+    async function spinCrystalWins(bet, machineNumber, branchId) {
+        return request('/api/play/crystal-wins', {
+            method: 'POST',
+            body: JSON.stringify({
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+                bet,
+            }),
+        });
+    }
+
     async function playRanchoLazo(bet, machineNumber, branchId) {
         return request('/api/play/rancho-lazo', {
             method: 'POST',
@@ -336,7 +347,7 @@ const MachineAPI = (function () {
     return {
         getMachineNumber, setMachineNumber, getBranchId, setBranchId, inicioUrl, machinePortalUrl,
         clearBinding, isLinked, bindTerminal, loginBranch, listMachines,
-        getPortal, getMachine, spinWheel, spinSlot, playRanchoLazo, playLagunaAnzuelo, playRascadito, getScratchPool,
+        getPortal, getMachine, spinWheel, spinSlot, spinCrystalWins, playRanchoLazo, playLagunaAnzuelo, playRascadito, getScratchPool,
         startDesenredaCable, pullDesenredaCable, playLoteria,
         startRompecabezas, moveRompecabezas, retryRompecabezas,
         startCallePelea, actionCallePelea, retryCallePelea,
