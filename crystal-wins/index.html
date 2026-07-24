@@ -11,6 +11,7 @@
 </head>
 <body>
     <div class="bg" aria-hidden="true">
+        <div class="bg__photo"></div>
         <div class="bg__vignette"></div>
         <div class="bg__glow bg__glow--a"></div>
         <div class="bg__glow bg__glow--b"></div>
@@ -33,22 +34,26 @@
 
             <div class="machine__row">
                 <div class="cabinet">
-                    <div class="cabinet__bezel">
-                        <div class="cabinet__inner">
-                            <div class="payline-layer" aria-hidden="true">
-                                <span class="pline pline--h0" data-line="0"></span>
-                                <span class="pline pline--h1" data-line="1"></span>
-                                <span class="pline pline--h2" data-line="2"></span>
-                                <span class="pline pline--d0" data-line="3"></span>
-                                <span class="pline pline--d1" data-line="4"></span>
+                    <div class="cabinet__perspective">
+                        <div class="cabinet__bezel">
+                            <div class="cabinet__frame" aria-hidden="true"></div>
+                            <div class="cabinet__inner">
+                                <div class="payline-layer" aria-hidden="true">
+                                    <span class="pline pline--h0" data-line="0"></span>
+                                    <span class="pline pline--h1" data-line="1"></span>
+                                    <span class="pline pline--h2" data-line="2"></span>
+                                    <span class="pline pline--d0" data-line="3"></span>
+                                    <span class="pline pline--d1" data-line="4"></span>
+                                </div>
+                                <div class="reels" id="reels">
+                                    <div class="reel" data-reel="0"><div class="reel__strip"></div></div>
+                                    <div class="reel" data-reel="1"><div class="reel__strip"></div></div>
+                                    <div class="reel" data-reel="2"><div class="reel__strip"></div></div>
+                                </div>
+                                <div class="win-flash" id="winFlash" hidden></div>
                             </div>
-                            <div class="reels" id="reels">
-                                <div class="reel" data-reel="0"><div class="reel__strip"></div></div>
-                                <div class="reel" data-reel="1"><div class="reel__strip"></div></div>
-                                <div class="reel" data-reel="2"><div class="reel__strip"></div></div>
-                            </div>
-                            <div class="win-flash" id="winFlash" hidden></div>
                         </div>
+                        <div class="cabinet__base" aria-hidden="true"></div>
                     </div>
                 </div>
 
