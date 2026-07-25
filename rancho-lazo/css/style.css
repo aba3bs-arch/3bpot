@@ -40,13 +40,22 @@ body {
   background: #0a0604;
 }
 
-.bg__dust {
+.bg__photo {
   position: absolute;
   inset: -2%;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% 0%, #3a2214 0%, transparent 55%),
-    linear-gradient(180deg, #2a1810 0%, #120a06 55%, #0a0604 100%);
+  background: url('../assets/ranch-bg.png') center / cover no-repeat;
+  transform: scale(1.04);
+  filter: saturate(1.2) contrast(1.1) brightness(0.85);
   animation: bgDrift 24s ease-in-out infinite;
+}
+
+.bg__dust {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(58, 34, 20, 0.35) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(20, 10, 6, 0.25) 0%, rgba(12, 6, 4, 0.45) 55%, rgba(8, 4, 2, 0.7) 100%);
+  pointer-events: none;
 }
 
 @keyframes bgDrift {

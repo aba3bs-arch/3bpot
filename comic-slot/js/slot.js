@@ -3,12 +3,12 @@
 
     const isPlayerMode = new URLSearchParams(location.search).has('player');
 
-    const INITIAL_BALANCE = 0;
     const MIN_BET = 5;
     const MAX_BET = 500;
+    const BET_STEP = 5;
     const ROWS = 3;
     const COLS = 3;
-    const CELL_H = 80;
+    const CELL_H_FALLBACK = 110;
 
     const SYMBOLS = [
         { id: 'poop', emoji: '💩', name: 'Caca Dorada', mult: 2, weight: 22 },
@@ -17,142 +17,68 @@
         { id: 'donut', emoji: '🍩', name: 'Donut Galáctico', mult: 6, weight: 14 },
         { id: 'alien', emoji: '👽', name: 'Alien Chismoso', mult: 8, weight: 10 },
         { id: 'clown', emoji: '🤡', name: 'Payaso VIP', mult: 12, weight: 7 },
-        { id: 'unicorn', emoji: '🦄', name: 'Unicornio Jackpot', mult: 25, weight: 3 },
+        { id: 'unicorn', emoji: '🦄', name: 'Unicornio', mult: 25, weight: 3 },
         { id: 'wild', emoji: '🎭', name: 'Comodín', mult: 0, weight: 6, wild: true },
     ];
 
-    const PAYLINES = [
-        { name: 'Arriba', row: 0, cls: 'payline--top' },
-        { name: 'Centro', row: 1, cls: 'payline--mid' },
-        { name: 'Abajo', row: 2, cls: 'payline--bot' },
-    ];
-
-    const HOST_IDLE = [
-        '¡Apuesta y gira, campeón! 🎪',
-        '¿Hoy toca unicornio? 🦄',
-        'El payaso trae suerte... o no 🤡',
-        '¡3 iguales y eres leyenda!',
-        'No mires el taco, mira el premio 🌮',
-    ];
-
-    const WIN_MSGS = {
-        poop: ['¡Caca de oro!', '¡Qué asco... de premio!', '¡Esto huele a dinero!'],
-        banana: ['¡Resbalón millonario!', '¡Plátano power!', '¡Monkeys approved! 🐒'],
-        taco: ['¡TACO TUESDAY FOREVER!', '¡Con extra queso y premio!', '¡Olé!'],
-        donut: ['¡Donut del universo!', '¡Azúcar pura!', '¡Glaseado de victoria!'],
-        alien: ['¡Te abducen las monedas!', '¡E.T. phone money!', '¡Ovni de la suerte!'],
-        clown: ['¡PAYASADA ÉPICA!', '¡Globo de billetes!', '¡Circo en tu bolsillo!'],
-        unicorn: ['¡UNICORNIO MÁGICO!', '¡Arcoíris de dinero!', '¡JACKPOT LOCO!'],
-        wild: ['¡Comodín salvaje!', '¡Máscara de la fortuna!'],
+    const WIN_HINTS = {
+        poop: '¡Caca de oro!',
+        banana: '¡Resbalón millonario!',
+        taco: '¡Taco Tuesday!',
+        donut: '¡Glaseado de victoria!',
+        alien: '¡Abducción de monedas!',
+        clown: '¡Payasada épica!',
+        unicorn: '¡Jackpot unicornio!',
+        wild: '¡Comodín salvaje!',
     };
-
-    const LOSE_MSGS = [
-        '¡Nada! Ni caca dorada 💩',
-        'El payaso se ríe de ti 🤡',
-        '¡Inténtalo otra vez, valiente!',
-        'El unicornio se fue de vacaciones 🦄',
-        '¡ZAP! Sin premio esta vez',
-    ];
 
     const totalWeight = SYMBOLS.reduce((s, sym) => s + sym.weight, 0);
 
-    let balance = INITIAL_BALANCE;
+    let balance = 0;
     let machineNumber = null;
     let minBet = MIN_BET;
     let maxBet = MAX_BET;
-    let currentBet = 50;
+    let currentBet = 10;
+    let lastWin = 0;
     let isSpinning = false;
-    let totalSpins = 0;
-    let totalWins = 0;
-    let bestWin = 0;
-    let sessionStartBalance = INITIAL_BALANCE;
-    let historyCount = 0;
+    let autoPlay = false;
+    let turbo = false;
+    let autoTimer = null;
     let grid = [];
-    let confettiParticles = [];
 
-    const spinBtn = document.getElementById('spinBtn');
-    const spinBtnCost = document.getElementById('spinBtnCost');
-    const balanceEl = document.getElementById('balance');
-    const currentBetEl = document.getElementById('currentBet');
-    const jackpotDisplay = document.getElementById('jackpotDisplay');
-    const betChips = document.getElementById('betChips');
-    const customBetInput = document.getElementById('customBet');
-    const lastResultEl = document.getElementById('lastResult');
-    const historyEl = document.getElementById('history');
-    const legendEl = document.getElementById('legend');
-    const toastEl = document.getElementById('toast');
-    const toastIcon = document.getElementById('toastIcon');
-    const toastMsg = document.getElementById('toastMsg');
-    const modal = document.getElementById('modal');
-    const modalContent = document.getElementById('modalContent');
-    const modalIcon = document.getElementById('modalIcon');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalAmount = document.getElementById('modalAmount');
-    const modalText = document.getElementById('modalText');
-    const modalClose = document.getElementById('modalClose');
-    const resetBtn = document.getElementById('resetBtn');
-    const totalSpinsEl = document.getElementById('totalSpins');
-    const totalWinsEl = document.getElementById('totalWins');
-    const bestWinEl = document.getElementById('bestWin');
-    const netProfitEl = document.getElementById('netProfit');
-    const historyCountEl = document.getElementById('historyCount');
-    const slotLightsEl = document.getElementById('slotLights');
-    const halfBetBtn = document.getElementById('halfBetBtn');
-    const doubleBetBtn = document.getElementById('doubleBetBtn');
-    const maxBetBtn = document.getElementById('maxBetBtn');
-    const hostMessage = document.getElementById('hostMessage');
-    const winLinesEl = document.getElementById('winLines');
-    const winLinesLabel = document.getElementById('winLinesLabel');
-    const reelsEl = document.getElementById('reels');
-    const confettiCanvas = document.getElementById('confetti');
-    const confettiCtx = confettiCanvas.getContext('2d');
-    const paylineEls = PAYLINES.map((p) => document.querySelector('.' + p.cls));
+    const els = {
+        spinBtn: document.getElementById('spinBtn'),
+        autoBtn: document.getElementById('autoBtn'),
+        turboBtn: document.getElementById('turboBtn'),
+        turboLabel: document.getElementById('turboLabel'),
+        balance: document.getElementById('balance'),
+        machineNum: document.getElementById('machineNum'),
+        betDisplay: document.getElementById('betDisplay'),
+        winDisplay: document.getElementById('winDisplay'),
+        betMinus: document.getElementById('betMinus'),
+        betPlus: document.getElementById('betPlus'),
+        reels: document.getElementById('reels'),
+        hint: document.getElementById('hint'),
+        toast: document.getElementById('toast'),
+        toastMsg: document.getElementById('toastMsg'),
+        modal: document.getElementById('modal'),
+        modalTitle: document.getElementById('modalTitle'),
+        modalAmount: document.getElementById('modalAmount'),
+        modalClose: document.getElementById('modalClose'),
+        winFlash: document.getElementById('winFlash'),
+        backLink: document.getElementById('backLink'),
+        plines: [...document.querySelectorAll('.pline')],
+        winMeter: document.querySelector('.hud__screen--win'),
+    };
 
     function formatMoney(n) {
         if (isPlayerMode) return PlayerAuth.formatPesos(n);
         return MachineAPI.formatPesos(n);
     }
 
-    async function loadBalance() {
-        if (isPlayerMode) {
-            if (!PlayerAuth.isLoggedIn()) {
-                window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
-                return;
-            }
-            const machineNumEl = document.getElementById('machineNum');
-            if (machineNumEl) machineNumEl.textContent = PlayerAuth.getUser()?.name || 'Jugador';
-            try {
-                const data = await PlayerAuth.request('/api/auth/me');
-                balance = data.user.game_balance || 0;
-                minBet = MIN_BET;
-                maxBet = MAX_BET;
-                sessionStartBalance = balance;
-                updateBalanceUI();
-                setBet(currentBet);
-            } catch (err) {
-                showToast(err.message || 'Error al cargar saldo', 'lose');
-            }
-            return;
-        }
-        machineNumber = MachineAPI.requireMachine();
-        if (!machineNumber) return;
-        const machineNumEl = document.getElementById('machineNum');
-        if (machineNumEl) machineNumEl.textContent = '#' + machineNumber;
-        try {
-            const data = await MachineAPI.getMachine(machineNumber);
-            balance = data.balance;
-            minBet = data.minBet || MIN_BET;
-            maxBet = data.maxBet || MAX_BET;
-            sessionStartBalance = balance;
-            updateBalanceUI();
-            setBet(currentBet);
-        } catch (err) {
-            showToast(err.message || 'Error al cargar saldo', 'lose', '⚠️');
-        }
-    }
-
-    function getActiveBet() {
-        return customBetInput.value ? parseInt(customBetInput.value, 10) : currentBet;
+    function cellSize() {
+        const reel = els.reels.querySelector('.reel');
+        return reel ? reel.clientHeight / ROWS : CELL_H_FALLBACK;
     }
 
     function clampBet(val) {
@@ -161,37 +87,29 @@
 
     function setBet(val) {
         currentBet = clampBet(val);
-        customBetInput.value = '';
-        betChips.querySelectorAll('.bet-chip').forEach((c) => {
-            c.classList.toggle('is-active', parseInt(c.dataset.bet, 10) === currentBet);
-        });
-        updateBetUI();
+        els.betDisplay.textContent = String(currentBet);
     }
 
-    function updateBalanceUI(flashType) {
-        balanceEl.textContent = formatMoney(balance);
-        if (flashType) {
-            balanceEl.classList.remove('balance-flash', 'lose-flash');
-            void balanceEl.offsetWidth;
-            balanceEl.classList.add('balance-flash', flashType === 'lose' ? 'lose-flash' : '');
+    function setWin(amount) {
+        lastWin = amount;
+        els.winDisplay.textContent = String(amount);
+        if (amount > 0 && els.winMeter) {
+            els.winMeter.classList.remove('is-hit');
+            void els.winMeter.offsetWidth;
+            els.winMeter.classList.add('is-hit');
         }
-        netProfitEl.textContent = formatMoney(balance - sessionStartBalance);
-        netProfitEl.style.color = balance >= sessionStartBalance ? 'var(--comic-green)' : 'var(--comic-red)';
     }
 
-    function updateBetUI() {
-        const bet = getActiveBet();
-        const active = isNaN(bet) ? currentBet : bet;
-        currentBetEl.textContent = formatMoney(active);
-        spinBtnCost.textContent = formatMoney(active);
-        jackpotDisplay.textContent = formatMoney(active * 25 * COLS);
+    function updateBalanceUI() {
+        els.balance.textContent = formatMoney(balance);
     }
 
-    function updateStatsUI() {
-        totalSpinsEl.textContent = totalSpins;
-        totalWinsEl.textContent = totalWins;
-        bestWinEl.textContent = bestWin > 0 ? formatMoney(bestWin) : '—';
-        historyCountEl.textContent = historyCount + (historyCount === 1 ? ' jugada' : ' jugadas');
+    function showToast(msg, type) {
+        els.toastMsg.textContent = msg;
+        els.toast.className = 'toast' + (type ? ' is-' + type : '');
+        els.toast.hidden = false;
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => { els.toast.hidden = true; }, 2800);
     }
 
     function pickSymbol() {
@@ -207,428 +125,277 @@
         const g = [];
         for (let r = 0; r < ROWS; r++) {
             g[r] = [];
-            for (let c = 0; c < COLS; c++) {
-                g[r][c] = pickSymbol();
-            }
+            for (let c = 0; c < COLS; c++) g[r][c] = pickSymbol();
         }
         return g;
     }
 
-    function resolveLine(symbols) {
-        const nonWild = symbols.filter((s) => !s.wild);
-        if (nonWild.length === 0) {
-            return { match: symbols[0], count: 3, mult: 25 };
-        }
-        const base = nonWild[0];
-        const allSameOrWild = symbols.every((s) => s.wild || s.id === base.id);
-        if (allSameOrWild) {
-            return { match: base, count: 3, mult: base.mult };
-        }
-        return null;
-    }
-
-    function checkWins(g) {
-        const wins = [];
-        PAYLINES.forEach((line, i) => {
-            const symbols = [g[line.row][0], g[line.row][1], g[line.row][2]];
-            const result = resolveLine(symbols);
-            if (result) {
-                wins.push({ ...result, lineIndex: i, lineName: line.name, row: line.row });
-            }
-        });
-        return wins;
-    }
-
-    function buildLegend() {
-        legendEl.innerHTML = SYMBOLS.filter((s) => !s.wild).map((sym) =>
-            `<div class="legend-item">
-                <span class="legend-item__emoji">${sym.emoji}</span>
-                <span class="legend-item__name">${sym.name}</span>
-                <span class="legend-item__mult">${sym.mult}×</span>
-            </div>`
-        ).join('') + `<div class="legend-item">
-            <span class="legend-item__emoji">🎭</span>
-            <span class="legend-item__name">Comodín</span>
-            <span class="legend-item__mult">★</span>
-        </div>`;
-    }
-
-    function buildLights() {
-        slotLightsEl.innerHTML = '';
-        const positions = [
-            [5, 5], [50, 2], [95, 5], [98, 50], [95, 95], [50, 98], [5, 95], [2, 50],
-        ];
-        positions.forEach(([x, y], i) => {
-            const light = document.createElement('span');
-            light.className = 'slot-light';
-            light.style.left = x + '%';
-            light.style.top = y + '%';
-            light.style.animationDelay = (i * 0.15) + 's';
-            slotLightsEl.appendChild(light);
-        });
+    function symHtml(sym) {
+        const id = sym.id || 'banana';
+        const art = window.ComicSymbols ? ComicSymbols.render(id) : (sym.emoji || '?');
+        return `<div class="sym-wrap">${art}</div>`;
     }
 
     function renderReels(g, animate) {
-        const reelEls = reelsEl.querySelectorAll('.reel');
+        const reelEls = els.reels.querySelectorAll('.reel');
+        const h = cellSize();
+
         reelEls.forEach((reelEl, col) => {
             const strip = reelEl.querySelector('.reel__strip');
             const symbols = [g[0][col], g[1][col], g[2][col]];
 
             if (!animate) {
-                strip.innerHTML = symbols.map((s) =>
-                    `<div class="reel__cell">${s.emoji}</div>`
-                ).join('');
+                strip.innerHTML = symbols.map((s) => `<div class="reel__cell">${symHtml(s)}</div>`).join('');
+                strip.style.transition = 'none';
                 strip.style.transform = 'translateY(0)';
-                reelEl.classList.remove('is-spinning', 'is-stopped', 'is-win');
+                reelEl.classList.remove('is-spinning', 'is-win');
                 return;
             }
 
+            const blurCount = turbo ? 8 : 14;
             const extra = [];
-            for (let i = 0; i < 14; i++) extra.push(pickSymbol());
-            const allCells = [...extra, ...symbols];
-            strip.innerHTML = allCells.map((s) =>
-                `<div class="reel__cell">${s.emoji}</div>`
-            ).join('');
-
-            const targetOffset = (allCells.length - ROWS) * CELL_H;
+            for (let i = 0; i < blurCount; i++) extra.push(pickSymbol());
+            const all = [...extra, ...symbols];
+            strip.innerHTML = all.map((s) => `<div class="reel__cell">${symHtml(s)}</div>`).join('');
             strip.style.transition = 'none';
             strip.style.transform = 'translateY(0)';
             reelEl.classList.add('is-spinning');
-            reelEl.classList.remove('is-stopped', 'is-win');
-            reelEl.dataset.targetOffset = targetOffset;
+            reelEl.classList.remove('is-win');
+            reelEl.dataset.targetOffset = String((all.length - ROWS) * h);
         });
     }
 
     function spinReels(g) {
         return new Promise((resolve) => {
             renderReels(g, true);
-            const reelEls = reelsEl.querySelectorAll('.reel');
+            const reelEls = els.reels.querySelectorAll('.reel');
             let stopped = 0;
+            const baseDelay = turbo ? 100 : 380;
+            const stagger = turbo ? 80 : 260;
+            const duration = turbo ? 0.24 : 0.48;
 
             reelEls.forEach((reelEl, col) => {
                 const strip = reelEl.querySelector('.reel__strip');
-                const delay = 600 + col * 400;
-
                 setTimeout(() => {
-                    const targetOffset = parseInt(reelEl.dataset.targetOffset, 10);
-                    strip.style.transition = 'transform 0.55s cubic-bezier(0.15, 0.85, 0.25, 1)';
-                    strip.style.transform = `translateY(-${targetOffset}px)`;
+                    const target = parseInt(reelEl.dataset.targetOffset, 10);
+                    strip.style.transition = `transform ${duration}s cubic-bezier(0.15, 0.85, 0.25, 1)`;
+                    strip.style.transform = `translateY(-${target}px)`;
                     reelEl.classList.remove('is-spinning');
-
                     setTimeout(() => {
-                        reelEl.classList.add('is-stopped');
                         stopped++;
                         if (stopped === COLS) resolve();
-                    }, 520);
-                }, delay);
+                    }, duration * 1000 + 30);
+                }, baseDelay + col * stagger);
             });
         });
     }
 
+    function clearPaylines() {
+        els.plines.forEach((el) => el.classList.remove('is-win'));
+        els.reels.querySelectorAll('.reel').forEach((r) => r.classList.remove('is-win'));
+        els.winFlash.hidden = true;
+    }
+
     function highlightWins(wins) {
-        paylineEls.forEach((el) => el.classList.remove('is-win'));
-        winLinesEl.hidden = wins.length === 0;
-
-        if (wins.length === 0) return;
+        clearPaylines();
+        if (!wins || !wins.length) return;
 
         wins.forEach((w) => {
-            paylineEls[w.lineIndex].classList.add('is-win');
+            const el = els.plines[w.lineIndex];
+            if (el) el.classList.add('is-win');
         });
-
-        const reelEls = reelsEl.querySelectorAll('.reel');
-        wins.forEach((w) => {
-            reelEls.forEach((reel) => reel.classList.add('is-win'));
-        });
-
-        const names = wins.map((w) => w.lineName).join(', ');
-        winLinesLabel.textContent = `¡Línea${wins.length > 1 ? 's' : ''} ${names}!`;
+        els.reels.querySelectorAll('.reel').forEach((r) => r.classList.add('is-win'));
+        els.winFlash.hidden = false;
+        setTimeout(() => { els.winFlash.hidden = true; }, 800);
     }
 
-    function setHostMessage(msg) {
-        hostMessage.textContent = msg;
-        hostMessage.parentElement.classList.remove('speech-bubble--host');
-        void hostMessage.parentElement.offsetWidth;
-        hostMessage.parentElement.classList.add('speech-bubble--host');
+    function setHint(msg, isWin) {
+        els.hint.textContent = msg;
+        els.hint.classList.toggle('is-win', !!isWin);
     }
 
-    function randomFrom(arr) {
-        return arr[Math.floor(Math.random() * arr.length)];
+    async function loadBalance() {
+        if (isPlayerMode) {
+            if (!PlayerAuth.isLoggedIn()) {
+                window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
+                return;
+            }
+            els.machineNum.textContent = PlayerAuth.getUser()?.name || 'Jugador';
+            els.backLink.href = '/portal/';
+            try {
+                const data = await PlayerAuth.request('/api/auth/me');
+                balance = data.user.game_balance || 0;
+                minBet = MIN_BET;
+                maxBet = MAX_BET;
+                updateBalanceUI();
+                setBet(currentBet);
+            } catch (err) {
+                showToast(err.message || 'Error al cargar saldo', 'lose');
+            }
+            return;
+        }
+
+        machineNumber = MachineAPI.requireMachine();
+        if (!machineNumber) return;
+        els.machineNum.textContent = '#' + machineNumber;
+        els.backLink.href = MachineAPI.inicioUrl();
+        try {
+            const data = await MachineAPI.getMachine(machineNumber);
+            balance = data.balance;
+            minBet = data.minBet || MIN_BET;
+            maxBet = data.maxBet || MAX_BET;
+            updateBalanceUI();
+            setBet(currentBet);
+        } catch (err) {
+            showToast(err.message || 'Error al cargar saldo', 'lose');
+        }
+    }
+
+    function stopAuto() {
+        autoPlay = false;
+        els.autoBtn.classList.remove('is-on');
+        if (autoTimer) {
+            clearTimeout(autoTimer);
+            autoTimer = null;
+        }
+    }
+
+    function scheduleAuto() {
+        if (!autoPlay || isSpinning) return;
+        autoTimer = setTimeout(() => {
+            if (autoPlay) spin();
+        }, turbo ? 300 : 600);
     }
 
     async function spin() {
         if (isSpinning) return;
 
-        const bet = getActiveBet();
-        if (isNaN(bet) || bet < minBet || bet > maxBet) {
-            showToast('Apuesta entre ' + formatMoney(minBet) + ' y ' + formatMoney(maxBet), 'lose', '⚠️');
+        const bet = currentBet;
+        if (bet < minBet || bet > maxBet) {
+            showToast('Apuesta entre ' + formatMoney(minBet) + ' y ' + formatMoney(maxBet), 'lose');
+            stopAuto();
             return;
         }
         if (bet > balance) {
-            showToast('Saldo insuficiente — paga en caja para recargar', 'lose', '💸');
+            showToast('Saldo insuficiente', 'lose');
+            stopAuto();
             return;
         }
 
         isSpinning = true;
-        spinBtn.disabled = true;
-        spinBtn.classList.add('is-spinning');
-        paylineEls.forEach((el) => el.classList.remove('is-win'));
-        winLinesEl.hidden = true;
-        reelsEl.querySelectorAll('.reel').forEach((r) => r.classList.remove('is-stopped', 'is-win'));
-        setHostMessage('¡Girando... agarraos! 🌀');
+        els.spinBtn.disabled = true;
+        els.spinBtn.classList.add('is-spinning');
+        clearPaylines();
+        setWin(0);
+        setHint('Girando...', false);
 
         try {
             const apiResult = isPlayerMode
                 ? await PlayerAuth.playComicSlot(bet)
                 : await MachineAPI.spinSlot(bet, machineNumber);
-            totalSpins++;
-            updateStatsUI();
 
             grid = apiResult.grid;
             await spinReels(grid);
 
-            const wins = apiResult.wins;
-            const totalPayout = apiResult.payout;
+            const wins = apiResult.wins || [];
+            const payout = apiResult.payout || 0;
             balance = apiResult.balance;
             const net = apiResult.net;
 
-            if (net > 0) totalWins++;
-            if (net > bestWin) bestWin = net;
-
+            updateBalanceUI();
+            setWin(payout);
             highlightWins(wins);
-            updateBalanceUI(net >= 0 && totalPayout > 0 ? 'win' : 'lose');
-            updateStatsUI();
-            showLastResult(wins, totalPayout, net);
-            addHistory(bet, wins, net);
-            showToastResult(wins, net, totalPayout);
 
-            if (wins.some((w) => w.mult >= 12)) fireConfetti(true);
-            else if (wins.length > 0) fireConfetti(false);
-
-            if (wins.some((w) => w.mult >= 25)) {
-                showModal(wins.find((w) => w.mult >= 25), totalPayout);
-            }
-
-            if (net > 0 && wins.length > 0) {
-                const topWin = wins.reduce((a, b) => (b.mult > a.mult ? b : a), wins[0]);
-                setHostMessage(randomFrom(WIN_MSGS[topWin.match.id] || WIN_MSGS.wild));
+            if (wins.length > 0 && payout > 0) {
+                const top = wins.reduce((a, b) => (b.mult > a.mult ? b : a), wins[0]);
+                const gag = WIN_HINTS[top.match?.id] || '¡Premio!';
+                setHint(gag + ' +' + formatMoney(payout), true);
+                showToast('+' + formatMoney(payout), 'win');
+                if (wins.some((w) => w.mult >= 12)) {
+                    showModal(top.mult >= 25 ? '¡JACKPOT LOCO!' : '¡PREMIO GIGANTE!', formatMoney(payout));
+                }
             } else {
-                setHostMessage(randomFrom(LOSE_MSGS));
+                setHint('', false);
+                showToast(formatMoney(net), 'lose');
             }
 
-            if (balance <= 0) {
-                setTimeout(() => {
-                    showModal(null, 0, 'Sin saldo. Paga en caja para seguir jugando.', 'gameover');
-                }, 800);
-            }
+            if (balance <= 0) stopAuto();
         } catch (err) {
-            showToast(err.message || 'Error al girar', 'lose', '⚠️');
-            setHostMessage(randomFrom(HOST_IDLE));
+            showToast(err.message || 'Error al girar', 'lose');
+            stopAuto();
+            setHint('', false);
         }
 
         isSpinning = false;
-        spinBtn.disabled = false;
-        spinBtn.classList.remove('is-spinning');
+        els.spinBtn.disabled = false;
+        els.spinBtn.classList.remove('is-spinning');
+        scheduleAuto();
     }
 
-    function showLastResult(wins, payout, net) {
-        const isWin = net > 0;
-        lastResultEl.className = 'result-box ' + (isWin ? 'is-win' : 'is-lose');
+    function showModal(title, amount) {
+        els.modalTitle.textContent = title;
+        els.modalAmount.textContent = amount;
+        els.modal.hidden = false;
+        stopAuto();
+    }
 
-        if (wins.length === 0) {
-            const midRow = grid[1].map((s) => s.emoji).join(' ');
-            lastResultEl.innerHTML = `
-                <div>
-                    <div class="result-box__symbols">${midRow}</div>
-                    <div class="result-box__amount lose">${formatMoney(net)}</div>
-                    <div class="result-box__msg">${randomFrom(LOSE_MSGS)}</div>
-                </div>`;
+    els.spinBtn.addEventListener('click', () => {
+        if (autoPlay) stopAuto();
+        spin();
+    });
+
+    els.autoBtn.addEventListener('click', () => {
+        if (autoPlay) {
+            stopAuto();
             return;
         }
-
-        const best = wins.reduce((a, b) => (b.mult > a.mult ? b : a), wins[0]);
-        const symRow = grid[best.row].map((s) => s.emoji).join(' ');
-        lastResultEl.innerHTML = `
-            <div>
-                <div class="result-box__symbols">${symRow}</div>
-                <div class="result-box__amount win">+${formatMoney(net)}</div>
-                <div class="result-box__msg">${best.match.emoji} ${best.match.name} · ${best.mult}× · ${wins.length} línea${wins.length > 1 ? 's' : ''}</div>
-            </div>`;
-    }
-
-    function addHistory(bet, wins, net) {
-        const empty = historyEl.querySelector('.history__empty');
-        if (empty) empty.remove();
-
-        historyCount++;
-        const li = document.createElement('li');
-        const midRow = grid[1].map((s) => s.emoji).join('');
-        const resultCls = net > 0 ? 'win' : 'lose';
-        const label = wins.length > 0 ? wins.map((w) => w.match.emoji).join('') : midRow;
-        li.innerHTML = `
-            <div class="history__left">
-                <span class="history__bet">Apuesta ${formatMoney(bet)}</span>
-                <span class="history__symbols">${label}</span>
-            </div>
-            <span class="history__result ${resultCls}">${net >= 0 ? '+' : ''}${formatMoney(net)}</span>`;
-        historyEl.prepend(li);
-        while (historyEl.children.length > 15) historyEl.removeChild(historyEl.lastChild);
-        updateStatsUI();
-    }
-
-    function showToastResult(wins, net, payout) {
-        if (wins.length === 0) {
-            showToast(randomFrom(LOSE_MSGS), 'lose', '😵');
-        } else if (net > 0) {
-            showToast(`+${formatMoney(net)} · ${wins.length} línea${wins.length > 1 ? 's' : ''} ganadora${wins.length > 1 ? 's' : ''}`, 'win', '🎉');
-        } else {
-            showToast(`${formatMoney(payout)} recuperados`, 'lose', '😬');
-        }
-    }
-
-    function showToast(msg, type, icon) {
-        toastMsg.textContent = msg;
-        toastIcon.textContent = icon || '';
-        toastEl.className = 'toast ' + type;
-        toastEl.hidden = false;
-        clearTimeout(showToast._timer);
-        showToast._timer = setTimeout(() => { toastEl.hidden = true; }, 3200);
-    }
-
-    function showModal(win, payout, customText, mode) {
-        modalContent.classList.toggle('is-jackpot', !customText && win);
-
-        if (customText) {
-            modalIcon.textContent = mode === 'gameover' ? '💸' : 'ℹ️';
-            modalTitle.textContent = mode === 'gameover' ? '¡Game Over!' : 'Aviso';
-            modalAmount.textContent = '';
-            modalAmount.hidden = true;
-            modalText.textContent = customText;
-        } else {
-            modalIcon.textContent = win.match.emoji;
-            modalTitle.textContent = win.mult >= 25 ? '¡JACKPOT LOCO!' : '¡PREMIO GIGANTE!';
-            modalAmount.textContent = formatMoney(payout);
-            modalAmount.hidden = false;
-            modalText.textContent = randomFrom(WIN_MSGS[win.match.id] || WIN_MSGS.wild);
-        }
-        modal.hidden = false;
-    }
-
-    function resizeConfetti() {
-        confettiCanvas.width = window.innerWidth;
-        confettiCanvas.height = window.innerHeight;
-    }
-
-    function fireConfetti(big) {
-        const colors = ['#ffe135', '#ff6b2b', '#e63946', '#06d6a0', '#8338ec', '#fff'];
-        const count = big ? 100 : 50;
-        confettiParticles = [];
-        for (let i = 0; i < count; i++) {
-            confettiParticles.push({
-                x: confettiCanvas.width / 2 + (Math.random() - 0.5) * 280,
-                y: confettiCanvas.height / 2,
-                vx: (Math.random() - 0.5) * 16,
-                vy: Math.random() * -18 - 4,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                size: Math.random() * 10 + 5,
-                rot: Math.random() * 360,
-                rotV: (Math.random() - 0.5) * 14,
-                life: 1,
-            });
-        }
-        animateConfetti();
-    }
-
-    function animateConfetti() {
-        confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
-        confettiParticles = confettiParticles.filter((p) => p.life > 0);
-        confettiParticles.forEach((p) => {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.vy += 0.4;
-            p.rot += p.rotV;
-            p.life -= 0.012;
-            confettiCtx.save();
-            confettiCtx.translate(p.x, p.y);
-            confettiCtx.rotate((p.rot * Math.PI) / 180);
-            confettiCtx.globalAlpha = p.life;
-            confettiCtx.fillStyle = p.color;
-            confettiCtx.strokeStyle = '#1a1a2e';
-            confettiCtx.lineWidth = 1;
-            confettiCtx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-            confettiCtx.strokeRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-            confettiCtx.restore();
-        });
-        if (confettiParticles.length > 0) requestAnimationFrame(animateConfetti);
-    }
-
-    betChips.addEventListener('click', (e) => {
-        const chip = e.target.closest('.bet-chip');
-        if (!chip) return;
-        setBet(parseInt(chip.dataset.bet, 10));
+        autoPlay = true;
+        els.autoBtn.classList.add('is-on');
+        if (!isSpinning) spin();
     });
 
-    customBetInput.addEventListener('input', () => {
-        betChips.querySelectorAll('.bet-chip').forEach((c) => c.classList.remove('is-active'));
-        const val = parseInt(customBetInput.value, 10);
-        if (!isNaN(val)) {
-            currentBet = val;
-            updateBetUI();
+    els.turboBtn.addEventListener('click', () => {
+        turbo = !turbo;
+        els.turboBtn.classList.toggle('is-on', turbo);
+        els.turboLabel.textContent = turbo ? 'ON' : 'OFF';
+    });
+
+    els.betMinus.addEventListener('click', () => {
+        if (isSpinning) return;
+        setBet(currentBet - BET_STEP);
+    });
+
+    els.betPlus.addEventListener('click', () => {
+        if (isSpinning) return;
+        setBet(currentBet + BET_STEP);
+    });
+
+    els.modalClose.addEventListener('click', () => {
+        els.modal.hidden = true;
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && els.modal.hidden) {
+            e.preventDefault();
+            if (!isSpinning) spin();
         }
     });
-
-    halfBetBtn.addEventListener('click', () => setBet(Math.floor(getActiveBet() / 2)));
-    doubleBetBtn.addEventListener('click', () => setBet(getActiveBet() * 2));
-    maxBetBtn.addEventListener('click', () => setBet(Math.min(maxBet, balance)));
-    spinBtn.addEventListener('click', spin);
-    modalClose.addEventListener('click', () => { modal.hidden = true; });
-
-    resetBtn.addEventListener('click', () => {
-        totalSpins = 0;
-        totalWins = 0;
-        bestWin = 0;
-        historyCount = 0;
-        historyEl.innerHTML = '<li class="history__empty">Sin jugadas recientes</li>';
-        lastResultEl.className = 'result-box';
-        lastResultEl.innerHTML = `<div class="result-box__empty"><span class="result-box__emoji">🎰</span><span>¡Dale al botón gigante!</span></div>`;
-        paylineEls.forEach((el) => el.classList.remove('is-win'));
-        winLinesEl.hidden = true;
-        grid = generateGrid();
-        renderReels(grid, false);
-        loadBalance().then(() => {
-            sessionStartBalance = balance;
-            setBet(50);
-            updateStatsUI();
-            setHostMessage('Estadísticas reiniciadas 🎪');
-            showToast('¡Listo!', 'win', '✓');
-        });
-    });
-
-    window.addEventListener('resize', resizeConfetti);
-
-    setInterval(() => {
-        if (!isSpinning) setHostMessage(randomFrom(HOST_IDLE));
-    }, 8000);
 
     if (isPlayerMode) {
         if (!PlayerAuth.isLoggedIn()) {
             window.location.href = '/portal/?redirect=' + encodeURIComponent(location.pathname + location.search);
             return;
         }
-        const portalLink = document.querySelector('.header__portal');
-        if (portalLink) portalLink.href = '/portal/';
     } else if (!MachineAPI.getMachineNumber()) {
+        grid = generateGrid();
+        renderReels(grid, false);
         MachineAPI.requireMachine();
         return;
     }
-    const portalLink = document.querySelector('.header__portal');
-    if (portalLink) portalLink.href = MachineAPI.inicioUrl();
 
-    buildLegend();
-    buildLights();
     grid = generateGrid();
     renderReels(grid, false);
-    setBet(50);
-    updateStatsUI();
-    resizeConfetti();
+    setBet(10);
+    setWin(0);
     loadBalance();
 })();

@@ -2,203 +2,120 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>3B Pot — Comic Slot</title>
     <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/slot.css">
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Exo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/slot.css?v=comic2">
 </head>
 <body>
-    <div class="halftone" aria-hidden="true"></div>
-    <div class="comic-bursts" aria-hidden="true">
-        <span class="burst burst--1">POW!</span>
-        <span class="burst burst--2">ZAP!</span>
-        <span class="burst burst--3">BOING!</span>
+    <div class="bg" aria-hidden="true">
+        <div class="bg__photo"></div>
+        <div class="bg__vignette"></div>
+        <div class="bg__glow bg__glow--a"></div>
+        <div class="bg__glow bg__glow--b"></div>
+        <div class="bg__noise"></div>
     </div>
 
-    <div class="app">
-        <header class="header">
-            <div class="header__brand">
-                <div class="header__logo">🎰</div>
-                <div class="header__brand-text">
-                    <h1 class="header__title">SLOT LOCO</h1>
-                    <span class="header__tagline">¡Tragamonedas 100% ridículas!</span>
-                </div>
-                <span class="header__badge">DEMO</span>
-            </div>
-            <div class="header__stats">
-                <div class="stat-pill">
-                    <span class="stat-pill__label">Giros</span>
-                    <span class="stat-pill__value" id="totalSpins">0</span>
-                </div>
-                <div class="stat-pill">
-                    <span class="stat-pill__label">Máquina</span>
-                    <span class="stat-pill__value" id="machineNum">—</span>
-                </div>
-                <div class="stat-pill stat-pill--gold">
-                    <span class="stat-pill__label">Saldo</span>
-                    <span class="stat-pill__value" id="balance">$0</span>
-                </div>
-                <a href="/inicio/" class="header__portal">← Juegos</a>
+    <div class="stage">
+        <header class="topbar">
+            <a class="topbar__back" id="backLink" href="/inicio/">← Juegos</a>
+            <div class="topbar__meta">
+                <span class="topbar__chip">Máq. <strong id="machineNum">—</strong></span>
+                <span class="topbar__chip topbar__chip--balance">Saldo <strong id="balance">$0</strong></span>
             </div>
         </header>
 
-        <main class="main">
-            <section class="game-panel">
-                <div class="game-panel__header">
-                    <div class="speech-bubble speech-bubble--host">
-                        <span id="hostMessage">¡Apuesta y gira, campeón! 🎪</span>
-                    </div>
-                    <h2 class="game-title">Las 3 Líneas del Caos</h2>
-                    <p class="game-subtitle">3 iguales en fila = premio · Comodín 🎭 sustituye todo · Jackpot hasta <strong>25×</strong></p>
-                </div>
+        <main class="machine">
+            <h1 class="logo">
+                <span class="logo__text">Comic Slot</span>
+            </h1>
 
-                <div class="slot-machine">
-                    <div class="slot-machine__top">
-                        <div class="slot-machine__marquee">
-                            <span class="marquee-dot"></span>
-                            <span>JACKPOT: <strong id="jackpotDisplay">$12,500</strong></span>
-                            <span class="marquee-dot"></span>
-                        </div>
-                    </div>
-                    <div class="slot-machine__frame">
-                        <div class="slot-machine__lights" id="slotLights"></div>
-                        <div class="reels-wrap">
-                            <div class="payline payline--top" aria-hidden="true"></div>
-                            <div class="payline payline--mid" aria-hidden="true"></div>
-                            <div class="payline payline--bot" aria-hidden="true"></div>
-                            <div class="reels" id="reels">
-                                <div class="reel" data-reel="0"><div class="reel__strip"></div></div>
-                                <div class="reel" data-reel="1"><div class="reel__strip"></div></div>
-                                <div class="reel" data-reel="2"><div class="reel__strip"></div></div>
+            <div class="machine__row">
+                <div class="cabinet">
+                    <div class="cabinet__perspective">
+                        <div class="cabinet__bezel">
+                            <div class="cabinet__frame" aria-hidden="true"></div>
+                            <div class="cabinet__inner">
+                                <div class="payline-layer" aria-hidden="true">
+                                    <span class="pline pline--h0" data-line="0"></span>
+                                    <span class="pline pline--h1" data-line="1"></span>
+                                    <span class="pline pline--h2" data-line="2"></span>
+                                </div>
+                                <div class="reels" id="reels">
+                                    <div class="reel" data-reel="0"><div class="reel__strip"></div></div>
+                                    <div class="reel" data-reel="1"><div class="reel__strip"></div></div>
+                                    <div class="reel" data-reel="2"><div class="reel__strip"></div></div>
+                                </div>
+                                <div class="win-flash" id="winFlash" hidden></div>
                             </div>
                         </div>
-                        <div class="win-lines" id="winLines" hidden>
-                            <span class="win-lines__label" id="winLinesLabel"></span>
-                        </div>
+                        <div class="cabinet__base" aria-hidden="true"></div>
                     </div>
-                    <button class="spin-btn" id="spinBtn" type="button">
-                        <span class="spin-btn__burst">¡GIRAR!</span>
-                        <span class="spin-btn__cost" id="spinBtnCost">$50</span>
+                </div>
+
+                <aside class="controls">
+                    <button type="button" class="ctrl" id="autoBtn" title="Auto">
+                        <svg class="ctrl__svg" viewBox="0 0 40 40" aria-hidden="true">
+                            <circle cx="20" cy="20" r="15" fill="none" stroke="currentColor" stroke-width="2.2"/>
+                            <path fill="currentColor" d="M20 7v6l5-3-5-3zm-8.5 6.2 4.2 4.2-3 1.2-1.2-5.4z"/>
+                            <text x="20" y="24" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor" font-family="Exo 2,sans-serif">A</text>
+                        </svg>
+                        <span class="ctrl__label">AUTO</span>
                     </button>
-                </div>
 
-                <div class="bet-panel">
-                    <div class="bet-panel__top">
-                        <p class="bet-panel__label">¿Cuánto te la juegas?</p>
-                        <div class="bet-panel__actions">
-                            <button type="button" class="btn-ghost" id="halfBetBtn">½</button>
-                            <button type="button" class="btn-ghost" id="doubleBetBtn">2×</button>
-                            <button type="button" class="btn-ghost btn-ghost--max" id="maxBetBtn">MAX</button>
-                        </div>
-                    </div>
-                    <div class="bet-chips" id="betChips">
-                        <button type="button" class="bet-chip" data-bet="10"><span class="bet-chip__inner">10</span></button>
-                        <button type="button" class="bet-chip" data-bet="25"><span class="bet-chip__inner">25</span></button>
-                        <button type="button" class="bet-chip is-active" data-bet="50"><span class="bet-chip__inner">50</span></button>
-                        <button type="button" class="bet-chip" data-bet="100"><span class="bet-chip__inner">100</span></button>
-                        <button type="button" class="bet-chip" data-bet="250"><span class="bet-chip__inner">250</span></button>
-                    </div>
-                    <div class="bet-custom">
-                        <div class="input-group">
-                            <label for="customBet">Apuesta rara</label>
-                            <div class="input-group__field">
-                                <span class="input-group__prefix">$</span>
-                                <input type="number" id="customBet" min="5" max="500" step="5" placeholder="75">
-                            </div>
-                        </div>
-                        <div class="bet-summary">
-                            <span class="bet-summary__label">Apuesta activa</span>
-                            <span class="bet-summary__value" id="currentBet">50 WC</span>
-                        </div>
-                    </div>
-                </div>
+                    <button type="button" class="spin" id="spinBtn" title="Girar" aria-label="Girar">
+                        <span class="spin__outer"></span>
+                        <span class="spin__mid"></span>
+                        <span class="spin__face">
+                            <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
+                                <path fill="#fff" d="M32 8c-9.4 0-17.5 5.4-21.3 13.2l5.8 2.4A17.9 17.9 0 0 1 32 14c9.9 0 18 8.1 18 18s-8.1 18-18 18c-7.4 0-13.8-4.5-16.6-10.9l-5.9 2.2C13.2 50.6 21.9 56 32 56c13.3 0 24-10.7 24-24S45.3 8 32 8zm-2 0v10l9-5-9-5z"/>
+                            </svg>
+                        </span>
+                    </button>
 
-                <div class="paytable">
-                    <h3 class="paytable__title">Tabla de premios (× apuesta)</h3>
-                    <div class="symbols-legend" id="legend"></div>
-                </div>
-            </section>
+                    <button type="button" class="ctrl" id="turboBtn" title="Turbo">
+                        <svg class="ctrl__svg" viewBox="0 0 40 40" aria-hidden="true">
+                            <path fill="currentColor" d="M22 4 10 22h8l-2 14 14-20h-8l2-12z"/>
+                        </svg>
+                        <span class="ctrl__label" id="turboLabel">OFF</span>
+                    </button>
+                </aside>
+            </div>
 
-            <aside class="sidebar">
-                <div class="card card--highlight">
-                    <div class="card__head">
-                        <h2>Último giro</h2>
-                        <span class="live-dot">En vivo</span>
+            <div class="hud">
+                <div class="hud__bet">
+                    <button type="button" class="hud__adj" id="betMinus" aria-label="Bajar">−</button>
+                    <div class="hud__screen">
+                        <span id="betDisplay">10</span>
                     </div>
-                    <div class="result-box" id="lastResult">
-                        <div class="result-box__empty">
-                            <span class="result-box__emoji">🎰</span>
-                            <span>¡Dale al botón gigante!</span>
-                        </div>
-                    </div>
+                    <button type="button" class="hud__adj" id="betPlus" aria-label="Subir">+</button>
                 </div>
+                <div class="hud__screen hud__screen--win">
+                    <span id="winDisplay">0</span>
+                </div>
+                <div class="hud__lines">3 LINES</div>
+            </div>
 
-                <div class="metrics">
-                    <div class="metric">
-                        <span class="metric__value" id="totalWins">0</span>
-                        <span class="metric__label">Victorias</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric__value" id="bestWin">—</span>
-                        <span class="metric__label">Mejor premio</span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric__value" id="netProfit">$0</span>
-                        <span class="metric__label">Balance neto</span>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card__head">
-                        <h2>Historial</h2>
-                        <span class="card__count" id="historyCount">0 jugadas</span>
-                    </div>
-                    <ul class="history" id="history">
-                        <li class="history__empty">Sin jugadas recientes</li>
-                    </ul>
-                </div>
-
-                <div class="card card--info">
-                    <h2>Reglas locas</h2>
-                    <ul class="rules">
-                        <li>3 símbolos iguales en una fila = premio.</li>
-                        <li>El comodín 🎭 cuenta como cualquier símbolo.</li>
-                        <li>Puedes ganar en varias líneas a la vez.</li>
-                        <li>Paga en efectivo al cajero — crédito en tu máquina.</li>
-                    </ul>
-                    <button type="button" class="btn-reset" id="resetBtn">🔄 Reiniciar sesión</button>
-                </div>
-            </aside>
+            <p class="status" id="hint"></p>
         </main>
-
-        <footer class="footer">
-            <p>3B Pot · Salón de máquinas · Paga en caja</p>
-        </footer>
     </div>
 
-    <canvas id="confetti" class="confetti-canvas" aria-hidden="true"></canvas>
-
-    <div class="toast" id="toast" hidden>
-        <span class="toast__icon" id="toastIcon"></span>
-        <span class="toast__msg" id="toastMsg"></span>
-    </div>
+    <div class="toast" id="toast" hidden><span id="toastMsg"></span></div>
 
     <div class="modal" id="modal" hidden>
         <div class="modal__backdrop"></div>
-        <div class="modal__content" id="modalContent">
-            <div class="modal__burst">¡KABOOM!</div>
-            <div class="modal__icon" id="modalIcon"></div>
-            <h2 class="modal__title" id="modalTitle"></h2>
-            <p class="modal__amount" id="modalAmount"></p>
-            <p class="modal__text" id="modalText"></p>
-            <button type="button" class="modal__btn" id="modalClose">¡Seguir de locos!</button>
+        <div class="modal__card">
+            <div class="modal__title" id="modalTitle">¡PREMIO!</div>
+            <div class="modal__amount" id="modalAmount">$0</div>
+            <button type="button" class="modal__btn" id="modalClose">Continuar</button>
         </div>
     </div>
 
     <script src="/shared/machine-client.js"></script>
     <script src="/shared/player-auth.js"></script>
-    <script src="js/slot.js"></script>
+    <script src="js/symbols.js"></script>
+    <script src="js/slot.js?v=comic2"></script>
 </body>
 </html>

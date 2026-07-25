@@ -29,11 +29,14 @@
   }
 
   const ANIMAL_TYPES = [
-    { kind: "pig", label: "Cerdo", mult: 0.5, speed: 100, scale: 0.95, resist: 1.5, weight: 72, coat: "#f0a8b0", dark: "#c87888", muzzle: "#e89098", pattern: "solid", horns: false, bull: false, pig: true },
-    { kind: "cow", label: "Vaca", mult: 1.5, speed: 120, scale: 1.28, resist: 3, weight: 14, coat: "#fff8f0", dark: "#1a1a1a", muzzle: "#e8b4b8", pattern: "spots", horns: false, bull: false, pig: false },
-    { kind: "cow", label: "Vaca", mult: 1.5, speed: 135, scale: 1.3, resist: 3.2, weight: 11, coat: "#d4893a", dark: "#6a3a18", muzzle: "#d4a090", pattern: "solid", horns: false, bull: false, pig: false },
-    { kind: "bull", label: "Toro", mult: 8, speed: 195, scale: 1.45, resist: 6.5, weight: 3, coat: "#3a120a", dark: "#1a0804", muzzle: "#6a3a30", pattern: "solid", horns: true, bull: true, pig: false },
+    { kind: "pig", label: "Cerdo", mult: 0.5, speed: 175, scale: 0.95, resist: 1.5, weight: 72, coat: "#f0a8b0", dark: "#c87888", muzzle: "#e89098", pattern: "solid", horns: false, bull: false, pig: true },
+    { kind: "cow", label: "Vaca", mult: 1.5, speed: 210, scale: 1.28, resist: 3, weight: 14, coat: "#fff8f0", dark: "#1a1a1a", muzzle: "#e8b4b8", pattern: "spots", horns: false, bull: false, pig: false },
+    { kind: "cow", label: "Vaca", mult: 1.5, speed: 230, scale: 1.3, resist: 3.2, weight: 11, coat: "#d4893a", dark: "#6a3a18", muzzle: "#d4a090", pattern: "solid", horns: false, bull: false, pig: false },
+    { kind: "bull", label: "Toro", mult: 8, speed: 320, scale: 1.45, resist: 6.5, weight: 3, coat: "#3a120a", dark: "#1a0804", muzzle: "#6a3a30", pattern: "solid", horns: true, bull: true, pig: false },
   ];
+
+  const ranchBg = new Image();
+  ranchBg.src = "assets/ranch-bg.png";
 
   let credits = 0;
   let betIndex = 0;
@@ -290,7 +293,7 @@
     lasso.ropeStretch = 0;
     state.shake = 4;
     playAnimalSound(animal);
-    hintEl.textContent = "¡Se resiste! Pulsa ¡TIRA! rápido — el lazo se rompe a los 5s";
+    hintEl.textContent = "¡Se resiste! Pulsa ¡TIRA! rápido — el lazo se rompe a los 3.5s";
     state.pops.push({ x: animal.x + animal.w / 2, y: animal.y - 8, text: "¡Forcejeo!", life: 0.9 });
     spawnDust(animal, 6);
     refreshActionBtn();
@@ -300,18 +303,18 @@
     const animal = lasso.catchId;
     if (!animal) return;
     AudioFX && AudioFX.tug();
-    const pullPower = 0.7 + (animal.bull ? 0.1 : 0) + (animal.pig ? 0.25 : 0);
+    const pullPower = 1.05 + (animal.bull ? 0.15 : 0) + (animal.pig ? 0.35 : 0);
     lasso.grip = Math.min(lasso.gripMax, lasso.grip + pullPower);
-    lasso.tugFlash = 0.25;
-    lasso.escape = Math.max(0, lasso.escape - 0.15);
+    lasso.tugFlash = 0.2;
+    lasso.escape = Math.max(0, lasso.escape - 0.22);
     animal.shakeAmp = 1;
-    animal.x += (W * 0.5 - animal.w / 2 - animal.x) * 0.1;
-    animal.y += (H * 0.62 - animal.y) * 0.06;
+    animal.x += (W * 0.5 - animal.w / 2 - animal.x) * 0.16;
+    animal.y += (H * 0.62 - animal.y) * 0.1;
     state.shake = Math.min(10, state.shake + 3);
     spawnDust(animal, 3);
 
     const sr = lasso.serverResult || {};
-    if (sr.caught && lasso.grip >= lasso.gripMax * 0.85) {
+    if (sr.caught && lasso.grip >= lasso.gripMax * 0.78) {
       finishCatch(animal, lasso, sr);
     }
   }
@@ -366,7 +369,7 @@
     AudioFX && (sr.missed ? AudioFX.miss() : AudioFX.escape());
   }
 
-  const LASSO_TIMEOUT_MS = 5000;
+  const LASSO_TIMEOUT_MS = 3500;
 
   function snapLasso(lasso, reason) {
     if (lasso.phase === "snap" || lasso.done) return;
@@ -438,22 +441,22 @@
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
       spawnAnimal();
-      state.spawnTimer = rand(0.7, 1.25);
+      state.spawnTimer = rand(0.35, 0.7);
     }
 
     for (const a of state.animals) {
       if (a.caught && a.struggle) {
-        a.phase += dt * 18;
-        a.breath += dt * 8;
-        a.shakeAmp = Math.min(1, (a.shakeAmp || 0) + dt * 2);
+        a.phase += dt * 26;
+        a.breath += dt * 11;
+        a.shakeAmp = Math.min(1, (a.shakeAmp || 0) + dt * 3);
         const away = a.x + a.w / 2 < W * 0.5 ? -1 : 1;
-        a.x += away * (40 + a.resist * 12) * dt;
+        a.x += away * (55 + a.resist * 16) * dt;
         continue;
       }
       if (a.caught) continue;
       a.x += a.vx * dt;
-      a.phase += dt * Math.abs(a.vx) * 0.085;
-      a.breath += dt * 3.2;
+      a.phase += dt * Math.abs(a.vx) * 0.1;
+      a.breath += dt * 4.2;
       if (a.shakeAmp > 0) a.shakeAmp = Math.max(0, a.shakeAmp - dt * 3);
     }
     state.animals = state.animals.filter((a) => {
@@ -471,7 +474,7 @@
       }
 
       if (l.phase === "throw") {
-        l.progress += dt * 3.2;
+        l.progress += dt * 5.8;
         const t = Math.min(1, l.progress);
         const ease = 1 - Math.pow(1 - t, 2);
         l.x = W * 0.5;
@@ -503,11 +506,11 @@
         const animal = l.catchId;
         if (!animal) { l.done = true; continue; }
         const sr = l.serverResult || {};
-        const drain = (0.28 + animal.resist * 0.06) * dt;
+        const drain = (0.38 + animal.resist * 0.07) * dt;
         l.grip = Math.max(0, l.grip - drain);
-        l.escape += dt * (sr.caught ? 0.12 : 0.45);
+        l.escape += dt * (sr.caught ? 0.16 : 0.55);
         if (l.tugFlash > 0) l.tugFlash -= dt;
-        l.ropeStretch = Math.sin(performance.now() / 60) * (8 + animal.resist * 2);
+        l.ropeStretch = Math.sin(performance.now() / 48) * (8 + animal.resist * 2);
         l.x = animal.x + animal.w / 2 + Math.sin(animal.phase) * 10;
         l.y = animal.y + animal.h * 0.35 + Math.cos(animal.phase * 1.3) * 6;
 
@@ -515,7 +518,7 @@
         else if (!sr.caught && (l.grip <= 0.02 || l.escape >= 1)) breakFree(animal, l);
         else if (sr.caught && l.escape >= 1.2) finishCatch(animal, l, sr);
       } else if (l.phase === "pull") {
-        l.progress += dt * 2.4;
+        l.progress += dt * 3.6;
         const animal = l.catchId;
         if (animal) {
           animal.x += (W * 0.5 - animal.w / 2 - animal.x) * Math.min(1, dt * 6);
@@ -582,20 +585,24 @@
   }
 
   function drawSky() {
+    if (ranchBg.complete && ranchBg.naturalWidth) {
+      const iw = ranchBg.naturalWidth;
+      const ih = ranchBg.naturalHeight;
+      const scale = Math.max(W / iw, H / ih) * 1.05;
+      const dw = iw * scale;
+      const dh = ih * scale;
+      const drift = Math.sin(state.horseBob * 0.15) * 8;
+      ctx.drawImage(ranchBg, (W - dw) / 2 + drift, (H - dh) / 2 - 20, dw, dh);
+      ctx.fillStyle = "rgba(20, 10, 4, 0.22)";
+      ctx.fillRect(0, 0, W, H);
+      return;
+    }
     const g = ctx.createLinearGradient(0, 0, 0, H * 0.55);
-    g.addColorStop(0, "#7ec8e3");
-    g.addColorStop(0.55, "#c8e8f4");
-    g.addColorStop(1, "#e8f4c8");
+    g.addColorStop(0, "#e8a060");
+    g.addColorStop(0.45, "#f0c878");
+    g.addColorStop(1, "#c8a060");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    drawCloud(120, 70, 1.1);
-    drawCloud(420, 50, 0.85);
-    drawCloud(720, 80, 1.0);
-    ctx.fillStyle = "#f5d76e";
-    ctx.beginPath();
-    ctx.arc(860, 70, 36, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   function drawCloud(x, y, s) {
@@ -607,16 +614,16 @@
   }
 
   function drawBackground() {
-    ctx.fillStyle = "#6b8f4e";
-    ctx.fillRect(0, H * 0.42, W, H * 0.58);
-    ctx.fillStyle = "#5a7d42";
-    for (let i = 0; i < 40; i++) {
-      const x = (i * 97) % W;
-      const y = H * 0.45 + ((i * 53) % 180);
-      ctx.fillRect(x, y, 3, 8);
-    }
+    // Soft ground wash so animals read over the photo
+    const ground = ctx.createLinearGradient(0, H * 0.38, 0, H);
+    ground.addColorStop(0, "rgba(90, 70, 40, 0)");
+    ground.addColorStop(0.25, "rgba(90, 110, 50, 0.35)");
+    ground.addColorStop(1, "rgba(60, 45, 25, 0.55)");
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, H * 0.38, W, H * 0.62);
+
     const fenceY = 185;
-    ctx.strokeStyle = "#6b4226";
+    ctx.strokeStyle = "rgba(70, 42, 22, 0.85)";
     ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.moveTo(0, fenceY);
@@ -625,24 +632,9 @@
     ctx.lineTo(W, fenceY + 28);
     ctx.stroke();
     for (let x = 30; x < W; x += 70) {
-      ctx.fillStyle = "#5c3d2e";
+      ctx.fillStyle = "rgba(70, 45, 28, 0.9)";
       ctx.fillRect(x, fenceY - 8, 10, 55);
     }
-    ctx.fillStyle = "#8b3a2a";
-    ctx.fillRect(60, 95, 130, 90);
-    ctx.fillStyle = "#5c2a1e";
-    ctx.beginPath();
-    ctx.moveTo(50, 95);
-    ctx.lineTo(125, 55);
-    ctx.lineTo(200, 95);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#3d2418";
-    ctx.fillRect(105, 130, 40, 55);
-    ctx.fillStyle = "#e8b84a";
-    ctx.font = "bold 11px Nunito, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("RANCHO", 92, 118);
     drawSpectator(275, 152, "#e85d2c", "#f5c518", 0, "cheer");
     drawSpectator(328, 156, "#3a7bd5", "#fff", 1.1, "clap");
     drawSpectator(382, 150, "#8b4513", "#e8b84a", 2.2, "wave");
@@ -1397,7 +1389,7 @@
     state.lastTs = ts;
 
     // Siempre anima vaquero + público (aunque no esté jugando)
-    state.horseBob += dt * (state.running ? 4.5 : 3.2);
+    state.horseBob += dt * (state.running ? 6.2 : 4.0);
     if (state.celebrateTimer > 0) {
       state.celebrateTimer -= dt;
       if (state.celebrateTimer <= 0) state.playerPose = "arena";
@@ -1406,7 +1398,7 @@
 
     cheerTimer -= dt;
     if (cheerTimer <= 0) {
-      cheerTimer = rand(1.4, 2.8);
+      cheerTimer = rand(0.9, 1.8);
       const sx = rand(260, 400);
       state.pops.push({
         x: sx,
