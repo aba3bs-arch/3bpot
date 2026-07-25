@@ -113,12 +113,18 @@ async function reload() {
                 console.warn('[store] blob empty — bootstrapping defaults (first boot)');
             }
         } catch (e) {
-            // Cold-start / blob error: NEVER seed+flush or balances get wiped.
-            console.error('[store] blob load failed — refusing writes:', e.message);
-            data = emptyData();
-            loadedExistingDb = false;
+            // Do NOT 503 the whole API (cajero/admin would die).
+            // Use /tmp cache if present; otherwise in-memory seed — but never flush over blob.
+            console.error('[store] blob load failed — read-only fallback:', e.message);
+            const tmp = loadFromFile(TMP_DB);
+            if (dbHasRealData(tmp)) {
+                data = tmp;
+                loadedExistingDb = true;
+            } else {
+                data = emptyData();
+                loadedExistingDb = false;
+            }
             writesAllowed = false;
-            throw e;
         }
     } else {
         data = loadFromFile(DB_FILE);
@@ -1196,10 +1202,12 @@ function ensureAdminUser() {
     if (admin.username !== adminUser) { admin.username = adminUser; changed = true; }
     if (admin.email != null) { admin.email = null; changed = true; }
 
-    const needsPassword = data.settings.admin_password_seed !== desiredPassword
-        || !admin.password_hash
-        || !bcrypt.compareSync(desiredPassword, admin.password_hash);
-    if (needsPassword) {
+    // Fast path: seed already matches desired password — skip bcrypt on every request
+    if (!admin.password_hash) {
+        admin.password_hash = bcrypt.hashSync(desiredPassword, 10);
+        data.settings.admin_password_seed = desiredPassword;
+        changed = true;
+    } else if (data.settings.admin_password_seed !== desiredPassword) {
         admin.password_hash = bcrypt.hashSync(desiredPassword, 10);
         data.settings.admin_password_seed = desiredPassword;
         changed = true;
@@ -1248,6 +1256,9 @@ const DEFAULT_BRANCHES = [
     { id: '3b9', name: '3B9' },
     { id: '3b10', name: '3B10' },
 ];
+
+// Precomputed bcrypt (cost 8) for "sucursal123" — avoids hashing 7 branches on every cold seed
+const DEFAULT_BRANCH_PASSWORD_HASH = '$2a$08$y89krd72bscuG2M0YXBpoO.cfbgpFRubEuOddC9o7DF4XELfeXSQK';
 
 function listBranches() {
     return [...data.branches].sort((a, b) => a.name.localeCompare(b.name));
@@ -1303,6 +1314,8 @@ function ensureBranchAuth(branch) {
     if (branch.float_balance == null) branch.float_balance = 0;
     if (branch.active == null) branch.active = 1;
     const defaultPwd = 'sucursal123';
+
+    // Custom password: never rehash on every request (was timing out /cajero API on Netlify)
     if (branch.password_custom) {
         if (!branch.password_hash) {
             branch.password_hash = bcrypt.hashSync(defaultPwd, 10);
@@ -1311,12 +1324,25 @@ function ensureBranchAuth(branch) {
         }
         return;
     }
-    if (!branch.password_hash
-        || branch.password_seed !== defaultPwd
-        || !bcrypt.compareSync(defaultPwd, branch.password_hash)) {
+
+    // Fast path — already on default seed
+    if (branch.password_hash && branch.password_seed === defaultPwd) return;
+
+    if (!branch.password_hash) {
         branch.password_hash = bcrypt.hashSync(defaultPwd, 10);
         branch.password_seed = defaultPwd;
+        return;
     }
+
+    // Legacy rows without seed: stamp default without bcrypt (avoids 7× compare per API call)
+    if (!branch.password_seed) {
+        branch.password_seed = defaultPwd;
+        return;
+    }
+
+    // Seed says default but drifted — only then repair once
+    if (branch.password_seed === defaultPwd) return;
+    branch.password_custom = 1;
 }
 
 function setBranchPassword(branchId, password) {
@@ -1514,7 +1540,9 @@ function ensureDefaultBranches() {
                 name: b.name,
                 active: 1,
                 float_balance: 5000,
-                password_hash: bcrypt.hashSync('sucursal123', 10),
+                password_hash: DEFAULT_BRANCH_PASSWORD_HASH,
+                password_seed: 'sucursal123',
+                password_custom: 0,
                 games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'],
                 created_at: now()});
             mutated = true;

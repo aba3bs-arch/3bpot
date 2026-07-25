@@ -31,8 +31,9 @@ if (isServerless) {
             res.on('finish', flushData);
             next();
         } catch (err) {
+            // reload() itself should not throw anymore; keep as last-resort guard
             console.error('[store] reload:', err);
-            res.status(503).json({ error: 'Base de datos temporalmente no disponible. Reintenta en unos segundos.' });
+            next(err);
         }
     });
 } else {
