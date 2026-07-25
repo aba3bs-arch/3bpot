@@ -76,10 +76,7 @@ async function saveToBlob() {
 }
 
 function persist() {
-    if (!writesAllowed) {
-        console.warn('[store] persist blocked — blob load was not trusted');
-        return;
-    }
+    // Always mark dirty — blocking here made cajero credits look OK then vanish
     if (isServerless) dirty = true;
     else saveToFile(DB_FILE);
 }
@@ -113,9 +110,9 @@ async function reload() {
                 console.warn('[store] blob empty — bootstrapping defaults (first boot)');
             }
         } catch (e) {
-            // Do NOT 503 the whole API (cajero/admin would die).
-            // Use /tmp cache if present; otherwise in-memory seed — but never flush over blob.
-            console.error('[store] blob load failed — read-only fallback:', e.message);
+            // Keep API up. Prefer /tmp snapshot; still allow writes so cajero can credit
+            // (flush tries blob again and always mirrors to /tmp).
+            console.error('[store] blob load failed — using fallback:', e.message);
             const tmp = loadFromFile(TMP_DB);
             if (dbHasRealData(tmp)) {
                 data = tmp;
@@ -124,7 +121,7 @@ async function reload() {
                 data = emptyData();
                 loadedExistingDb = false;
             }
-            writesAllowed = false;
+            writesAllowed = true;
         }
     } else {
         data = loadFromFile(DB_FILE);
@@ -136,28 +133,35 @@ async function reload() {
 
 async function flush() {
     if (!dirty) return;
-    if (!writesAllowed) {
-        console.error('[store] flush blocked — would overwrite blob with untrusted/empty seed');
-        dirty = false;
-        return;
-    }
-    // Extra guard: never write a fresh empty seed if we somehow lost real data mid-request
-    if (!loadedExistingDb && !dbHasRealData(data) && process.env.ALLOW_EMPTY_DB_BOOTSTRAP !== '1') {
-        // Allow true first boot (no users yet after seedDefaults creates admin)
+
+    // Only block a completely empty brand-new seed (protects against wipe-on-cold-start).
+    // Never block after real mutations (credits, sales, etc.).
+    if (!loadedExistingDb && !dbHasRealData(data)) {
         const hasAdmin = Array.isArray(data.users) && data.users.some((u) => u.role === 'admin');
         const hasBranches = Array.isArray(data.branches) && data.branches.length > 0;
-        if (!hasAdmin && !hasBranches) {
-            console.error('[store] flush blocked — refusing empty bootstrap without ALLOW_EMPTY_DB_BOOTSTRAP');
+        if (!hasAdmin && !hasBranches && process.env.ALLOW_EMPTY_DB_BOOTSTRAP !== '1') {
+            console.error('[store] flush blocked — refusing empty bootstrap');
             dirty = false;
             return;
         }
     }
+
     try {
-        await saveToBlob();
+        if (isServerless) {
+            await saveToBlob();
+        } else {
+            saveToFile(DB_FILE);
+        }
+        try { saveToFile(TMP_DB); } catch (_) { /* ignore tmp errors */ }
         loadedExistingDb = true;
+        writesAllowed = true;
     } catch (e) {
-        console.warn('[store] blob save:', e.message);
-        saveToFile(TMP_DB);
+        console.warn('[store] blob save failed, writing /tmp mirror:', e.message);
+        try { saveToFile(TMP_DB); } catch (e2) {
+            console.error('[store] tmp save failed:', e2.message);
+            // Keep dirty so a later request can retry
+            return;
+        }
     }
     dirty = false;
 }

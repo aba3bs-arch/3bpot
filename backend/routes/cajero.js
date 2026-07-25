@@ -59,7 +59,7 @@ router.delete('/machines/:id', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/sell', (req, res) => {
+router.post('/sell', async (req, res) => {
     const machineId = parseInt(req.body.machineId, 10);
     const amount = parseInt(req.body.amount, 10);
     const id = branchId(req);
@@ -74,6 +74,8 @@ router.post('/sell', (req, res) => {
             paymentMethod: 'efectivo',
             note: req.body.note || 'Recarga en sucursal',
         });
+        // Await persist before responding — Netlify can freeze before finish-flush
+        await store.flush();
         const branch = store.findBranchById(id);
         res.json({
             ...result,
@@ -92,7 +94,7 @@ router.get('/players', (req, res) => {
     res.json({ players: store.listPlayers({ branchId: branchId(req) }) });
 });
 
-router.post('/players', (req, res) => {
+router.post('/players', async (req, res) => {
     try {
         const out = store.createPlayer(req.body.username, req.body.password, req.body.name, {
             branchId: branchId(req),
@@ -106,6 +108,7 @@ router.post('/players', (req, res) => {
             });
             out.user = store.sanitizeUser(store.findUserById(out.user.id));
         }
+        await store.flush();
         res.status(201).json({
             player: out.user,
             username: out.user.username,
@@ -115,7 +118,7 @@ router.post('/players', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/players/:id/credit', (req, res) => {
+router.post('/players/:id/credit', async (req, res) => {
     const amount = parseInt(req.body.amount, 10);
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
     try {
@@ -123,6 +126,7 @@ router.post('/players/:id/credit', (req, res) => {
             branchId: branchId(req),
             note: req.body.note || 'Crédito sucursal a jugador',
         });
+        await store.flush();
         res.json({ ...result, message: `$${amount} acreditados` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
