@@ -24,15 +24,39 @@ function emptyData() {
 
 let data = emptyData();
 let dirty = false;
+/** False after a failed blob read — must never flush seeds over real data. */
+let writesAllowed = true;
+/** True when the blob/file already had a real DB (not first-boot empty). */
+let loadedExistingDb = false;
+
+function normalizeDb(raw) {
+    if (!raw || typeof raw !== 'object') return emptyData();
+    if (!raw.settings) raw.settings = emptyData().settings;
+    if (!raw.branches) raw.branches = [];
+    if (!raw.machines) raw.machines = [];
+    if (!raw.users) raw.users = [];
+    if (!raw.transactions) raw.transactions = [];
+    if (!raw.game_rounds) raw.game_rounds = [];
+    if (!raw.counters) raw.counters = emptyData().counters;
+    return raw;
+}
+
+function dbHasRealData(db) {
+    if (!db) return false;
+    if (Array.isArray(db.transactions) && db.transactions.length > 0) return true;
+    if (Array.isArray(db.game_rounds) && db.game_rounds.length > 0) return true;
+    if (Array.isArray(db.machines) && db.machines.some((m) => (m.balance || 0) !== 0)) return true;
+    if (Array.isArray(db.users) && db.users.some((u) => (u.game_balance || 0) > 0 || (u.float_balance || 0) > 0)) return true;
+    if (Array.isArray(db.branches) && db.branches.some((b) => (b.float_balance || 0) > 0 && (b.float_balance || 0) !== 5000)) return true;
+    if (Array.isArray(db.machines) && db.machines.length > 0) return true;
+    if (Array.isArray(db.users) && db.users.length > 0) return true;
+    return false;
+}
 
 function loadFromFile(filePath) {
     if (!fs.existsSync(filePath)) return emptyData();
     try {
-        const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-        if (!raw.settings) raw.settings = emptyData().settings;
-        if (!raw.branches) raw.branches = [];
-        if (!raw.machines) raw.machines = [];
-        return raw;
+        return normalizeDb(JSON.parse(fs.readFileSync(filePath, 'utf8')));
     } catch {
         return emptyData();
     }
@@ -42,11 +66,8 @@ async function loadFromBlob() {
     const { getStore } = require('@netlify/blobs');
     const blobStore = getStore('winpot-db');
     const stored = await blobStore.get('data', { type: 'json' });
-    if (!stored) return emptyData();
-    if (!stored.settings) stored.settings = emptyData().settings;
-    if (!stored.branches) stored.branches = [];
-    if (!stored.machines) stored.machines = [];
-    return stored;
+    if (!stored) return null;
+    return normalizeDb(stored);
 }
 
 async function saveToBlob() {
@@ -54,24 +75,81 @@ async function saveToBlob() {
     await getStore('winpot-db').setJSON('data', data);
 }
 
-function persist() { if (isServerless) dirty = true; else saveToFile(DB_FILE); }
+function persist() {
+    if (!writesAllowed) {
+        console.warn('[store] persist blocked — blob load was not trusted');
+        return;
+    }
+    if (isServerless) dirty = true;
+    else saveToFile(DB_FILE);
+}
+
 function saveToFile(fp) { fs.writeFileSync(fp, JSON.stringify(data, null, 2), 'utf8'); }
 
-function initLocal() { data = loadFromFile(DB_FILE); seedDefaults(); }
+function initLocal() {
+    data = loadFromFile(DB_FILE);
+    loadedExistingDb = dbHasRealData(data);
+    writesAllowed = true;
+    seedDefaults();
+}
 
 async function reload() {
+    dirty = false;
+    writesAllowed = true;
+    loadedExistingDb = false;
+
     if (isServerless) {
-        try { data = await loadFromBlob(); } catch (e) {
-            console.warn('[store] blob load:', e.message);
-            data = loadFromFile(TMP_DB);
+        try {
+            const stored = await loadFromBlob();
+            if (stored) {
+                data = stored;
+                loadedExistingDb = dbHasRealData(stored);
+                writesAllowed = true;
+            } else {
+                // First boot: blob key missing. Seed is allowed once.
+                data = emptyData();
+                loadedExistingDb = false;
+                writesAllowed = true;
+                console.warn('[store] blob empty — bootstrapping defaults (first boot)');
+            }
+        } catch (e) {
+            // Cold-start / blob error: NEVER seed+flush or balances get wiped.
+            console.error('[store] blob load failed — refusing writes:', e.message);
+            data = emptyData();
+            loadedExistingDb = false;
+            writesAllowed = false;
+            throw e;
         }
-    } else data = loadFromFile(DB_FILE);
+    } else {
+        data = loadFromFile(DB_FILE);
+        loadedExistingDb = dbHasRealData(data);
+        writesAllowed = true;
+    }
     seedDefaults();
 }
 
 async function flush() {
     if (!dirty) return;
-    try { await saveToBlob(); } catch (e) {
+    if (!writesAllowed) {
+        console.error('[store] flush blocked — would overwrite blob with untrusted/empty seed');
+        dirty = false;
+        return;
+    }
+    // Extra guard: never write a fresh empty seed if we somehow lost real data mid-request
+    if (!loadedExistingDb && !dbHasRealData(data) && process.env.ALLOW_EMPTY_DB_BOOTSTRAP !== '1') {
+        // Allow true first boot (no users yet after seedDefaults creates admin)
+        const hasAdmin = Array.isArray(data.users) && data.users.some((u) => u.role === 'admin');
+        const hasBranches = Array.isArray(data.branches) && data.branches.length > 0;
+        if (!hasAdmin && !hasBranches) {
+            console.error('[store] flush blocked — refusing empty bootstrap without ALLOW_EMPTY_DB_BOOTSTRAP');
+            dirty = false;
+            return;
+        }
+    }
+    try {
+        await saveToBlob();
+        loadedExistingDb = true;
+    } catch (e) {
         console.warn('[store] blob save:', e.message);
         saveToFile(TMP_DB);
     }
@@ -1112,18 +1190,21 @@ function ensureAdminUser() {
         return;
     }
 
-    admin.role = 'admin';
-    admin.active = 1;
-    admin.username = adminUser;
-    admin.email = null;
+    let changed = false;
+    if (admin.role !== 'admin') { admin.role = 'admin'; changed = true; }
+    if (!admin.active) { admin.active = 1; changed = true; }
+    if (admin.username !== adminUser) { admin.username = adminUser; changed = true; }
+    if (admin.email != null) { admin.email = null; changed = true; }
 
-    if (data.settings.admin_password_seed !== desiredPassword
+    const needsPassword = data.settings.admin_password_seed !== desiredPassword
         || !admin.password_hash
-        || !bcrypt.compareSync(desiredPassword, admin.password_hash)) {
+        || !bcrypt.compareSync(desiredPassword, admin.password_hash);
+    if (needsPassword) {
         admin.password_hash = bcrypt.hashSync(desiredPassword, 10);
         data.settings.admin_password_seed = desiredPassword;
+        changed = true;
     }
-    persist();
+    if (changed) persist();
 }
 
 function ensureDefaultAgent() {
@@ -1425,7 +1506,7 @@ function seedBranches() {
 
 function ensureDefaultBranches() {
     if (!data.branches) data.branches = [];
-    let added = 0;
+    let mutated = false;
     DEFAULT_BRANCHES.forEach((b) => {
         if (!findBranchById(b.id)) {
             data.branches.push({
@@ -1436,24 +1517,35 @@ function ensureDefaultBranches() {
                 password_hash: bcrypt.hashSync('sucursal123', 10),
                 games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'],
                 created_at: now()});
-            added += 1;
+            mutated = true;
         }
     });
     data.branches.forEach((b) => {
+        const beforeHash = b.password_hash;
+        const beforeSeed = b.password_seed;
+        const beforeFloat = b.float_balance;
         ensureBranchAuth(b);
-        if (!Array.isArray(b.games) || !b.games.length) {
-            b.games = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'];
-        } else {
-            if (!b.games.includes('loteria')) b.games = [...b.games, 'loteria'];
-            if (!b.games.includes('rompecabezas')) b.games = [...b.games, 'rompecabezas'];
-            if (!b.games.includes('calle-pelea')) b.games = [...b.games, 'calle-pelea'];
-            if (!b.games.includes('crystal-wins')) b.games = [...b.games, 'crystal-wins'];
+        if (b.password_hash !== beforeHash || b.password_seed !== beforeSeed || b.float_balance !== beforeFloat) {
+            mutated = true;
         }
+        const catalog = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'];
+        if (!Array.isArray(b.games) || !b.games.length) {
+            b.games = catalog.slice();
+            mutated = true;
+        } else {
+            catalog.forEach((g) => {
+                if (!b.games.includes(g)) {
+                    b.games = [...b.games, g];
+                    mutated = true;
+                }
+            });
+        }
+        const beforeMachines = data.machines.length;
         ensureMachinesForBranch(b.id, 3);
+        if (data.machines.length !== beforeMachines) mutated = true;
     });
-    if (added) persist();
-    else persist();
-    return added;
+    if (mutated) persist();
+    return mutated ? 1 : 0;
 }
 
 function listMachinesForCashier(cashierId) {

@@ -36,6 +36,20 @@ html, body {
     linear-gradient(180deg, #161a26 0%, #0a0c12 55%, #06070b 100%);
 }
 
+.bg__photo {
+  position: absolute;
+  inset: -2%;
+  background: url('../assets/calle-bg.png') center / cover no-repeat;
+  filter: saturate(1.15) contrast(1.08) brightness(0.45);
+  transform: scale(1.04);
+  animation: calleDrift 22s ease-in-out infinite;
+}
+
+@keyframes calleDrift {
+  0%, 100% { transform: scale(1.04) translate(0, 0); }
+  50% { transform: scale(1.08) translate(-1%, 0.6%); }
+}
+
 .bg__glow {
   position: absolute;
   border-radius: 50%;

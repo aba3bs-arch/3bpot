@@ -53,8 +53,8 @@ const clock = new THREE.Clock();
 const mixers = [];
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x6a9fc4);
-scene.fog = new THREE.Fog(0x8eb8d4, 8, 28);
+scene.background = new THREE.Color(0x0a0c14);
+scene.fog = new THREE.Fog(0x12151f, 10, 32);
 
 const camera = new THREE.PerspectiveCamera(42, 16 / 7, 0.1, 80);
 camera.position.set(0, 1.55, 3.15);
@@ -69,10 +69,10 @@ renderer.toneMappingExposure = 1.08;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 viewEl.appendChild(renderer.domElement);
 
-const hemi = new THREE.HemisphereLight(0xd8ecff, 0x3d4a28, 0.95);
+const hemi = new THREE.HemisphereLight(0xff6a6a, 0x1a2030, 0.55);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xfff1d6, 1.45);
+const sun = new THREE.DirectionalLight(0xffc8a0, 1.15);
 sun.position.set(4, 10, 6);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
@@ -301,14 +301,29 @@ async function buildArena() {
 
   let grassTex = await loadTexture('assets/textures/grass.jpg');
   let brickTex = await loadTexture('assets/textures/brick.jpg');
+  const nightBg = await loadTexture('assets/calle-bg.png');
   if (!grassTex) grassTex = makeFallbackGrass();
   else grassTex.repeat.set(8, 8);
   if (!brickTex) brickTex = makeFallbackBrick();
   else brickTex.repeat.set(3, 2);
 
+  if (nightBg) {
+    const backdrop = new THREE.Mesh(
+      new THREE.PlaneGeometry(28, 14),
+      new THREE.MeshBasicMaterial({ map: nightBg, depthWrite: false })
+    );
+    backdrop.position.set(0, 5.2, -7.5);
+    arenaRoot.add(backdrop);
+  }
+
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(18, 12),
-    new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.92, metalness: 0.02 })
+    new THREE.MeshStandardMaterial({
+      map: grassTex,
+      color: 0x3a4558,
+      roughness: 0.95,
+      metalness: 0.04,
+    })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -409,8 +424,8 @@ function createFighter(template, facingSign, tintHex) {
   const targetH = 1.85;
   const s = size.y > 0.1 ? targetH / size.y : 1;
   root.scale.setScalar(s);
-  // Mixamo Soldier/Xbot: +Z forward — face opponent on the X axis (flip from prior bug)
-  root.rotation.y = facingSign > 0 ? -Math.PI / 2 : Math.PI / 2;
+  // Mixamo Soldier faces +Z. Rival/Xbot was mirrored backwards — flip yaw 180° for facingSign < 0.
+  root.rotation.y = facingSign > 0 ? -Math.PI / 2 : (Math.PI / 2 + Math.PI);
 
   root.traverse((o) => {
     if (!o.isMesh) return;
@@ -589,7 +604,8 @@ function placeFighters() {
   if (rivalActor) {
     rivalActor.baseX = gap;
     rivalActor.root.position.set(gap, 0, 0);
-    rivalActor.root.rotation.y = Math.PI / 2; // face -X toward player
+    // Xbot facing was inverted vs Soldier — yaw flipped so he looks at the player
+    rivalActor.root.rotation.y = Math.PI / 2 + Math.PI;
     setPose(rivalActor, 'idle');
   }
 }

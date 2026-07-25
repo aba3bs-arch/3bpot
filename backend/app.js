@@ -21,13 +21,18 @@ if (isServerless) {
     app.use(async (req, res, next) => {
         try {
             await store.reload();
-            const flushData = () => store.flush().catch((e) => console.error('[store]', e));
+            let flushed = false;
+            const flushData = () => {
+                if (flushed) return;
+                flushed = true;
+                store.flush().catch((e) => console.error('[store]', e));
+            };
+            // Only finish — close+finish double-flush caused last-writer races
             res.on('finish', flushData);
-            res.on('close', flushData);
             next();
         } catch (err) {
             console.error('[store] reload:', err);
-            next(err);
+            res.status(503).json({ error: 'Base de datos temporalmente no disponible. Reintenta en unos segundos.' });
         }
     });
 } else {
