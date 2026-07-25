@@ -139,13 +139,26 @@
     scratchCtx.fill();
   }
 
+  const SYM_ART = {
+    cherry: 'assets/rasc-cherry.png',
+    lemon: 'assets/rasc-lemon.png',
+    bell: 'assets/rasc-bell.png',
+    star: 'assets/rasc-star.png',
+    diamond: 'assets/rasc-diamond.png',
+    jackpot: 'assets/rasc-jackpot.png',
+  };
+
   function renderGrid(cells, winLine) {
     gridEl.innerHTML = '';
     cells.forEach((cell, index) => {
       const div = document.createElement('div');
       div.className = 'cell';
       if (winLine && winLine.includes(index)) div.classList.add('win');
-      div.innerHTML = `<span>${cell.emoji}</span><span class="cell-label">${cell.label}</span>`;
+      const src = SYM_ART[cell.id] || '';
+      const art = src
+        ? `<img class="cell-art" src="${src}" alt="">`
+        : `<span>${cell.emoji || ''}</span>`;
+      div.innerHTML = `${art}<span class="cell-label">${cell.label}</span>`;
       gridEl.appendChild(div);
     });
   }

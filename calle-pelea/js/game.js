@@ -826,7 +826,7 @@ async function doAction(action) {
 
 function beginPlay() {
   if (!assetsReady) {
-    showToast('Espera', 'Aún cargan los luchadores GLB…', null);
+    showToast('Espera', 'Aún cargan los luchadores…', null);
     return;
   }
   if (!isPlayerMode && !machineNumber) {
@@ -915,12 +915,12 @@ async function boot() {
   loadBalance();
 
   try {
-    if (loadBanner) loadBanner.textContent = 'Cargando Fighter.glb…';
+    if (loadBanner) loadBanner.textContent = 'Cargando luchador…';
     const fighterGltf = await loadGltf('assets/models/Fighter.glb');
     templates.fighter.scene = fighterGltf.scene;
     templates.fighter.animations = fighterGltf.animations || [];
 
-    if (loadBanner) loadBanner.textContent = 'Cargando Rival.glb…';
+    if (loadBanner) loadBanner.textContent = 'Cargando rival…';
     let rivalGltf = null;
     try {
       rivalGltf = await loadGltf('assets/models/Rival.glb');
@@ -939,12 +939,12 @@ async function boot() {
 
     assetsReady = true;
     loadBanner?.classList.add('hidden');
-    hintEl.textContent = 'Luchadores GLB listos · Idle/Walk/Run + arena 3D';
+    hintEl.textContent = 'Luchadores listos · Idle/Walk/Run + arena 3D';
     refreshHud();
   } catch (err) {
     console.error(err);
-    if (loadBanner) loadBanner.textContent = 'Error cargando GLB — recarga la página';
-    showToast('Error 3D', 'No se pudieron cargar los modelos GLB', false);
+    if (loadBanner) loadBanner.textContent = 'Error cargando modelos — recarga la página';
+    showToast('Error 3D', 'No se pudieron cargar los luchadores', false);
   }
 }
 

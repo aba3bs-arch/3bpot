@@ -21,6 +21,10 @@
   const W = canvas.width;
   const H = canvas.height;
   const BETS = [5, 10, 20, 50, 100, 200];
+  const betHud = document.getElementById("betHud");
+
+  const lagunaBg = new Image();
+  lagunaBg.src = "assets/laguna-bg.png";
 
   function mxn(n) {
     if (isPlayerMode) return PlayerAuth.formatPesos(n);
@@ -67,6 +71,7 @@
   function refreshHud() {
     creditsEl.textContent = mxn(credits);
     betEl.textContent = mxn(bet());
+    if (betHud) betHud.textContent = mxn(bet());
     winEl.textContent = mxn(state.lastWin);
     if (machineLabel) machineLabel.textContent = machineNumber ? "#" + machineNumber : "—";
     refreshActionBtn();
@@ -283,7 +288,7 @@
     if (hook.grip >= hook.gripMax) finishCatch(fish, hook);
   }
 
-  const STRUGGLE_AUTO_MS = 2600;
+  const STRUGGLE_AUTO_MS = 2200;
 
   function finishCatch(fish, hook) {
     fish.struggle = false;
@@ -406,7 +411,7 @@
     for (const h of state.hooks) {
       if (h.done) continue;
       if (h.phase === "throw") {
-        h.progress += dt * 2.8;
+        h.progress += dt * 3.4;
         const t = Math.min(1, h.progress);
         const ease = 1 - Math.pow(1 - t, 2);
         h.x = W * 0.5 + Math.sin(t * Math.PI) * 8;
@@ -439,7 +444,7 @@
           finishCatch(fish, h);
         }
       } else if (h.phase === "pull") {
-        h.progress += dt * 2.2;
+        h.progress += dt * 2.8;
         const fish = h.catchId;
         if (fish) {
           fish.x += (W * 0.5 - fish.w / 2 - fish.x) * Math.min(1, dt * 5.5);
@@ -452,7 +457,7 @@
           state.fish = state.fish.filter((f) => f !== fish);
         }
       } else if (h.phase === "miss" || h.phase === "snap") {
-        h.progress += dt * 2.6;
+        h.progress += dt * 3.1;
         const t = Math.min(1, h.progress);
         h.y = (h.ty || 300) + (48 - (h.ty || 300)) * t * (h.phase === "snap" ? 0.35 : 1);
         if (h.phase === "snap") h.x += Math.sin(t * 20) * 2;
@@ -495,18 +500,31 @@
   }
 
   function drawWater() {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, "#1488a8");
-    g.addColorStop(0.35, "#0d6b84");
-    g.addColorStop(0.7, "#0a5570");
-    g.addColorStop(1, "#063a52");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
+    if (lagunaBg.complete && lagunaBg.naturalWidth) {
+      const iw = lagunaBg.naturalWidth;
+      const ih = lagunaBg.naturalHeight;
+      const scale = Math.max(W / iw, H / ih) * 1.05;
+      const dw = iw * scale;
+      const dh = ih * scale;
+      const drift = Math.sin(state.wavePhase * 0.35) * 6;
+      ctx.drawImage(lagunaBg, (W - dw) / 2 + drift, (H - dh) / 2 - 12, dw, dh);
+      ctx.fillStyle = "rgba(6, 40, 58, 0.28)";
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#1488a8");
+      g.addColorStop(0.35, "#0d6b84");
+      g.addColorStop(0.7, "#0a5570");
+      g.addColorStop(1, "#063a52");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
 
+    // Translucent water overlays / caustics so fish still read on the photo
     for (let i = 0; i < 5; i++) {
       const x = 80 + i * 190 + Math.sin(state.wavePhase + i) * 20;
       const shaft = ctx.createLinearGradient(x, 40, x + 40, H);
-      shaft.addColorStop(0, "rgba(180, 240, 255, 0.14)");
+      shaft.addColorStop(0, "rgba(180, 240, 255, 0.16)");
       shaft.addColorStop(1, "rgba(180, 240, 255, 0)");
       ctx.fillStyle = shaft;
       ctx.beginPath();
@@ -518,7 +536,14 @@
       ctx.fill();
     }
 
-    ctx.fillStyle = "rgba(180, 240, 255, 0.18)";
+    const midTint = ctx.createLinearGradient(0, 80, 0, H * 0.85);
+    midTint.addColorStop(0, "rgba(10, 90, 110, 0.08)");
+    midTint.addColorStop(0.55, "rgba(8, 70, 95, 0.22)");
+    midTint.addColorStop(1, "rgba(4, 40, 60, 0.35)");
+    ctx.fillStyle = midTint;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = "rgba(180, 240, 255, 0.16)";
     ctx.beginPath();
     ctx.moveTo(0, 55);
     for (let x = 0; x <= W; x += 12) {
@@ -533,15 +558,15 @@
 
     const floor = ctx.createLinearGradient(0, H - 70, 0, H);
     floor.addColorStop(0, "rgba(194, 160, 96, 0)");
-    floor.addColorStop(0.35, "rgba(180, 140, 70, 0.35)");
-    floor.addColorStop(1, "rgba(120, 90, 45, 0.7)");
+    floor.addColorStop(0.35, "rgba(180, 140, 70, 0.28)");
+    floor.addColorStop(1, "rgba(120, 90, 45, 0.55)");
     ctx.fillStyle = floor;
     ctx.fillRect(0, H - 80, W, 80);
 
     for (let i = 0; i < 10; i++) {
       const bx = 40 + i * 95;
       const sway = Math.sin(state.wavePhase * 1.5 + i) * 10;
-      ctx.strokeStyle = i % 2 ? "rgba(34, 140, 100, 0.55)" : "rgba(20, 110, 80, 0.5)";
+      ctx.strokeStyle = i % 2 ? "rgba(34, 140, 100, 0.45)" : "rgba(20, 110, 80, 0.4)";
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.moveTo(bx, H);

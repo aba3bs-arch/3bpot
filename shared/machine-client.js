@@ -150,29 +150,6 @@ const MachineAPI = (function () {
         return request('/api/play/rascadito/pool?branch=' + encodeURIComponent(id));
     }
 
-    async function startDesenredaCable(bet, machineNumber, branchId) {
-        return request('/api/play/desenreda-cable/start', {
-            method: 'POST',
-            body: JSON.stringify({
-                machineNumber: machineNumber || getMachineNumber(),
-                branch_id: branchId || getBranchId(),
-                bet,
-            }),
-        });
-    }
-
-    async function pullDesenredaCable(sessionId, end, machineNumber, branchId) {
-        return request('/api/play/desenreda-cable/pull', {
-            method: 'POST',
-            body: JSON.stringify({
-                sessionId,
-                end,
-                machineNumber: machineNumber || getMachineNumber(),
-                branch_id: branchId || getBranchId(),
-            }),
-        });
-    }
-
     async function playLoteria(bet, machineNumber, branchId) {
         return request('/api/play/loteria', {
             method: 'POST',
@@ -313,7 +290,7 @@ const MachineAPI = (function () {
         getMachineNumber, setMachineNumber, getBranchId, setBranchId, inicioUrl, machinePortalUrl,
         clearBinding, isLinked, bindTerminal, loginBranch, listMachines,
         getPortal, getMachine, spinWheel, spinSlot, spinCrystalWins, playRanchoLazo, playLagunaAnzuelo, playRascadito, getScratchPool,
-        startDesenredaCable, pullDesenredaCable, playLoteria,
+        playLoteria,
         startRompecabezas, moveRompecabezas, retryRompecabezas,
         startCallePelea, actionCallePelea, retryCallePelea,
         formatPesos, requireMachine, wireInicioLinks, apiBase,

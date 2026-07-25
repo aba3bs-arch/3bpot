@@ -28,7 +28,6 @@
     'rancho-lazo': { href: '/rancho-lazo/', icon: '🤠', name: 'Rancho Lazo' },
     'laguna-anzuelo': { href: '/laguna-anzuelo/', icon: '🎣', name: 'Laguna Anzuelo' },
     'rascadito': { href: '/rascadito/', icon: '🎫', name: 'Rascadito' },
-    'desenreda-cable': { href: '/desenreda-cable/', icon: '🔌', name: 'Desenreda Cable' },
     'loteria': { href: '/loteria/', icon: '🎴', name: 'Lotería' },
     'rompecabezas': { href: '/rompecabezas/', icon: '🧩', name: 'Rompecabezas' },
     'calle-pelea': { href: '/calle-pelea/', icon: '🥊', name: 'Calle Pelea' },

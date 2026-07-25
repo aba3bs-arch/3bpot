@@ -45,7 +45,7 @@
   function showToast(title, text, ok) {
     toastTitle.textContent = title;
     toastText.textContent = text;
-    toast.style.borderColor = ok ? '#6bcb77' : ok === false ? '#e85d4c' : '#2ec4b6';
+    toast.style.borderColor = ok ? '#6bcb77' : ok === false ? '#e85d4c' : '#e8c76a';
     toast.classList.remove('hidden');
     setTimeout(() => toast.classList.add('hidden'), 2800);
   }
@@ -114,13 +114,21 @@
     const size = session.size;
     boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
     const canMove = session.status === 'playing' && !busy;
+    const posDenom = size > 1 ? size - 1 : 1;
 
     session.board.forEach((val, idx) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'tile' + (val === 0 ? ' empty' : '');
       if (val !== 0 && val === solvedTarget(idx, size)) btn.classList.add('correct');
-      btn.textContent = val === 0 ? '' : String(val);
+      btn.textContent = '';
+      if (val !== 0) {
+        const row = Math.floor((val - 1) / size);
+        const col = (val - 1) % size;
+        btn.style.backgroundImage = "url('assets/puzzle-art.png')";
+        btn.style.backgroundSize = `${size * 100}% ${size * 100}%`;
+        btn.style.backgroundPosition = `${(col * 100) / posDenom}% ${(row * 100) / posDenom}%`;
+      }
       btn.disabled = !canMove || val === 0;
       if (val !== 0 && canMove) {
         btn.addEventListener('click', () => moveTile(idx));
@@ -225,7 +233,7 @@
         data.message || `Premio ${mxn(data.prize)} · cobrado ${mxn(bet())}`,
         true
       );
-      hintEl.textContent = 'Toca una ficha junto al hueco para moverla. Ordena 1…N.';
+      hintEl.textContent = 'Toca una ficha junto al hueco para moverla. Arma la imagen.';
     } catch (err) {
       showToast('Error', err.message || 'No se pudo iniciar', false);
       if (restart) {
