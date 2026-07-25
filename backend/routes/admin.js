@@ -184,11 +184,12 @@ router.post('/branches/:id/machines', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/branches/:id/float', (req, res) => {
+router.post('/branches/:id/float', async (req, res) => {
     const amount = parseInt(req.body.amount, 10);
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
     try {
         const balance = store.topUpBranch(req.params.id, amount, req.user.id, req.body.note);
+        await store.flush();
         res.json({ float_balance: balance, message: `$${amount} inyectados a la sucursal` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -272,7 +273,7 @@ router.post('/players', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/players/:id/credit', (req, res) => {
+router.post('/players/:id/credit', async (req, res) => {
     const amount = parseInt(req.body.amount, 10);
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
     try {
@@ -280,6 +281,7 @@ router.post('/players/:id/credit', (req, res) => {
             adminId: req.user.id,
             note: req.body.note || 'Crédito admin a jugador',
         });
+        await store.flush();
         res.json({ ...result, message: `$${amount} acreditados` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });

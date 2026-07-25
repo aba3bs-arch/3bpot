@@ -148,7 +148,7 @@ router.post('/players', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/players/:id/credit', (req, res) => {
+router.post('/players/:id/credit', async (req, res) => {
     const amount = parseInt(req.body.amount, 10);
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
     try {
@@ -156,6 +156,7 @@ router.post('/players/:id/credit', (req, res) => {
             agentId: req.user.id,
             note: req.body.note || 'Crédito agente a jugador',
         });
+        await store.flush();
         res.json({ ...result, message: `$${amount} acreditados` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
