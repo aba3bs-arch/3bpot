@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Exo+2:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/spin.css">
+    <link rel="stylesheet" href="css/spin.css?v=bets2">
 </head>
 <body>
     <div class="bg" aria-hidden="true">
@@ -107,24 +107,25 @@
                         </div>
                     </div>
                     <div class="bet-chips" id="betChips">
-                        <button type="button" class="bet-chip" data-bet="10"><span class="bet-chip__inner">10</span></button>
+                        <button type="button" class="bet-chip" data-bet="1"><span class="bet-chip__inner">1</span></button>
+                        <button type="button" class="bet-chip" data-bet="5"><span class="bet-chip__inner">5</span></button>
+                        <button type="button" class="bet-chip is-active" data-bet="10"><span class="bet-chip__inner">10</span></button>
                         <button type="button" class="bet-chip" data-bet="25"><span class="bet-chip__inner">25</span></button>
-                        <button type="button" class="bet-chip is-active" data-bet="50"><span class="bet-chip__inner">50</span></button>
+                        <button type="button" class="bet-chip" data-bet="50"><span class="bet-chip__inner">50</span></button>
                         <button type="button" class="bet-chip" data-bet="100"><span class="bet-chip__inner">100</span></button>
-                        <button type="button" class="bet-chip" data-bet="250"><span class="bet-chip__inner">250</span></button>
                     </div>
                     <div class="bet-custom">
                         <div class="input-group">
                             <label for="customBet">Otro monto</label>
                             <div class="input-group__field">
                                 <span class="input-group__prefix">$</span>
-                                <input type="number" id="customBet" min="5" max="500" step="5" placeholder="75">
+                                <input type="number" id="customBet" min="1" max="500" step="1" placeholder="15">
                             </div>
                         </div>
                         <div class="bet-summary">
                             <span class="bet-summary__label">Activa</span>
-                            <span class="bet-summary__value" id="currentBet">50</span>
-                            <span class="bet-summary__potential">Máx <strong id="potentialWin">$1,000</strong></span>
+                            <span class="bet-summary__value" id="currentBet">10</span>
+                            <span class="bet-summary__potential">Máx <strong id="potentialWin">$200</strong></span>
                         </div>
                     </div>
                 </div>
@@ -159,6 +160,6 @@
 
     <script src="/shared/machine-client.js"></script>
     <script src="/shared/player-auth.js"></script>
-    <script src="js/spin.js"></script>
+    <script src="js/spin.js?v=bets2"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@ const isServerless = !!(process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_N
 
 function emptyData() {
     return {
-        settings: { retention_percent: 15, min_bet: 5, max_bet: 500 },
+        settings: { retention_percent: 15, min_bet: 1, max_bet: 500 },
         branches: [],
         machines: [],
         users: [],
@@ -1249,6 +1249,11 @@ function seedDefaults() {
     ensureAdminUser();
     ensureDefaultAgent();
     ensureCashierUser();
+    // Allow $1 bets (Ruleta chips 1/5/10…) — migrate old default of 5
+    if (data.settings && data.settings.min_bet === 5) {
+        data.settings.min_bet = 1;
+        persist();
+    }
 }
 
 const DEFAULT_BRANCHES = [

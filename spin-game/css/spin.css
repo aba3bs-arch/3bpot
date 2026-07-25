@@ -695,8 +695,8 @@ body {
 }
 
 .bet-chip {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: 2px solid rgba(232,199,106,.35);
     background:

@@ -4,7 +4,7 @@
     const isPlayerMode = new URLSearchParams(location.search).has('player');
 
     const INITIAL_BALANCE = 0;
-    const MIN_BET = 5;
+    const MIN_BET = 1;
     const MAX_BET = 500;
 
     const SEGMENTS = [
@@ -21,7 +21,7 @@
     const totalWeight = SEGMENTS.reduce((s, seg) => s + seg.weight, 0);
 
     let balance = INITIAL_BALANCE;
-    let currentBet = 50;
+    let currentBet = 10;
     let machineNumber = null;
     let minBet = MIN_BET;
     let maxBet = MAX_BET;
@@ -89,6 +89,11 @@
                 minBet = MIN_BET;
                 maxBet = MAX_BET;
                 sessionStartBalance = balance;
+                if (customBetInput) {
+                    customBetInput.min = String(minBet);
+                    customBetInput.max = String(maxBet);
+                    customBetInput.step = '1';
+                }
                 updateBalanceUI();
                 setBet(currentBet);
             } catch (err) {
@@ -103,9 +108,15 @@
         try {
             const data = await MachineAPI.getMachine(machineNumber);
             balance = data.balance;
-            minBet = data.minBet || MIN_BET;
+            // Ruleta allows from $1 even if global min was higher
+            minBet = MIN_BET;
             maxBet = data.maxBet || MAX_BET;
             sessionStartBalance = balance;
+            if (customBetInput) {
+                customBetInput.min = String(minBet);
+                customBetInput.max = String(maxBet);
+                customBetInput.step = '1';
+            }
             updateBalanceUI();
             setBet(currentBet);
         } catch (err) {
@@ -544,7 +555,7 @@
         </div>`;
         loadBalance().then(() => {
             sessionStartBalance = balance;
-            setBet(50);
+            setBet(10);
             updateStatsUI();
             showToast('Estadísticas reiniciadas', 'win', '✓');
         });
@@ -572,7 +583,7 @@
 
     buildWheelLights();
     buildLegend();
-    setBet(50);
+    setBet(10);
     updateStatsUI();
     resizeConfetti();
     requestAnimationFrame(setupCanvas);
