@@ -12,8 +12,11 @@ router.post('/login', (req, res) => {
     if (!username || !password) return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
 
     const user = store.findUserByUsername(username);
-    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-        return res.status(401).json({ error: 'Credenciales incorrectas' });
+    if (!user) {
+        return res.status(401).json({ error: 'Usuario no encontrado. Revisa el usuario o créalo de nuevo en Admin.' });
+    }
+    if (!user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
+        return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
     if (!user.active) return res.status(403).json({ error: 'Cuenta desactivada' });
 
@@ -53,11 +56,16 @@ router.post('/login-branch', (req, res) => {
                 branch: session,
             });
         }
+        // Wrong password for branch — still try cashier with same login id below
     }
 
     // 2) Cajero creado por admin (usuario + clave)
     const user = store.findUserByUsername(loginId);
-    if (user && user.role === 'cashier' && user.active && bcrypt.compareSync(password, user.password_hash)) {
+    if (user && user.role === 'cashier') {
+        if (!user.active) return res.status(403).json({ error: 'Cajero desactivado' });
+        if (!user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
+            return res.status(401).json({ error: 'Contraseña incorrecta' });
+        }
         if (!user.branch_id) {
             return res.status(403).json({ error: 'Cajero sin sucursal asignada' });
         }
@@ -79,7 +87,9 @@ router.post('/login-branch', (req, res) => {
     if (branch) {
         return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
-    return res.status(401).json({ error: 'Credenciales incorrectas' });
+    return res.status(401).json({
+        error: 'Sucursal o cajero no encontrado. Créalos en Admin y usa el ID/usuario exacto.',
+    });
 });
 
 router.post('/login-player', (req, res) => {
@@ -88,8 +98,14 @@ router.post('/login-player', (req, res) => {
     if (!username || !password) return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
 
     const user = store.findUserByUsername(username);
-    if (!user || user.role !== 'user' || !bcrypt.compareSync(password, user.password_hash)) {
-        return res.status(401).json({ error: 'Credenciales incorrectas' });
+    if (!user) {
+        return res.status(401).json({ error: 'Jugador no encontrado. Debe crearlo el cajero o la sucursal.' });
+    }
+    if (user.role !== 'user') {
+        return res.status(403).json({ error: 'Esta cuenta no es de jugador. Usa /admin/, /agente/ o /cajero/.' });
+    }
+    if (!user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
+        return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
     if (!user.active) return res.status(403).json({ error: 'Cuenta desactivada' });
 

@@ -28,6 +28,14 @@ let dirty = false;
 let blobSynced = false;
 /** True when we know the DB had real content (users/branches/balances). */
 let loadedExistingDb = false;
+/** Serialize reload/flush on the same warm instance to reduce lost updates. */
+let storeLock = Promise.resolve();
+
+function withStoreLock(fn) {
+    const run = storeLock.then(fn, fn);
+    storeLock = run.then(() => undefined, () => undefined);
+    return run;
+}
 
 function normalizeDb(raw) {
     if (!raw || typeof raw !== 'object') return emptyData();
@@ -77,6 +85,77 @@ async function saveToBlob() {
     await getStore('winpot-db').setJSON('data', data);
 }
 
+/** Merge blob (base) with local dirty memory (overlay). Local wins on same ids/usernames. */
+function mergeDatabases(base, local) {
+    const out = normalizeDb(JSON.parse(JSON.stringify(base || emptyData())));
+    const loc = normalizeDb(local || emptyData());
+
+    const userById = new Map((out.users || []).map((u) => [u.id, u]));
+    const userByKey = new Map();
+    for (const u of userById.values()) {
+        const k = (u.username || u.email || '').toString().trim().toLowerCase().replace(/\s+/g, '');
+        if (k) userByKey.set(k, u);
+    }
+    for (const u of loc.users || []) {
+        const k = (u.username || u.email || '').toString().trim().toLowerCase().replace(/\s+/g, '');
+        if (k && userByKey.has(k) && userByKey.get(k).id !== u.id) {
+            userById.delete(userByKey.get(k).id);
+        }
+        userById.set(u.id, u);
+        if (k) userByKey.set(k, u);
+    }
+    out.users = [...userById.values()];
+
+    const branchById = new Map((out.branches || []).map((b) => [String(b.id).toLowerCase(), b]));
+    for (const b of loc.branches || []) branchById.set(String(b.id).toLowerCase(), b);
+    out.branches = [...branchById.values()];
+
+    const machineById = new Map((out.machines || []).map((m) => [m.id, m]));
+    for (const m of loc.machines || []) machineById.set(m.id, m);
+    out.machines = [...machineById.values()];
+
+    out.counters = { ...(out.counters || {}) };
+    for (const [k, v] of Object.entries(loc.counters || {})) {
+        out.counters[k] = Math.max(out.counters[k] || 0, v || 0);
+    }
+
+    out.settings = { ...(out.settings || {}), ...(loc.settings || {}) };
+    out.migrations = { ...(out.migrations || {}), ...(loc.migrations || {}) };
+
+    const txIds = new Set((out.transactions || []).map((t) => t.id));
+    for (const t of loc.transactions || []) {
+        if (!txIds.has(t.id)) {
+            out.transactions.push(t);
+            txIds.add(t.id);
+        }
+    }
+    if (out.transactions.length > 5000) {
+        out.transactions = out.transactions.slice(-5000);
+    }
+
+    const roundIds = new Set((out.game_rounds || []).map((r) => r.id));
+    for (const r of loc.game_rounds || []) {
+        if (!roundIds.has(r.id)) {
+            out.game_rounds.push(r);
+            roundIds.add(r.id);
+        }
+    }
+    if (out.game_rounds.length > 5000) {
+        out.game_rounds = out.game_rounds.slice(-5000);
+    }
+
+    // Sessions: prefer local (active play)
+    for (const key of ['puzzle_sessions', 'fight_sessions', 'runner_sessions', 'zone_sessions']) {
+        const baseList = Array.isArray(out[key]) ? out[key] : [];
+        const locList = Array.isArray(loc[key]) ? loc[key] : [];
+        const byId = new Map(baseList.map((s) => [s.id, s]));
+        for (const s of locList) byId.set(s.id, s);
+        out[key] = [...byId.values()];
+    }
+
+    return out;
+}
+
 function persist() {
     if (isServerless) dirty = true;
     else saveToFile(DB_FILE);
@@ -106,94 +185,77 @@ function memoryLooksPopulated() {
 }
 
 async function reload() {
-    // Never drop unflushed writes — that caused agents/cashiers to vanish
-    if (dirty) {
-        await flush();
-    }
+    return withStoreLock(async () => {
+        if (dirty) {
+            await flushUnlocked();
+        }
 
-    const previous = data;
+        const previous = data;
 
-    if (isServerless) {
-        try {
-            const stored = await loadFromBlob();
-            if (stored) {
-                data = stored;
-                loadedExistingDb = dbHasRealData(stored) || memoryLooksPopulated();
-                blobSynced = true;
-            } else {
-                // Key missing: first boot OR wiped. Keep previous memory if we had data.
-                if (memoryLooksPopulated()) {
+        if (isServerless) {
+            try {
+                const stored = await loadFromBlob();
+                if (stored) {
+                    data = stored;
+                    loadedExistingDb = dbHasRealData(stored) || memoryLooksPopulated();
+                    blobSynced = true;
+                } else if (memoryLooksPopulated()) {
                     loadedExistingDb = true;
                     blobSynced = false;
                     console.warn('[store] blob empty — keeping in-memory DB');
                 } else {
                     data = emptyData();
                     loadedExistingDb = false;
-                    blobSynced = true; // safe to create fresh DB in blob
+                    blobSynced = true;
                     console.warn('[store] blob empty — first boot (sin demo automática)');
                 }
+            } catch (e) {
+                console.error('[store] blob load failed:', e.message);
+                const tmp = loadFromFile(TMP_DB);
+                if (dbHasRealData(tmp) || (tmp.users && tmp.users.length) || (tmp.branches && tmp.branches.length)) {
+                    data = tmp;
+                    loadedExistingDb = true;
+                    blobSynced = false;
+                    console.warn('[store] using /tmp snapshot after blob error');
+                } else if (previous && (dbHasRealData(previous) || (previous.users && previous.users.length) || (previous.branches && previous.branches.length))) {
+                    data = previous;
+                    loadedExistingDb = true;
+                    blobSynced = false;
+                    console.warn('[store] blob failed — keeping previous in-memory DB');
+                } else {
+                    data = emptyData();
+                    loadedExistingDb = false;
+                    blobSynced = false;
+                    console.warn('[store] blob failed — empty memory; writes go to /tmp until blob recovers');
+                }
             }
-        } catch (e) {
-            console.error('[store] blob load failed:', e.message);
-            const tmp = loadFromFile(TMP_DB);
-            if (dbHasRealData(tmp) || (tmp.users && tmp.users.length) || (tmp.branches && tmp.branches.length)) {
-                data = tmp;
-                loadedExistingDb = true;
-                blobSynced = false;
-                console.warn('[store] using /tmp snapshot after blob error');
-            } else if (previous && (dbHasRealData(previous) || (previous.users && previous.users.length) || (previous.branches && previous.branches.length))) {
-                // Keep warm-instance memory — do NOT wipe to emptyData
-                data = previous;
-                loadedExistingDb = true;
-                blobSynced = false;
-                console.warn('[store] blob failed — keeping previous in-memory DB');
-            } else {
-                data = emptyData();
-                loadedExistingDb = false;
-                blobSynced = false;
-                console.warn('[store] blob failed — empty memory; writes go to /tmp until blob recovers');
-            }
+        } else {
+            data = loadFromFile(DB_FILE);
+            loadedExistingDb = dbHasRealData(data) || data.users.length > 0 || data.branches.length > 0;
+            blobSynced = true;
         }
-    } else {
-        data = loadFromFile(DB_FILE);
-        loadedExistingDb = dbHasRealData(data) || data.users.length > 0 || data.branches.length > 0;
-        blobSynced = true;
-    }
-    seedDefaults();
+        seedDefaults();
+    });
 }
 
-async function flush() {
+async function flushUnlocked() {
     if (!dirty) return;
 
     try {
         if (isServerless) {
-            // Avoid overwriting a healthy blob with a half-empty memory after a failed read
-            if (!blobSynced) {
-                try {
-                    const existing = await loadFromBlob();
-                    if (existing && dbHasRealData(existing)) {
-                        const existingScore = (existing.users?.length || 0) + (existing.branches?.length || 0) + (existing.machines?.length || 0);
-                        const localScore = (data.users?.length || 0) + (data.branches?.length || 0) + (data.machines?.length || 0);
-                        if (localScore < existingScore) {
-                            console.warn('[store] flush skipped — blob has more data than memory; adopting blob');
-                            data = existing;
-                            loadedExistingDb = true;
-                            blobSynced = true;
-                            dirty = false;
-                            try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
-                            return;
-                        }
-                    }
-                    // Blob empty/missing or our memory is richer — write it
-                    blobSynced = true;
-                } catch (e) {
-                    console.warn('[store] pre-flush blob check failed, writing /tmp only:', e.message);
-                    try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
-                    // Keep dirty so a later request retries blob
-                    return;
+            try {
+                const existing = await loadFromBlob();
+                if (existing) {
+                    // Always merge — never discard local creates because blob "looks bigger"
+                    data = mergeDatabases(existing, data);
                 }
+                await saveToBlob();
+                blobSynced = true;
+            } catch (e) {
+                console.warn('[store] blob save/merge failed, writing /tmp:', e.message);
+                try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
+                return; // keep dirty for retry
             }
-            await saveToBlob();
         } else {
             saveToFile(DB_FILE);
         }
@@ -201,13 +263,17 @@ async function flush() {
         loadedExistingDb = true;
         blobSynced = true;
     } catch (e) {
-        console.warn('[store] blob save failed, writing /tmp mirror:', e.message);
+        console.warn('[store] flush failed:', e.message);
         try { saveToFile(TMP_DB); } catch (e2) {
             console.error('[store] tmp save failed:', e2.message);
             return;
         }
     }
     dirty = false;
+}
+
+async function flush() {
+    return withStoreLock(() => flushUnlocked());
 }
 
 function nextId(key) { data.counters[key] = (data.counters[key] || 0) + 1; return data.counters[key]; }
