@@ -20,7 +20,6 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`Inicio:  http://localhost:${PORT}/inicio/`);
     console.log(`Cajero:  http://localhost:${PORT}/cajero/`);
     console.log(`Admin:   http://localhost:${PORT}/admin/`);
-    console.log(`Admin:   ${process.env.ADMIN_USER || 'admin'} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
-    console.log(`Agente:  agente / agente123`);
-    console.log(`Caja:    fusion / sucursal123`);
+    console.log(`Admin:   ${process.env.ADMIN_USER || 'admin'} / (ADMIN_PASSWORD)`);
+    console.log(`Agentes, sucursales y cajeros: créalos desde /admin/ (sin demo automática)`);
 });

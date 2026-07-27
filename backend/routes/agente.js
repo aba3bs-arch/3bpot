@@ -44,13 +44,19 @@ router.post('/branches', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/branches/seed', (_req, res) => {
+router.post('/branches/seed', async (_req, res) => {
+    if (process.env.ENABLE_DEMO_SEED !== '1') {
+        return res.status(403).json({
+            error: 'Seed demo desactivado. Crea sucursales desde el panel. (ENABLE_DEMO_SEED=1 para habilitar)',
+        });
+    }
     const added = store.ensureDefaultBranches();
+    await store.flush();
     res.json({
         branches: store.listBranches().map((b) => store.sanitizeBranch(b)),
         message: added
-            ? `${added} sucursales agregadas (clave: sucursal123)`
-            : 'Sucursales listas (clave: sucursal123)',
+            ? `${added} sucursales demo agregadas (clave: sucursal123)`
+            : 'Sucursales demo ya existían',
     });
 });
 

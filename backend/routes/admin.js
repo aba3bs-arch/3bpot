@@ -18,7 +18,7 @@ router.get('/stats', (_req, res) => {
 /* —— Agentes —— */
 router.get('/agents', (_req, res) => res.json({ agents: store.listAgents() }));
 
-router.post('/agents', (req, res) => {
+router.post('/agents', async (req, res) => {
     const name = String(req.body.name || '').trim();
     const username = String(req.body.username || req.body.email || '').trim();
     const password = String(req.body.password || '').trim();
@@ -30,6 +30,7 @@ router.post('/agents', (req, res) => {
     if (store.findUserByUsername(key)) return res.status(409).json({ error: 'Usuario ya registrado' });
     const pwd = password && password.length >= 6 ? password : 'agente123';
     const user = store.createUser(key, bcrypt.hashSync(pwd, 10), name, 'agent', null);
+    await store.flush();
     res.status(201).json({
         agent: store.sanitizeUser(user),
         username: user.username,
@@ -38,16 +39,17 @@ router.post('/agents', (req, res) => {
     });
 });
 
-router.post('/agents/:id/float', (req, res) => {
+router.post('/agents/:id/float', async (req, res) => {
     const amount = parseInt(req.body.amount, 10);
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
     try {
         const balance = store.topUpAgent(parseInt(req.params.id, 10), amount, req.user.id, req.body.note);
+        await store.flush();
         res.json({ float_balance: balance, message: `$${amount} inyectados al agente` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.patch('/agents/:id', (req, res) => {
+router.patch('/agents/:id', async (req, res) => {
     try {
         const agent = store.updateStaffUser(parseInt(req.params.id, 10), {
             name: req.body.name,
@@ -55,13 +57,15 @@ router.patch('/agents/:id', (req, res) => {
             password: req.body.password || undefined,
             active: req.body.active,
         });
+        await store.flush();
         res.json({ agent, message: 'Agente actualizado' });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.delete('/agents/:id', (req, res) => {
+router.delete('/agents/:id', async (req, res) => {
     try {
         store.deleteStaffUser(parseInt(req.params.id, 10));
+        await store.flush();
         res.json({ message: 'Agente eliminado' });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -69,7 +73,7 @@ router.delete('/agents/:id', (req, res) => {
 /* —— Cajeros —— */
 router.get('/cashiers', (_req, res) => res.json({ cashiers: store.listCashiers() }));
 
-router.post('/cashiers', (req, res) => {
+router.post('/cashiers', async (req, res) => {
     const name = String(req.body.name || '').trim();
     const username = String(req.body.username || req.body.email || '').trim();
     const password = String(req.body.password || '').trim();
@@ -80,20 +84,22 @@ router.post('/cashiers', (req, res) => {
         return res.status(400).json({ error: 'Usuario: 3-32 caracteres (letras, números, . _ -)' });
     }
     if (store.findUserByUsername(key)) return res.status(409).json({ error: 'Usuario ya registrado' });
-    if (branchId && !store.findBranchById(branchId)) {
+    if (!branchId) return res.status(400).json({ error: 'Asigna una sucursal al cajero' });
+    if (!store.findBranchById(branchId)) {
         return res.status(404).json({ error: 'Sucursal no encontrada' });
     }
     const pwd = password && password.length >= 6 ? password : 'cajero123';
     const user = store.createUser(key, bcrypt.hashSync(pwd, 10), name, 'cashier', branchId);
+    await store.flush();
     res.status(201).json({
         cashier: store.sanitizeUser(user),
         username: user.username,
         password: pwd,
-        message: `Cajero ${name} creado`,
+        message: `Cajero ${name} creado · entra en /cajero/ con usuario ${user.username}`,
     });
 });
 
-router.patch('/cashiers/:id', (req, res) => {
+router.patch('/cashiers/:id', async (req, res) => {
     try {
         const cashier = store.updateStaffUser(parseInt(req.params.id, 10), {
             name: req.body.name,
@@ -105,13 +111,15 @@ router.patch('/cashiers/:id', (req, res) => {
             if (req.body.branch_id) store.assignCashierToBranch(parseInt(req.params.id, 10), req.body.branch_id);
             else store.unassignCashier(parseInt(req.params.id, 10));
         }
+        await store.flush();
         res.json({ cashier: store.sanitizeUser(store.findUserById(parseInt(req.params.id, 10))), message: 'Cajero actualizado' });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.delete('/cashiers/:id', (req, res) => {
+router.delete('/cashiers/:id', async (req, res) => {
     try {
         store.deleteStaffUser(parseInt(req.params.id, 10));
+        await store.flush();
         res.json({ message: 'Cajero eliminado' });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -160,13 +168,19 @@ router.post('/branches', (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/branches/seed', (_req, res) => {
+router.post('/branches/seed', async (_req, res) => {
+    if (process.env.ENABLE_DEMO_SEED !== '1') {
+        return res.status(403).json({
+            error: 'Seed demo desactivado. Crea sucursales manualmente desde Admin. (ENABLE_DEMO_SEED=1 para habilitar)',
+        });
+    }
     const added = store.ensureDefaultBranches();
+    await store.flush();
     res.json({
         branches: store.listBranches().map((b) => store.sanitizeBranch(b)),
         message: added
-            ? `${added} sucursales agregadas (clave por defecto: sucursal123)`
-            : 'Sucursales listas (clave por defecto: sucursal123)',
+            ? `${added} sucursales demo agregadas (clave: sucursal123)`
+            : 'Sucursales demo ya existían',
     });
 });
 

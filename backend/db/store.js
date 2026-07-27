@@ -76,7 +76,11 @@ async function saveToBlob() {
 }
 
 function persist() {
-    // Always mark dirty — blocking here made cajero credits look OK then vanish
+    // Never mark dirty after a failed blob read with empty memory — that overwrote production with demo.
+    if (!writesAllowed) {
+        console.warn('[store] persist ignored — writes locked after blob load failure');
+        return;
+    }
     if (isServerless) dirty = true;
     else saveToFile(DB_FILE);
 }
@@ -90,9 +94,17 @@ function initLocal() {
     seedDefaults();
 }
 
+function isWriteLocked() {
+    return !writesAllowed;
+}
+
+function hasLoadedExistingDb() {
+    return loadedExistingDb;
+}
+
 async function reload() {
     // Never drop unflushed writes — that caused agents/cashiers to vanish
-    if (dirty) {
+    if (dirty && writesAllowed) {
         await flush();
     }
 
@@ -104,32 +116,36 @@ async function reload() {
             const stored = await loadFromBlob();
             if (stored) {
                 data = stored;
-                loadedExistingDb = dbHasRealData(stored);
+                loadedExistingDb = dbHasRealData(stored) || !!(stored.users && stored.users.length) || !!(stored.branches && stored.branches.length);
                 writesAllowed = true;
             } else {
-                // First boot: blob key missing. Seed is allowed once.
+                // Blob key missing: first deploy. Allow writes so admin can be created,
+                // but seedDefaults will NOT create demo branches/agents.
                 data = emptyData();
                 loadedExistingDb = false;
                 writesAllowed = true;
-                console.warn('[store] blob empty — bootstrapping defaults (first boot)');
+                console.warn('[store] blob empty — first boot (sin demo automático)');
             }
         } catch (e) {
-            // Keep API up. Prefer /tmp snapshot; still allow writes so cajero can credit
-            // (flush tries blob again and always mirrors to /tmp).
-            console.error('[store] blob load failed — using fallback:', e.message);
+            console.error('[store] blob load failed:', e.message);
             const tmp = loadFromFile(TMP_DB);
-            if (dbHasRealData(tmp)) {
+            if (dbHasRealData(tmp) || (tmp.users && tmp.users.length) || (tmp.branches && tmp.branches.length)) {
+                // Serve last known good snapshot; allow writes so credits can retry flush to blob
                 data = tmp;
                 loadedExistingDb = true;
+                writesAllowed = true;
+                console.warn('[store] using /tmp snapshot after blob error');
             } else {
+                // CRITICAL: do not seed+flush empty demo over a blob we failed to read
                 data = emptyData();
                 loadedExistingDb = false;
+                writesAllowed = false;
+                console.error('[store] write lock ON — refusing to seed over unread blob');
             }
-            writesAllowed = true;
         }
     } else {
         data = loadFromFile(DB_FILE);
-        loadedExistingDb = dbHasRealData(data);
+        loadedExistingDb = dbHasRealData(data) || data.users.length > 0 || data.branches.length > 0;
         writesAllowed = true;
     }
     seedDefaults();
@@ -137,13 +153,16 @@ async function reload() {
 
 async function flush() {
     if (!dirty) return;
+    if (!writesAllowed) {
+        console.error('[store] flush blocked — writes locked');
+        dirty = false;
+        return;
+    }
 
-    // Only block a completely empty brand-new seed (protects against wipe-on-cold-start).
-    // Never block after real mutations (credits, sales, etc.).
+    // Block flushing a brand-new empty shell (no admin yet) unless explicitly allowed
     if (!loadedExistingDb && !dbHasRealData(data)) {
         const hasAdmin = Array.isArray(data.users) && data.users.some((u) => u.role === 'admin');
-        const hasBranches = Array.isArray(data.branches) && data.branches.length > 0;
-        if (!hasAdmin && !hasBranches && process.env.ALLOW_EMPTY_DB_BOOTSTRAP !== '1') {
+        if (!hasAdmin && process.env.ALLOW_EMPTY_DB_BOOTSTRAP !== '1' && process.env.ENABLE_DEMO_SEED !== '1') {
             console.error('[store] flush blocked — refusing empty bootstrap');
             dirty = false;
             return;
@@ -1501,6 +1520,8 @@ function ensureAdminUser() {
 }
 
 function ensureDefaultAgent() {
+    // Solo con demo explícito — en producción el admin crea agentes
+    if (process.env.ENABLE_DEMO_SEED !== '1') return;
     if (findUserByUsername('agente')) return;
     createUser('agente', bcrypt.hashSync('agente123', 10), 'Agente', 'agent');
 }
@@ -1545,13 +1566,17 @@ function seedDefaults() {
     ensurePuzzleSessions();
     ensureFightSessions();
     ensureRunnerSessions();
-    seedBranches();
-    ensureDefaultBranches();
     migrateNewGames();
     migrateUsernames();
+    // Admin mínimo para que el panel no quede inaccesible
     ensureAdminUser();
-    ensureDefaultAgent();
-    ensureCashierUser();
+    // Demo (Fusion/agente/sucursal123) SOLO si ENABLE_DEMO_SEED=1
+    if (process.env.ENABLE_DEMO_SEED === '1') {
+        seedBranches();
+        ensureDefaultBranches();
+        ensureDefaultAgent();
+        ensureCashierUser();
+    }
     // Allow $1 bets (Ruleta chips 1/5/10…) — migrate old default of 5
     if (data.settings && data.settings.min_bet === 5) {
         data.settings.min_bet = 1;
@@ -1846,6 +1871,7 @@ function seedBranches() {
 function ensureDefaultBranches() {
     if (!data.branches) data.branches = [];
     let mutated = false;
+    const catalog = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'];
     DEFAULT_BRANCHES.forEach((b) => {
         if (!findBranchById(b.id)) {
             data.branches.push({
@@ -1856,35 +1882,13 @@ function ensureDefaultBranches() {
                 password_hash: DEFAULT_BRANCH_PASSWORD_HASH,
                 password_seed: 'sucursal123',
                 password_custom: 0,
-                games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'],
+                games: catalog.slice(),
                 created_at: now()});
+            ensureMachinesForBranch(b.id, 3);
             mutated = true;
         }
     });
-    data.branches.forEach((b) => {
-        const beforeHash = b.password_hash;
-        const beforeSeed = b.password_seed;
-        const beforeFloat = b.float_balance;
-        ensureBranchAuth(b);
-        if (b.password_hash !== beforeHash || b.password_seed !== beforeSeed || b.float_balance !== beforeFloat) {
-            mutated = true;
-        }
-        const catalog = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'];
-        if (!Array.isArray(b.games) || !b.games.length) {
-            b.games = catalog.slice();
-            mutated = true;
-        } else {
-            catalog.forEach((g) => {
-                if (!b.games.includes(g)) {
-                    b.games = [...b.games, g];
-                    mutated = true;
-                }
-            });
-        }
-        const beforeMachines = data.machines.length;
-        ensureMachinesForBranch(b.id, 3);
-        if (data.machines.length !== beforeMachines) mutated = true;
-    });
+    // No reescribir juegos/máquinas de sucursales existentes en cada request
     if (mutated) persist();
     return mutated ? 1 : 0;
 }
@@ -1906,7 +1910,7 @@ function branchStats(branchId) {
 }
 
 module.exports = {
-    isServerless, initLocal, reload, flush,
+    isServerless, initLocal, reload, flush, isWriteLocked, hasLoadedExistingDb,
     getSettings, setSettings, ensureAdminUser,
     findUserByEmail, findUserByUsername, findUserById, createUser, createPlayer, creditPlayer, listCashiers, listAgents, listPlayers,
     sanitizeUser, setUserActive, updateStaffUser, deleteStaffUser,

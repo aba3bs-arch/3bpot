@@ -21,19 +21,31 @@ if (isServerless) {
     app.use(async (req, res, next) => {
         try {
             await store.reload();
+            if (store.isWriteLocked()) {
+                return res.status(503).json({
+                    error: 'Base de datos temporalmente no disponible. Reintenta en unos segundos (no se borraron datos).',
+                });
+            }
+
+            // Await flush before the response fully ends so bets/credits survive cold starts
+            const originalEnd = res.end;
             let flushed = false;
-            const flushData = () => {
-                if (flushed) return;
+            res.end = function endWithFlush(chunk, encoding, cb) {
+                if (flushed) {
+                    return originalEnd.call(this, chunk, encoding, cb);
+                }
                 flushed = true;
-                store.flush().catch((e) => console.error('[store]', e));
+                Promise.resolve(store.flush())
+                    .catch((e) => console.error('[store] flush:', e))
+                    .finally(() => {
+                        res.end = originalEnd;
+                        originalEnd.call(res, chunk, encoding, cb);
+                    });
             };
-            // Only finish — close+finish double-flush caused last-writer races
-            res.on('finish', flushData);
             next();
         } catch (err) {
-            // reload() itself should not throw anymore; keep as last-resort guard
             console.error('[store] reload:', err);
-            next(err);
+            res.status(503).json({ error: 'No se pudo cargar la base de datos' });
         }
     });
 } else {
