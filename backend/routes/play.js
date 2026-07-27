@@ -9,6 +9,7 @@ const rascadito = require('../engines/rascadito');
 const loteria = require('../engines/loteria');
 const rompecabezas = require('../engines/rompecabezas');
 const callePelea = require('../engines/calle-pelea');
+const calleRunner = require('../engines/calle-runner');
 const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
@@ -361,6 +362,129 @@ router.post('/user/calle-pelea/retry', authRequired, (req, res) => {
     if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
     try {
         const out = store.retryFightLevel(sessionId, { userId: req.user.id }, settings.retention_percent);
+        res.json(out);
+    } catch (e) {
+        const status = e.message.includes('insuficiente') ? 402 : 400;
+        res.status(status).json({ error: e.message });
+    }
+});
+
+function validateRunnerBet(bet) {
+    return calleRunner.BETS.includes(bet);
+}
+
+function runnerReport(req) {
+    return {
+        completed: !!req.body.completed,
+        distance: req.body.distance,
+        coins: req.body.coins,
+    };
+}
+
+router.post('/calle-runner/active', (req, res) => {
+    try {
+        const owner = puzzleOwnerFromMachine(req);
+        res.json(store.getActiveRunnerSession(owner));
+    } catch (e) {
+        const status = e.status || 400;
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/calle-runner/start', (req, res) => {
+    const bet = parseInt(req.body.bet, 10);
+    const restart = !!req.body.restart;
+    const settings = store.getSettings();
+    if (!validateRunnerBet(bet)) {
+        return res.status(400).json({ error: 'Apuesta: $1, $2, $5, $10, $15 o $20' });
+    }
+    try {
+        const owner = puzzleOwnerFromMachine(req);
+        const out = store.startRunnerSession(owner, bet, settings.retention_percent, { restart });
+        res.json(out);
+    } catch (e) {
+        const status = e.status || (e.message.includes('insuficiente') ? 402 : 400);
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/calle-runner/finish', (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const owner = puzzleOwnerFromMachine(req);
+        const out = store.finishRunnerSession(sessionId, runnerReport(req), owner);
+        res.json(out);
+    } catch (e) {
+        const status = e.status || 400;
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/calle-runner/retry', (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    const settings = store.getSettings();
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const owner = puzzleOwnerFromMachine(req);
+        const out = store.retryRunnerLevel(sessionId, owner, settings.retention_percent);
+        res.json(out);
+    } catch (e) {
+        const status = e.status || (e.message.includes('insuficiente') ? 402 : 400);
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/user/calle-runner/active', authRequired, (req, res) => {
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Solo jugadores' });
+    try {
+        res.json(store.getActiveRunnerSession({ userId: req.user.id }));
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+router.post('/user/calle-runner/start', authRequired, (req, res) => {
+    const bet = parseInt(req.body.bet, 10);
+    const restart = !!req.body.restart;
+    const settings = store.getSettings();
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Solo jugadores' });
+    if (!validateRunnerBet(bet)) {
+        return res.status(400).json({ error: 'Apuesta: $1, $2, $5, $10, $15 o $20' });
+    }
+    try {
+        const out = store.startRunnerSession(
+            { userId: req.user.id },
+            bet,
+            settings.retention_percent,
+            { restart }
+        );
+        res.json(out);
+    } catch (e) {
+        const status = e.message.includes('insuficiente') ? 402 : 400;
+        res.status(status).json({ error: e.message });
+    }
+});
+
+router.post('/user/calle-runner/finish', authRequired, (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Solo jugadores' });
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const out = store.finishRunnerSession(sessionId, runnerReport(req), { userId: req.user.id });
+        res.json(out);
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+router.post('/user/calle-runner/retry', authRequired, (req, res) => {
+    const sessionId = parseInt(req.body.sessionId, 10);
+    const settings = store.getSettings();
+    if (req.user.role !== 'user') return res.status(403).json({ error: 'Solo jugadores' });
+    if (!sessionId) return res.status(400).json({ error: 'Sesión requerida' });
+    try {
+        const out = store.retryRunnerLevel(sessionId, { userId: req.user.id }, settings.retention_percent);
         res.json(out);
     } catch (e) {
         const status = e.message.includes('insuficiente') ? 402 : 400;

@@ -128,11 +128,45 @@ const PlayerAuth = (function () {
         });
     }
 
+    async function getActiveCalleRunner() {
+        return request('/api/play/user/calle-runner/active', {
+            method: 'POST',
+            body: JSON.stringify({}),
+        });
+    }
+
+    async function startCalleRunner(bet, restart) {
+        return request('/api/play/user/calle-runner/start', {
+            method: 'POST',
+            body: JSON.stringify({ bet, restart: !!restart }),
+        });
+    }
+
+    async function finishCalleRunner(sessionId, report) {
+        return request('/api/play/user/calle-runner/finish', {
+            method: 'POST',
+            body: JSON.stringify({
+                sessionId,
+                completed: !!(report && report.completed),
+                distance: report ? report.distance : 0,
+                coins: report ? report.coins : 0,
+            }),
+        });
+    }
+
+    async function retryCalleRunner(sessionId) {
+        return request('/api/play/user/calle-runner/retry', {
+            method: 'POST',
+            body: JSON.stringify({ sessionId }),
+        });
+    }
+
     return {
         login, logout, request, getUser, isLoggedIn, clearSession, formatPesos,
         playSpinWheel, playComicSlot, playCrystalWins, playRanchoLazo, playLagunaAnzuelo, playRascadito,
         playLoteria,
         startRompecabezas, moveRompecabezas, retryRompecabezas,
         startCallePelea, actionCallePelea, retryCallePelea,
+        getActiveCalleRunner, startCalleRunner, finishCalleRunner, retryCalleRunner,
     };
 })();

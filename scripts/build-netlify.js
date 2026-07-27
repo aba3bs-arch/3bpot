@@ -17,7 +17,7 @@ function copyDir(src, dest) {
 if (fs.existsSync(DIST)) fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(DIST, { recursive: true });
 
-for (const dir of ['inicio', 'admin', 'agente', 'cajero', 'portal', 'spin-game', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'shared']) {
+for (const dir of ['inicio', 'admin', 'agente', 'cajero', 'portal', 'spin-game', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner', 'shared']) {
     copyDir(path.join(ROOT, dir), path.join(DIST, dir));
 }
 

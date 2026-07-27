@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3B Pot — Calle Runner</title>
+    <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Exo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=run5">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+</head>
+<body>
+    <div class="bg" aria-hidden="true">
+        <div class="bg__glow bg__glow--a"></div>
+        <div class="bg__glow bg__glow--b"></div>
+        <div class="bg__vignette"></div>
+        <div class="bg__noise"></div>
+    </div>
+
+    <div class="stage">
+        <header class="topbar">
+            <a class="topbar__back" id="backLink" href="/inicio/" data-inicio-link>← Juegos</a>
+            <div class="topbar__meta">
+                <span class="topbar__chip">Máq. <strong id="machineNum">—</strong></span>
+                <span class="topbar__chip topbar__chip--balance">Saldo <strong id="balance">$0</strong></span>
+            </div>
+        </header>
+
+        <h1 class="logo"><span class="logo__text">Calle Runner</span></h1>
+        <div class="mode-badge" id="modeBadge" hidden>…</div>
+
+        <div class="metrics">
+            <div class="metric"><span>Nivel</span><strong id="levelLabel">—</strong></div>
+            <div class="metric"><span>Apuesta</span><strong id="betLabel">$1</strong></div>
+            <div class="metric"><span>Premio</span><strong id="prizeLabel">$0</strong></div>
+            <div class="metric"><span>Monedas</span><strong id="coinLabel">0</strong></div>
+            <div class="metric"><span>Ganado</span><strong id="wonLabel">$0</strong></div>
+        </div>
+
+        <div class="progress">
+            <div class="progress__bar"><i id="progressFill"></i></div>
+            <span class="progress__text" id="progressText">0 / 0 m</span>
+        </div>
+
+        <div class="screen">
+            <div class="screen__bezel">
+                <canvas id="game" width="960" height="480" aria-label="Calle Runner 3D"></canvas>
+                <div class="powerchips" id="powerChips"></div>
+                <div class="countdown" id="countdown" hidden>3</div>
+            </div>
+        </div>
+
+        <div class="superbar">
+            <div class="superbar__track"><i id="superFill"></i></div>
+            <span class="superbar__label" id="superLabel">SÚPER 0%</span>
+        </div>
+
+        <div class="pad">
+            <button type="button" class="pad__btn pad__btn--jump" id="btnJump">▲<span>SALTAR</span></button>
+            <button type="button" class="pad__btn pad__btn--duck" id="btnDuck">▼<span>AGACHARSE</span></button>
+            <button type="button" class="pad__btn pad__btn--super" id="btnSuper" disabled>★<span>SÚPER</span></button>
+        </div>
+
+        <div class="controls">
+            <div class="controls__bet">
+                <button type="button" class="ctrl" id="betDown" aria-label="Bajar apuesta">−</button>
+                <div class="ctrl__screen"><span id="betDisplay">1</span></div>
+                <button type="button" class="ctrl" id="betUp" aria-label="Subir apuesta">+</button>
+            </div>
+            <button type="button" class="btn btn--primary" id="playBtn">CORRER</button>
+            <button type="button" class="btn btn--ghost" id="restartBtn">REINICIAR</button>
+        </div>
+
+        <p class="hint" id="hint">Vista 3D: salta obstáculos, agáchate bajo letreros y junta monedas. Espacio = saltar · ↓ = agacharse · E = súper.</p>
+    </div>
+
+    <div class="toast" id="toast" hidden><span id="toastMsg"></span></div>
+
+    <div class="overlay" id="overlay">
+        <div class="overlay__card">
+            <div class="overlay__icon" id="overlayIcon">🏃</div>
+            <h2 id="overlayTitle">CALLE RUNNER 3D</h2>
+            <p id="overlaySubtitle">
+                Corre por la calle en 3D, esquiva obstáculos y junta monedas.
+                Cada nivel es más rápido y paga más. Completa la distancia para cobrar el premio.
+            </p>
+            <div class="overlay__prize" id="overlayPrize" hidden>$0</div>
+            <div class="overlay__actions">
+                <a class="btn btn--ghost" href="/inicio/" data-inicio-link>Volver a juegos</a>
+                <button type="button" class="btn btn--secondary" id="overlayRetry" hidden>Reintentar</button>
+                <button type="button" class="btn btn--primary" id="overlayStart">Empezar a correr</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/shared/machine-client.js"></script>
+    <script src="/shared/player-auth.js"></script>
+    <script src="js/vendor/three.min.js?v=run6"></script>
+    <script src="js/world3d.js?v=run6"></script>
+    <script src="js/game.js?v=run6"></script>
+</body>
+</html>

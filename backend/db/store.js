@@ -91,7 +91,11 @@ function initLocal() {
 }
 
 async function reload() {
-    dirty = false;
+    // Never drop unflushed writes — that caused agents/cashiers to vanish
+    if (dirty) {
+        await flush();
+    }
+
     writesAllowed = true;
     loadedExistingDb = false;
 
@@ -1122,6 +1126,283 @@ function retryFightLevel(sessionId, owner, retentionPercent) {
         message: `Revanche nivel ${session.level} · cobrado $${session.bet}`};
 }
 
+/* Calle Runner sessions */
+function ensureRunnerSessions() {
+    if (!data.runner_sessions) data.runner_sessions = [];
+    if (!data.counters.runner_sessions) data.counters.runner_sessions = 0;
+}
+
+function pruneRunnerSessions() {
+    ensureRunnerSessions();
+    const cutoff = Date.now() - 1000 * 60 * 60 * 6;
+    data.runner_sessions = data.runner_sessions.filter((s) => {
+        if (s.status === 'running' || s.status === 'level_complete') return true;
+        return new Date(s.created_at).getTime() > cutoff;
+    });
+}
+
+function findRunnerSession(id) {
+    ensureRunnerSessions();
+    return data.runner_sessions.find((s) => s.id === parseInt(id, 10)) || null;
+}
+
+function findActiveRunnerSession({ machineId, userId }) {
+    ensureRunnerSessions();
+    return data.runner_sessions.find((s) => {
+        if (machineId && s.machine_id === machineId && (s.status === 'running' || s.status === 'level_complete')) return true;
+        if (userId && s.user_id === userId && (s.status === 'running' || s.status === 'level_complete')) return true;
+        return false;
+    }) || null;
+}
+
+function getRunnerOwnerBalance(session) {
+    if (session.machine_id) return findMachineById(session.machine_id)?.balance ?? 0;
+    return findUserById(session.user_id)?.game_balance ?? 0;
+}
+
+function chargeRunnerBet(owner, bet) {
+    if (owner.machineId) {
+        const m = findMachineById(owner.machineId);
+        if (!m || !m.active) throw new Error('Máquina no disponible');
+        if (m.balance < bet) throw new Error('Saldo insuficiente en la máquina');
+        m.balance -= bet;
+        addTransaction({
+            machine_id: owner.machineId, type: 'bet', amount: -bet,
+            balance_after: m.balance, game: 'calle-runner'});
+        return { balance: m.balance, machine_number: m.number };
+    }
+    const u = findUserById(owner.userId);
+    if (!u || u.role !== 'user' || !u.active) throw new Error('Usuario no disponible');
+    if ((u.game_balance || 0) < bet) throw new Error('Saldo insuficiente');
+    u.game_balance -= bet;
+    addTransaction({
+        user_id: owner.userId, type: 'bet', amount: -bet,
+        balance_after: u.game_balance, game: 'calle-runner'});
+    return { balance: u.game_balance, user_name: u.name };
+}
+
+function creditRunnerPrize(session, amount) {
+    if (amount <= 0) return getRunnerOwnerBalance(session);
+    if (session.machine_id) {
+        const m = findMachineById(session.machine_id);
+        m.balance += amount;
+        addTransaction({
+            machine_id: session.machine_id, type: 'win', amount,
+            balance_after: m.balance, game: 'calle-runner'});
+        return m.balance;
+    }
+    const u = findUserById(session.user_id);
+    u.game_balance += amount;
+    addTransaction({
+        user_id: session.user_id, type: 'win', amount,
+        balance_after: u.game_balance, game: 'calle-runner'});
+    return u.game_balance;
+}
+
+/** Devuelve la apuesta del intento actual (p. ej. al cerrar/reiniciar una carrera a medias). */
+function refundRunnerBet(session, amount) {
+    if (amount <= 0) return getRunnerOwnerBalance(session);
+    if (session.machine_id) {
+        const m = findMachineById(session.machine_id);
+        if (!m) return 0;
+        m.balance += amount;
+        addTransaction({
+            machine_id: session.machine_id, type: 'refund', amount,
+            balance_after: m.balance, game: 'calle-runner'});
+        return m.balance;
+    }
+    const u = findUserById(session.user_id);
+    if (!u) return 0;
+    u.game_balance = (u.game_balance || 0) + amount;
+    addTransaction({
+        user_id: session.user_id, type: 'refund', amount,
+        balance_after: u.game_balance, game: 'calle-runner'});
+    return u.game_balance;
+}
+
+function abandonRunnerSession(session, { refundAttempt = true } = {}) {
+    let refunded = 0;
+    // Si la carrera seguía en curso, el intento no se jugó hasta el final: se devuelve la apuesta.
+    if (refundAttempt && session.status === 'running') {
+        refunded = session.bet || 0;
+        refundRunnerBet(session, refunded);
+        session.betsPaid = Math.max(0, (session.betsPaid || session.bet) - refunded);
+    }
+    session.status = 'abandoned';
+    addGameRound({
+        machine_id: session.machine_id || null,
+        user_id: session.user_id || null,
+        game: 'calle-runner',
+        bet: session.bet,
+        payout: (session.totalWon || 0) + refunded,
+        net: (session.totalWon || 0) + refunded - (session.betsPaid || 0) - refunded,
+        result_json: JSON.stringify({
+            abandoned: true,
+            refunded,
+            levelReached: session.level,
+            totalWon: session.totalWon || 0})});
+    return refunded;
+}
+
+/** Consulta sin cobrar: carrera activa para retomar al reabrir la página. */
+function getActiveRunnerSession(owner) {
+    const runner = require('../engines/calle-runner');
+    ensureRunnerSessions();
+    pruneRunnerSessions();
+    const session = findActiveRunnerSession(owner);
+    if (!session) {
+        return {
+            active: false,
+            balance: owner.machineId
+                ? (findMachineById(owner.machineId)?.balance ?? 0)
+                : (findUserById(owner.userId)?.game_balance ?? 0),
+        };
+    }
+    return {
+        active: true,
+        resumed: session.status === 'running',
+        levelComplete: session.status === 'level_complete',
+        ...runner.publicRun(session),
+        balance: getRunnerOwnerBalance(session),
+        machine_number: session.machine_id ? findMachineById(session.machine_id)?.number : undefined,
+        user_name: session.user_id ? findUserById(session.user_id)?.name : undefined,
+        message: session.status === 'running'
+            ? `Carrera en curso · nivel ${session.level} (ya cobrada)`
+            : `Nivel ${session.level} completado · listo para el siguiente`,
+    };
+}
+
+function startRunnerSession(owner, bet, retentionPercent, { restart = false } = {}) {
+    const runner = require('../engines/calle-runner');
+    if (!runner.BETS.includes(bet)) throw new Error('Apuesta inválida');
+
+    ensureRunnerSessions();
+    pruneRunnerSessions();
+
+    let session = findActiveRunnerSession(owner);
+
+    if (restart && session) {
+        abandonRunnerSession(session, { refundAttempt: session.status === 'running' });
+        persist();
+        session = null;
+    }
+
+    // Carrera en curso (refresh del cliente): se retoma sin cobrar de nuevo
+    if (session && session.status === 'running') {
+        return {
+            ...runner.publicRun(session),
+            balance: getRunnerOwnerBalance(session),
+            machine_number: session.machine_id ? findMachineById(session.machine_id)?.number : undefined,
+            user_name: session.user_id ? findUserById(session.user_id)?.name : undefined,
+            resumed: true,
+            message: `Continúa nivel ${session.level}`};
+    }
+
+    let level = 1;
+    let claimedLevels = [];
+    let totalWon = 0;
+    let betsPaid = 0;
+
+    if (session && session.status === 'level_complete') {
+        level = session.level + 1;
+        claimedLevels = [...(session.claimedLevels || [])];
+        totalWon = session.totalWon || 0;
+        betsPaid = session.betsPaid || session.bet;
+        session.status = 'continued';
+    }
+
+    const charged = chargeRunnerBet(owner, bet);
+    betsPaid += bet;
+
+    const runData = runner.createRun(level, bet, retentionPercent);
+    const newSession = {
+        id: nextId('runner_sessions'),
+        machine_id: owner.machineId || null,
+        user_id: owner.userId || null,
+        bet,
+        betsPaid,
+        ...runData,
+        distance: 0,
+        coins: 0,
+        prizePaid: false,
+        claimedLevels,
+        totalWon,
+        status: 'running',
+        created_at: now()};
+    data.runner_sessions.push(newSession);
+    persist();
+
+    return {
+        ...runner.publicRun(newSession),
+        balance: charged.balance,
+        machine_number: charged.machine_number,
+        user_name: charged.user_name,
+        message: `Nivel ${level} · ${runData.goal} m · premio $${runData.prize}`};
+}
+
+function finishRunnerSession(sessionId, report, owner) {
+    const runner = require('../engines/calle-runner');
+    const session = findRunnerSession(sessionId);
+    if (!session || session.status !== 'running') {
+        throw new Error('Carrera no encontrada o ya terminada');
+    }
+    if (owner.machineId && session.machine_id !== owner.machineId) throw new Error('Partida no válida');
+    if (owner.userId && session.user_id !== owner.userId) throw new Error('Partida no válida');
+
+    const result = runner.settleRun(session, report);
+    let balance = getRunnerOwnerBalance(session);
+
+    if (result.awarded > 0) {
+        balance = creditRunnerPrize(session, result.awarded);
+    }
+
+    addGameRound({
+        machine_id: session.machine_id || null,
+        user_id: session.user_id || null,
+        game: 'calle-runner',
+        bet: session.bet,
+        payout: result.awarded,
+        net: result.awarded - session.bet,
+        result_json: JSON.stringify({
+            level: session.level,
+            completed: result.completed,
+            distance: result.distance,
+            coins: result.coins,
+            coinBonus: result.coinBonus})});
+
+    persist();
+    return {
+        ...result,
+        session: runner.publicRun(session),
+        balance};
+}
+
+function retryRunnerLevel(sessionId, owner, retentionPercent) {
+    const runner = require('../engines/calle-runner');
+    const session = findRunnerSession(sessionId);
+    if (!session) throw new Error('Partida no encontrada');
+    if (owner.machineId && session.machine_id !== owner.machineId) throw new Error('Partida no válida');
+    if (owner.userId && session.user_id !== owner.userId) throw new Error('Partida no válida');
+    if (session.status !== 'failed') throw new Error('Solo puedes reintentar una carrera perdida');
+
+    const charged = chargeRunnerBet(owner, session.bet);
+    session.betsPaid = (session.betsPaid || session.bet) + session.bet;
+    const runData = runner.createRun(session.level, session.bet, retentionPercent);
+    Object.assign(session, runData, {
+        distance: 0,
+        coins: 0,
+        prizePaid: (session.claimedLevels || []).includes(session.level),
+        status: 'running'});
+    persist();
+
+    return {
+        ...runner.publicRun(session),
+        balance: charged.balance,
+        machine_number: charged.machine_number,
+        user_name: charged.user_name,
+        message: `Reintento nivel ${session.level} · cobrado $${session.bet}`};
+}
+
 /* Transactions */
 function addTransaction(row) {
     const tx = { id: nextId('transactions'), created_at: now(), ...row };
@@ -1240,11 +1521,33 @@ function migrateUsernames() {
     if (changed) persist();
 }
 
+/** Juegos nuevos que deben aparecer en sucursales ya existentes (una sola vez). */
+const GAME_ROLLOUTS = { games_calle_runner: 'calle-runner' };
+
+function migrateNewGames() {
+    if (!data.migrations) data.migrations = {};
+    let changed = false;
+    for (const flag of Object.keys(GAME_ROLLOUTS)) {
+        if (data.migrations[flag]) continue;
+        const gameId = GAME_ROLLOUTS[flag];
+        (data.branches || []).forEach((b) => {
+            if (!Array.isArray(b.games) || !b.games.length) return;
+            if (b.games.includes(gameId)) return;
+            b.games.push(gameId);
+        });
+        data.migrations[flag] = now();
+        changed = true;
+    }
+    if (changed) persist();
+}
+
 function seedDefaults() {
     ensurePuzzleSessions();
     ensureFightSessions();
+    ensureRunnerSessions();
     seedBranches();
     ensureDefaultBranches();
+    migrateNewGames();
     migrateUsernames();
     ensureAdminUser();
     ensureDefaultAgent();
@@ -1295,7 +1598,7 @@ function createBranch(id, name, password) {
         password_hash: bcrypt.hashSync(finalPwd, 10),
         password_seed: finalPwd === 'sucursal123' ? 'sucursal123' : null,
         password_custom: finalPwd === 'sucursal123' ? 0 : 1,
-        games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'],
+        games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'],
         created_at: now()};
     data.branches.push(branch);
     ensureMachinesForBranch(cleanId, 3);
@@ -1432,7 +1735,7 @@ function unassignCashier(cashierId) {
 
 function getBranchGames(branchId) {
     const branch = findBranchById(branchId);
-    const defaults = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'];
+    const defaults = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'];
     if (!branch) return defaults;
     if (!Array.isArray(branch.games) || !branch.games.length) {
         branch.games = defaults;
@@ -1444,7 +1747,7 @@ function getBranchGames(branchId) {
 function setBranchGames(branchId, games) {
     const branch = findBranchById(branchId);
     if (!branch) throw new Error('Sucursal no encontrada');
-    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'];
+    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'];
     const list = (games || []).filter((g) => allowed.includes(g));
     if (!list.length) throw new Error('Selecciona al menos un juego');
     branch.games = list;
@@ -1462,7 +1765,8 @@ function getGamesCatalog() {
         'rascadito': 'Rascadito',
         'loteria': 'Lotería',
         'rompecabezas': 'Rompecabezas',
-        'calle-pelea': 'Calle Pelea'};
+        'calle-pelea': 'Calle Pelea',
+        'calle-runner': 'Calle Runner'};
     const ids = Object.keys(labels);
     return ids.map((id) => ({
         id,
@@ -1473,7 +1777,7 @@ function getGamesCatalog() {
 }
 
 function removeGameEverywhere(gameId, branchId = null) {
-    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'];
+    const allowed = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'];
     if (!allowed.includes(gameId)) throw new Error('Juego no válido');
 
     const targets = branchId
@@ -1552,7 +1856,7 @@ function ensureDefaultBranches() {
                 password_hash: DEFAULT_BRANCH_PASSWORD_HASH,
                 password_seed: 'sucursal123',
                 password_custom: 0,
-                games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'],
+                games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'],
                 created_at: now()});
             mutated = true;
         }
@@ -1565,7 +1869,7 @@ function ensureDefaultBranches() {
         if (b.password_hash !== beforeHash || b.password_seed !== beforeSeed || b.float_balance !== beforeFloat) {
             mutated = true;
         }
-        const catalog = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'];
+        const catalog = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'];
         if (!Array.isArray(b.games) || !b.games.length) {
             b.games = catalog.slice();
             mutated = true;
@@ -1613,6 +1917,7 @@ module.exports = {
     getTransactions, getStats, getScratchPrizePool,
     startPuzzleSession, movePuzzleSession, retryPuzzleLevel, findPuzzleSession,
     startFightSession, actionFightSession, retryFightLevel, findFightSession,
+    startRunnerSession, finishRunnerSession, retryRunnerLevel, findRunnerSession, getActiveRunnerSession,
     listBranches, findBranchById, createBranch, updateBranch, deleteBranch, seedBranches, ensureDefaultBranches, branchStats,
     sanitizeBranch, setBranchPassword, topUpBranch, transferAgentToBranch, ensureBranchAuth, assertBranchMachineAccess,
     ensureMachinesForBranch, assignCashierToBranch, unassignCashier, getBranchGames, setBranchGames,

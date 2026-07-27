@@ -231,6 +231,53 @@ const MachineAPI = (function () {
         });
     }
 
+    async function getActiveCalleRunner(machineNumber, branchId) {
+        return request('/api/play/calle-runner/active', {
+            method: 'POST',
+            body: JSON.stringify({
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+            }),
+        });
+    }
+
+    async function startCalleRunner(bet, restart, machineNumber, branchId) {
+        return request('/api/play/calle-runner/start', {
+            method: 'POST',
+            body: JSON.stringify({
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+                bet,
+                restart: !!restart,
+            }),
+        });
+    }
+
+    async function finishCalleRunner(sessionId, report, machineNumber, branchId) {
+        return request('/api/play/calle-runner/finish', {
+            method: 'POST',
+            body: JSON.stringify({
+                sessionId,
+                completed: !!(report && report.completed),
+                distance: report ? report.distance : 0,
+                coins: report ? report.coins : 0,
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+            }),
+        });
+    }
+
+    async function retryCalleRunner(sessionId, machineNumber, branchId) {
+        return request('/api/play/calle-runner/retry', {
+            method: 'POST',
+            body: JSON.stringify({
+                sessionId,
+                machineNumber: machineNumber || getMachineNumber(),
+                branch_id: branchId || getBranchId(),
+            }),
+        });
+    }
+
     function clearBinding() {
         localStorage.removeItem(KEY);
         localStorage.removeItem(BRANCH_KEY);
@@ -293,6 +340,7 @@ const MachineAPI = (function () {
         playLoteria,
         startRompecabezas, moveRompecabezas, retryRompecabezas,
         startCallePelea, actionCallePelea, retryCallePelea,
+        getActiveCalleRunner, startCalleRunner, finishCalleRunner, retryCalleRunner,
         formatPesos, requireMachine, wireInicioLinks, apiBase,
     };
 })();

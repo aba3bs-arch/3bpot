@@ -31,6 +31,7 @@
     'loteria': { href: '/loteria/', icon: '🎴', name: 'Lotería' },
     'rompecabezas': { href: '/rompecabezas/', icon: '🧩', name: 'Rompecabezas' },
     'calle-pelea': { href: '/calle-pelea/', icon: '🥊', name: 'Calle Pelea' },
+    'calle-runner': { href: '/calle-runner/', icon: '🏃', name: 'Calle Runner' },
   };
 
   function showError(el, msg) {
