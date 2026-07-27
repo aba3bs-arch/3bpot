@@ -24,9 +24,9 @@ function emptyData() {
 
 let data = emptyData();
 let dirty = false;
-/** False after a failed blob read — must never flush seeds over real data. */
-let writesAllowed = true;
-/** True when the blob/file already had a real DB (not first-boot empty). */
+/** True after a successful blob/file read this process — safe to overwrite blob. */
+let blobSynced = false;
+/** True when we know the DB had real content (users/branches/balances). */
 let loadedExistingDb = false;
 
 function normalizeDb(raw) {
@@ -49,7 +49,9 @@ function dbHasRealData(db) {
     if (Array.isArray(db.users) && db.users.some((u) => (u.game_balance || 0) > 0 || (u.float_balance || 0) > 0)) return true;
     if (Array.isArray(db.branches) && db.branches.some((b) => (b.float_balance || 0) > 0 && (b.float_balance || 0) !== 5000)) return true;
     if (Array.isArray(db.machines) && db.machines.length > 0) return true;
-    if (Array.isArray(db.users) && db.users.length > 0) return true;
+    if (Array.isArray(db.users) && db.users.some((u) => u.role === 'cashier' || u.role === 'agent')) return true;
+    if (Array.isArray(db.users) && db.users.length > 1) return true;
+    if (Array.isArray(db.branches) && db.branches.length > 0) return true;
     return false;
 }
 
@@ -76,11 +78,6 @@ async function saveToBlob() {
 }
 
 function persist() {
-    // Never mark dirty after a failed blob read with empty memory — that overwrote production with demo.
-    if (!writesAllowed) {
-        console.warn('[store] persist ignored — writes locked after blob load failure');
-        return;
-    }
     if (isServerless) dirty = true;
     else saveToFile(DB_FILE);
 }
@@ -90,99 +87,123 @@ function saveToFile(fp) { fs.writeFileSync(fp, JSON.stringify(data, null, 2), 'u
 function initLocal() {
     data = loadFromFile(DB_FILE);
     loadedExistingDb = dbHasRealData(data);
-    writesAllowed = true;
+    blobSynced = true;
     seedDefaults();
 }
 
 function isWriteLocked() {
-    return !writesAllowed;
+    return false;
 }
 
 function hasLoadedExistingDb() {
     return loadedExistingDb;
 }
 
+function memoryLooksPopulated() {
+    return dbHasRealData(data)
+        || (Array.isArray(data.users) && data.users.length > 0)
+        || (Array.isArray(data.branches) && data.branches.length > 0);
+}
+
 async function reload() {
     // Never drop unflushed writes — that caused agents/cashiers to vanish
-    if (dirty && writesAllowed) {
+    if (dirty) {
         await flush();
     }
 
-    writesAllowed = true;
-    loadedExistingDb = false;
+    const previous = data;
 
     if (isServerless) {
         try {
             const stored = await loadFromBlob();
             if (stored) {
                 data = stored;
-                loadedExistingDb = dbHasRealData(stored) || !!(stored.users && stored.users.length) || !!(stored.branches && stored.branches.length);
-                writesAllowed = true;
+                loadedExistingDb = dbHasRealData(stored) || memoryLooksPopulated();
+                blobSynced = true;
             } else {
-                // Blob key missing: first deploy. Allow writes so admin can be created,
-                // but seedDefaults will NOT create demo branches/agents.
-                data = emptyData();
-                loadedExistingDb = false;
-                writesAllowed = true;
-                console.warn('[store] blob empty — first boot (sin demo automático)');
+                // Key missing: first boot OR wiped. Keep previous memory if we had data.
+                if (memoryLooksPopulated()) {
+                    loadedExistingDb = true;
+                    blobSynced = false;
+                    console.warn('[store] blob empty — keeping in-memory DB');
+                } else {
+                    data = emptyData();
+                    loadedExistingDb = false;
+                    blobSynced = true; // safe to create fresh DB in blob
+                    console.warn('[store] blob empty — first boot (sin demo automática)');
+                }
             }
         } catch (e) {
             console.error('[store] blob load failed:', e.message);
             const tmp = loadFromFile(TMP_DB);
             if (dbHasRealData(tmp) || (tmp.users && tmp.users.length) || (tmp.branches && tmp.branches.length)) {
-                // Serve last known good snapshot; allow writes so credits can retry flush to blob
                 data = tmp;
                 loadedExistingDb = true;
-                writesAllowed = true;
+                blobSynced = false;
                 console.warn('[store] using /tmp snapshot after blob error');
+            } else if (previous && (dbHasRealData(previous) || (previous.users && previous.users.length) || (previous.branches && previous.branches.length))) {
+                // Keep warm-instance memory — do NOT wipe to emptyData
+                data = previous;
+                loadedExistingDb = true;
+                blobSynced = false;
+                console.warn('[store] blob failed — keeping previous in-memory DB');
             } else {
-                // CRITICAL: do not seed+flush empty demo over a blob we failed to read
                 data = emptyData();
                 loadedExistingDb = false;
-                writesAllowed = false;
-                console.error('[store] write lock ON — refusing to seed over unread blob');
+                blobSynced = false;
+                console.warn('[store] blob failed — empty memory; writes go to /tmp until blob recovers');
             }
         }
     } else {
         data = loadFromFile(DB_FILE);
         loadedExistingDb = dbHasRealData(data) || data.users.length > 0 || data.branches.length > 0;
-        writesAllowed = true;
+        blobSynced = true;
     }
     seedDefaults();
 }
 
 async function flush() {
     if (!dirty) return;
-    if (!writesAllowed) {
-        console.error('[store] flush blocked — writes locked');
-        dirty = false;
-        return;
-    }
-
-    // Block flushing a brand-new empty shell (no admin yet) unless explicitly allowed
-    if (!loadedExistingDb && !dbHasRealData(data)) {
-        const hasAdmin = Array.isArray(data.users) && data.users.some((u) => u.role === 'admin');
-        if (!hasAdmin && process.env.ALLOW_EMPTY_DB_BOOTSTRAP !== '1' && process.env.ENABLE_DEMO_SEED !== '1') {
-            console.error('[store] flush blocked — refusing empty bootstrap');
-            dirty = false;
-            return;
-        }
-    }
 
     try {
         if (isServerless) {
+            // Avoid overwriting a healthy blob with a half-empty memory after a failed read
+            if (!blobSynced) {
+                try {
+                    const existing = await loadFromBlob();
+                    if (existing && dbHasRealData(existing)) {
+                        const existingScore = (existing.users?.length || 0) + (existing.branches?.length || 0) + (existing.machines?.length || 0);
+                        const localScore = (data.users?.length || 0) + (data.branches?.length || 0) + (data.machines?.length || 0);
+                        if (localScore < existingScore) {
+                            console.warn('[store] flush skipped — blob has more data than memory; adopting blob');
+                            data = existing;
+                            loadedExistingDb = true;
+                            blobSynced = true;
+                            dirty = false;
+                            try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
+                            return;
+                        }
+                    }
+                    // Blob empty/missing or our memory is richer — write it
+                    blobSynced = true;
+                } catch (e) {
+                    console.warn('[store] pre-flush blob check failed, writing /tmp only:', e.message);
+                    try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
+                    // Keep dirty so a later request retries blob
+                    return;
+                }
+            }
             await saveToBlob();
         } else {
             saveToFile(DB_FILE);
         }
         try { saveToFile(TMP_DB); } catch (_) { /* ignore tmp errors */ }
         loadedExistingDb = true;
-        writesAllowed = true;
+        blobSynced = true;
     } catch (e) {
         console.warn('[store] blob save failed, writing /tmp mirror:', e.message);
         try { saveToFile(TMP_DB); } catch (e2) {
             console.error('[store] tmp save failed:', e2.message);
-            // Keep dirty so a later request can retry
             return;
         }
     }

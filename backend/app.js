@@ -21,11 +21,6 @@ if (isServerless) {
     app.use(async (req, res, next) => {
         try {
             await store.reload();
-            if (store.isWriteLocked()) {
-                return res.status(503).json({
-                    error: 'Base de datos temporalmente no disponible. Reintenta en unos segundos (no se borraron datos).',
-                });
-            }
 
             // Await flush before the response fully ends so bets/credits survive cold starts
             const originalEnd = res.end;
@@ -45,7 +40,7 @@ if (isServerless) {
             next();
         } catch (err) {
             console.error('[store] reload:', err);
-            res.status(503).json({ error: 'No se pudo cargar la base de datos' });
+            next(err);
         }
     });
 } else {
