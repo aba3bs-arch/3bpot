@@ -26,6 +26,8 @@ let data = emptyData();
 let dirty = false;
 /** True after a successful blob/file read this process — safe to overwrite blob. */
 let blobSynced = false;
+/** ETag from last blob read — compare-and-swap writes. */
+let blobEtag = null;
 /** True when we know the DB had real content (users/branches/balances). */
 let loadedExistingDb = false;
 /** Serialize reload/flush on the same warm instance to reduce lost updates. */
@@ -37,6 +39,40 @@ function withStoreLock(fn) {
     return run;
 }
 
+function entityTime(e) {
+    if (!e || typeof e !== 'object') return 0;
+    return Date.parse(e.updated_at || e.created_at || '') || 0;
+}
+
+function touch(entity) {
+    if (entity && typeof entity === 'object') entity.updated_at = new Date().toISOString();
+    return entity;
+}
+
+function ensureDeletedMap(db = data) {
+    if (!db.deleted || typeof db.deleted !== 'object') {
+        db.deleted = { users: {}, machines: {}, branches: {} };
+    }
+    if (!db.deleted.users) db.deleted.users = {};
+    if (!db.deleted.machines) db.deleted.machines = {};
+    if (!db.deleted.branches) db.deleted.branches = {};
+    return db.deleted;
+}
+
+function markDeleted(kind, id) {
+    ensureDeletedMap()[kind][String(id)] = new Date().toISOString();
+}
+
+function pickNewer(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const ta = entityTime(a);
+    const tb = entityTime(b);
+    if (tb > ta) return b;
+    if (ta > tb) return a;
+    return b; // same time: prefer local (in-flight)
+}
+
 function normalizeDb(raw) {
     if (!raw || typeof raw !== 'object') return emptyData();
     if (!raw.settings) raw.settings = emptyData().settings;
@@ -46,6 +82,7 @@ function normalizeDb(raw) {
     if (!raw.transactions) raw.transactions = [];
     if (!raw.game_rounds) raw.game_rounds = [];
     if (!raw.counters) raw.counters = emptyData().counters;
+    ensureDeletedMap(raw);
     return raw;
 }
 
@@ -72,23 +109,91 @@ function loadFromFile(filePath) {
     }
 }
 
+function getBlobStore() {
+    const { getStore } = require('@netlify/blobs');
+    try {
+        return getStore({ name: 'winpot-db', consistency: 'strong' });
+    } catch (_) {
+        return getStore('winpot-db');
+    }
+}
+
+async function loadFromBlobMeta() {
+    const blobStore = getBlobStore();
+    try {
+        const result = await blobStore.getWithMetadata('data', { type: 'json' });
+        if (!result || result.data == null) return { db: null, etag: null };
+        return { db: normalizeDb(result.data), etag: result.etag || null };
+    } catch (_) {
+        const stored = await blobStore.get('data', { type: 'json' });
+        if (!stored) return { db: null, etag: null };
+        return { db: normalizeDb(stored), etag: null };
+    }
+}
+
 async function loadFromBlob() {
-    const { getStore } = require('@netlify/blobs');
-    const blobStore = getStore('winpot-db');
-    const stored = await blobStore.get('data', { type: 'json' });
-    if (!stored) return null;
-    return normalizeDb(stored);
+    const { db } = await loadFromBlobMeta();
+    return db;
 }
 
-async function saveToBlob() {
-    const { getStore } = require('@netlify/blobs');
-    await getStore('winpot-db').setJSON('data', data);
+async function saveToBlobCas(dbToSave, etag) {
+    const blobStore = getBlobStore();
+    const opts = etag ? { onlyIfMatch: etag } : { onlyIfNew: true };
+    try {
+        const result = await blobStore.setJSON('data', dbToSave, opts);
+        if (result && typeof result === 'object' && 'modified' in result) return result;
+        return { modified: true, etag: (result && result.etag) || null };
+    } catch (e) {
+        const msg = String((e && e.message) || e);
+        if (/412|precondition|not match|already exists|conflict/i.test(msg)) {
+            return { modified: false };
+        }
+        // Older @netlify/blobs without conditional writes — plain overwrite after merge
+        if (/onlyIf|unknown|unsupported|invalid option/i.test(msg)) {
+            await blobStore.setJSON('data', dbToSave);
+            return { modified: true };
+        }
+        throw e;
+    }
 }
 
-/** Merge blob (base) with local dirty memory (overlay). Local wins on same ids/usernames. */
+function mergeDeletedMaps(baseDel, locDel) {
+    const out = { users: {}, machines: {}, branches: {} };
+    for (const kind of ['users', 'machines', 'branches']) {
+        const a = (baseDel && baseDel[kind]) || {};
+        const b = (locDel && locDel[kind]) || {};
+        for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+            const ta = Date.parse(a[k] || '') || 0;
+            const tb = Date.parse(b[k] || '') || 0;
+            out[kind][k] = ta >= tb ? (a[k] || b[k]) : (b[k] || a[k]);
+        }
+    }
+    return out;
+}
+
+function applyTombstones(db) {
+    const del = ensureDeletedMap(db);
+    db.users = (db.users || []).filter((u) => {
+        const tDel = Date.parse((del.users || {})[String(u.id)] || '') || 0;
+        return !tDel || entityTime(u) > tDel;
+    });
+    db.machines = (db.machines || []).filter((m) => {
+        const tDel = Date.parse((del.machines || {})[String(m.id)] || '') || 0;
+        return !tDel || entityTime(m) > tDel;
+    });
+    db.branches = (db.branches || []).filter((b) => {
+        const tDel = Date.parse((del.branches || {})[String(b.id).toLowerCase()] || '') || 0;
+        return !tDel || entityTime(b) > tDel;
+    });
+    return db;
+}
+
+/** Merge remote (base) with local. Prefer newer updated_at — never wipe fresher cashiers/balances. */
 function mergeDatabases(base, local) {
     const out = normalizeDb(JSON.parse(JSON.stringify(base || emptyData())));
     const loc = normalizeDb(local || emptyData());
+
+    out.deleted = mergeDeletedMaps(out.deleted, loc.deleted);
 
     const userById = new Map((out.users || []).map((u) => [u.id, u]));
     const userByKey = new Map();
@@ -99,19 +204,32 @@ function mergeDatabases(base, local) {
     for (const u of loc.users || []) {
         const k = (u.username || u.email || '').toString().trim().toLowerCase().replace(/\s+/g, '');
         if (k && userByKey.has(k) && userByKey.get(k).id !== u.id) {
-            userById.delete(userByKey.get(k).id);
+            const other = userByKey.get(k);
+            const winner = pickNewer(other, u);
+            if (winner === u) {
+                userById.delete(other.id);
+                userById.set(u.id, u);
+                userByKey.set(k, u);
+            }
+            continue;
         }
-        userById.set(u.id, u);
-        if (k) userByKey.set(k, u);
+        const winner = pickNewer(userById.get(u.id), u);
+        userById.set(u.id, winner);
+        if (k) userByKey.set(k, winner);
     }
     out.users = [...userById.values()];
 
     const branchById = new Map((out.branches || []).map((b) => [String(b.id).toLowerCase(), b]));
-    for (const b of loc.branches || []) branchById.set(String(b.id).toLowerCase(), b);
+    for (const b of loc.branches || []) {
+        const key = String(b.id).toLowerCase();
+        branchById.set(key, pickNewer(branchById.get(key), b));
+    }
     out.branches = [...branchById.values()];
 
     const machineById = new Map((out.machines || []).map((m) => [m.id, m]));
-    for (const m of loc.machines || []) machineById.set(m.id, m);
+    for (const m of loc.machines || []) {
+        machineById.set(m.id, pickNewer(machineById.get(m.id), m));
+    }
     out.machines = [...machineById.values()];
 
     out.counters = { ...(out.counters || {}) };
@@ -144,16 +262,15 @@ function mergeDatabases(base, local) {
         out.game_rounds = out.game_rounds.slice(-5000);
     }
 
-    // Sessions: prefer local (active play)
     for (const key of ['puzzle_sessions', 'fight_sessions', 'runner_sessions', 'zone_sessions']) {
         const baseList = Array.isArray(out[key]) ? out[key] : [];
         const locList = Array.isArray(loc[key]) ? loc[key] : [];
-        const byId = new Map(baseList.map((s) => [s.id, s]));
-        for (const s of locList) byId.set(s.id, s);
+        const byId = new Map(baseList.map((sess) => [sess.id, sess]));
+        for (const sess of locList) byId.set(sess.id, pickNewer(byId.get(sess.id), sess));
         out[key] = [...byId.values()];
     }
 
-    return out;
+    return applyTombstones(out);
 }
 
 function persist() {
@@ -194,17 +311,20 @@ async function reload() {
 
         if (isServerless) {
             try {
-                const stored = await loadFromBlob();
+                const { db: stored, etag } = await loadFromBlobMeta();
                 if (stored) {
-                    data = stored;
+                    data = applyTombstones(stored);
+                    blobEtag = etag;
                     loadedExistingDb = dbHasRealData(stored) || memoryLooksPopulated();
                     blobSynced = true;
                 } else if (memoryLooksPopulated()) {
                     loadedExistingDb = true;
                     blobSynced = false;
+                    blobEtag = null;
                     console.warn('[store] blob empty — keeping in-memory DB');
                 } else {
                     data = emptyData();
+                    blobEtag = null;
                     loadedExistingDb = false;
                     blobSynced = true;
                     console.warn('[store] blob empty — first boot (sin demo automática)');
@@ -243,33 +363,49 @@ async function flushUnlocked() {
 
     try {
         if (isServerless) {
-            try {
-                const existing = await loadFromBlob();
-                if (existing) {
-                    // Always merge — never discard local creates because blob "looks bigger"
-                    data = mergeDatabases(existing, data);
+            const localCopy = data;
+            let lastErr = null;
+            for (let attempt = 0; attempt < 12; attempt++) {
+                try {
+                    const { db: existing, etag } = await loadFromBlobMeta();
+                    let merged = existing
+                        ? mergeDatabases(existing, localCopy)
+                        : normalizeDb(JSON.parse(JSON.stringify(localCopy)));
+                    merged = applyTombstones(merged);
+
+                    const result = await saveToBlobCas(merged, existing ? etag : null);
+                    if (result.modified) {
+                        data = merged;
+                        blobEtag = result.etag || etag;
+                        blobSynced = true;
+                        loadedExistingDb = true;
+                        try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
+                        dirty = false;
+                        return;
+                    }
+                    await new Promise((r) => setTimeout(r, 15 + attempt * 25));
+                } catch (e) {
+                    lastErr = e;
+                    console.warn('[store] blob CAS attempt failed:', e.message);
+                    await new Promise((r) => setTimeout(r, 20 + attempt * 30));
                 }
-                await saveToBlob();
-                blobSynced = true;
-            } catch (e) {
-                console.warn('[store] blob save/merge failed, writing /tmp:', e.message);
-                try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
-                return; // keep dirty for retry
             }
-        } else {
-            saveToFile(DB_FILE);
+            console.warn('[store] blob CAS exhausted, writing /tmp:', lastErr && lastErr.message);
+            try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
+            return; // keep dirty for retry
         }
+
+        saveToFile(DB_FILE);
         try { saveToFile(TMP_DB); } catch (_) { /* ignore tmp errors */ }
         loadedExistingDb = true;
         blobSynced = true;
+        dirty = false;
     } catch (e) {
         console.warn('[store] flush failed:', e.message);
         try { saveToFile(TMP_DB); } catch (e2) {
             console.error('[store] tmp save failed:', e2.message);
-            return;
         }
     }
-    dirty = false;
 }
 
 async function flush() {
@@ -332,7 +468,8 @@ function createUser(username, passwordHash, name, role = 'cashier', branchId = n
         float_balance: ['cashier', 'agent'].includes(role) ? 0 : 0,
         game_balance: role === 'user' ? 0 : 0,
         active: 1,
-        created_at: now()};
+        created_at: now(),
+        updated_at: now()};
     data.users.push(user);
     persist();
     return user;
@@ -398,6 +535,9 @@ function creditPlayer(userId, amount, opts = {}) {
     // admin: mints without deducting
 
     u.game_balance = (u.game_balance || 0) + amount;
+    touch(u);
+    if (opts.branchId) touch(findBranchById(opts.branchId));
+    if (opts.agentId) touch(findUserById(opts.agentId));
     addTransaction({
         user_id: userId,
         branch_id: opts.branchId || u.branch_id || null,
@@ -465,6 +605,7 @@ function updateStaffUser(id, updates = {}) {
         u.password_hash = bcrypt.hashSync(pwd, 10);
     }
     if (updates.active != null) u.active = updates.active ? 1 : 0;
+    touch(u);
     persist();
     return sanitizeUser(u);
 }
@@ -480,6 +621,7 @@ function deleteStaffUser(id) {
             if (player.parent_id === u.id) player.parent_id = null;
         });
     }
+    markDeleted('users', u.id);
     data.users = data.users.filter((x) => x.id !== u.id);
     persist();
     return true;
@@ -490,6 +632,7 @@ function topUpCashier(cashierId, amount, adminId, note) {
     if (!c || c.role !== 'cashier') throw new Error('Cajero no encontrado');
     if (amount <= 0) throw new Error('Monto inválido');
     c.float_balance = (c.float_balance || 0) + amount;
+    touch(c);
     addTransaction({
         user_id: cashierId, type: 'float_topup', amount, balance_after: c.float_balance,
         note: note || 'Inyección admin', admin_id: adminId});
@@ -502,6 +645,7 @@ function topUpAgent(agentId, amount, adminId, note) {
     if (!a || a.role !== 'agent') throw new Error('Agente no encontrado');
     if (amount <= 0) throw new Error('Monto inválido');
     a.float_balance = (a.float_balance || 0) + amount;
+    touch(a);
     addTransaction({
         user_id: agentId, type: 'float_topup', amount, balance_after: a.float_balance,
         note: note || 'Inyección admin a agente', admin_id: adminId});
@@ -559,7 +703,8 @@ function createMachine(number, name, branchId = null) {
         branch_id: branchId,
         balance: 0,
         active: 1,
-        created_at: now()};
+        created_at: now(),
+        updated_at: now()};
     data.machines.push(machine);
     persist();
     return machine;
@@ -647,6 +792,9 @@ function creditMachine(machineId, amount, opts = {}) {
     }
 
     m.balance += amount;
+    touch(m);
+    if (opts.branchId) touch(findBranchById(opts.branchId));
+    if (opts.cashierId) touch(findUserById(opts.cashierId));
     addTransaction({
         user_id: opts.cashierId || null,
         branch_id: opts.branchId || m.branch_id || null,
@@ -690,6 +838,8 @@ function creditUser(userId, amount, opts = {}) {
     }
 
     u.game_balance = (u.game_balance || 0) + amount;
+    touch(u);
+    if (opts.cashierId) touch(findUserById(opts.cashierId));
     addTransaction({
         user_id: userId,
         type: 'cash_sale',
@@ -717,6 +867,7 @@ function playUser(userId, bet, game, result) {
     }
 
     addGameRound({ user_id: userId, game, bet, payout: result.payout, net: result.net, result_json: JSON.stringify(result) });
+    touch(u);
     persist();
     return { ...result, balance: u.game_balance, user_name: u.name };
 }
@@ -735,6 +886,7 @@ function playMachine(machineId, bet, game, result) {
     }
 
     addGameRound({ machine_id: machineId, game, bet, payout: result.payout, net: result.net, result_json: JSON.stringify(result) });
+    touch(m);
     persist();
     return { ...result, balance: m.balance, machine_number: m.number };
 }
@@ -1711,7 +1863,8 @@ function createBranch(id, name, password) {
         password_seed: finalPwd === 'sucursal123' ? 'sucursal123' : null,
         password_custom: finalPwd === 'sucursal123' ? 0 : 1,
         games: ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'],
-        created_at: now()};
+        created_at: now(),
+        updated_at: now()};
     data.branches.push(branch);
     ensureMachinesForBranch(cleanId, 3);
     persist();
@@ -1786,6 +1939,7 @@ function topUpBranch(branchId, amount, adminId, note) {
     if (!branch) throw new Error('Sucursal no encontrada');
     if (amount <= 0) throw new Error('Monto inválido');
     branch.float_balance = (branch.float_balance || 0) + amount;
+    touch(branch);
     addTransaction({
         branch_id: branchId, type: 'float_topup', amount, balance_after: branch.float_balance,
         note: note || 'Inyección admin a sucursal', admin_id: adminId});
@@ -1933,6 +2087,7 @@ function updateBranch(id, updates = {}) {
     }
     if (updates.active != null) branch.active = updates.active ? 1 : 0;
     if (updates.password) setBranchPassword(id, updates.password);
+    touch(branch);
     persist();
     return sanitizeBranch(branch);
 }
@@ -1943,6 +2098,9 @@ function deleteBranch(id) {
     data.users.forEach((u) => {
         if (u.branch_id === id) u.branch_id = null;
     });
+    const removedMachines = data.machines.filter((m) => m.branch_id === id);
+    removedMachines.forEach((m) => markDeleted('machines', m.id));
+    markDeleted('branches', id);
     data.machines = data.machines.filter((m) => m.branch_id !== id);
     data.branches = data.branches.filter((b) => b.id !== id);
     persist();

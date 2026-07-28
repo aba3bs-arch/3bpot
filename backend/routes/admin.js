@@ -124,11 +124,12 @@ router.delete('/cashiers/:id', async (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/cashiers/:id/float', (req, res) => {
+router.post('/cashiers/:id/float', async (req, res) => {
     const amount = parseInt(req.body.amount, 10);
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
     try {
         const balance = store.topUpCashier(parseInt(req.params.id, 10), amount, req.user.id, req.body.note);
+        await store.flush();
         res.json({ float_balance: balance, message: `$${amount} inyectados al cajero` });
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -156,9 +157,10 @@ router.get('/branches', (_req, res) => {
     });
 });
 
-router.post('/branches', (req, res) => {
+router.post('/branches', async (req, res) => {
     try {
         const out = store.createBranch(req.body.id, req.body.name, req.body.password);
+        await store.flush();
         res.status(201).json({
             branch: out.branch,
             password: out.password,
