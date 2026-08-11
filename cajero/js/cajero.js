@@ -230,11 +230,12 @@
         const fd = new FormData(e.target);
         try {
             const data = await StaffAuth.loginBranch(fd.get('branch_id'), fd.get('password'));
-            if ((data.user && data.user.role === 'branch') || (data.branch && data.branch.role === 'branch')) {
+            const role = data.user && data.user.role;
+            if (role === 'branch' || role === 'cashier') {
                 showApp();
             } else {
                 StaffAuth.clearSession();
-                throw new Error('Esta cuenta no es una sucursal');
+                throw new Error('Esta cuenta no es de caja');
             }
         } catch (err) {
             errEl.textContent = err.message || 'No se pudo entrar';
@@ -257,5 +258,5 @@
         });
     }
 
-    if (StaffAuth.isLoggedIn() && StaffAuth.getUser()?.role === 'branch') showApp();
+    if (StaffAuth.isLoggedIn() && ['branch', 'cashier'].includes(StaffAuth.getUser()?.role)) showApp();
 })();

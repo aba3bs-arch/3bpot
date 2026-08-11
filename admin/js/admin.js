@@ -12,8 +12,8 @@
     let agentsCache = [];
     let cashiersCache = [];
 
-    const GAME_LABELS = { 'spin-wheel': 'Ruleta', 'comic-slot': 'Slot', 'crystal-wins': 'Crystal Wins', 'rancho-lazo': 'Rancho', 'laguna-anzuelo': 'Laguna Anzuelo', 'rascadito': 'Rascadito', 'loteria': 'Lotería', 'rompecabezas': 'Rompecabezas', 'calle-pelea': 'Calle Pelea' };
-    const ALL_GAMES = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea'];
+    const GAME_LABELS = { 'spin-wheel': 'Ruleta', 'comic-slot': 'Slot', 'crystal-wins': 'Crystal Wins', 'rancho-lazo': 'Rancho', 'laguna-anzuelo': 'Laguna Anzuelo', 'rascadito': 'Rascadito', 'loteria': 'Lotería', 'rompecabezas': 'Rompecabezas', 'calle-pelea': 'Calle Pelea', 'calle-runner': 'Calle Runner' };
+    const ALL_GAMES = ['spin-wheel', 'comic-slot', 'crystal-wins', 'rancho-lazo', 'laguna-anzuelo', 'rascadito', 'loteria', 'rompecabezas', 'calle-pelea', 'calle-runner'];
 
     function showToast(msg, err, ms) {
         toast.textContent = msg;

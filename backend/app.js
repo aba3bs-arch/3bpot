@@ -48,7 +48,12 @@ if (isServerless) {
 }
 
 app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, currency: 'MXN', mode: 'arcade' });
+    res.json({
+        ok: true,
+        currency: 'MXN',
+        mode: 'arcade',
+        persist: store.getPersistStatus(),
+    });
 });
 
 app.use('/api/auth', authRoutes);

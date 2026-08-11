@@ -359,7 +359,7 @@ async function reload() {
 }
 
 async function flushUnlocked() {
-    if (!dirty) return;
+    if (!dirty) return { ok: true, synced: true, skipped: true };
 
     try {
         if (isServerless) {
@@ -372,6 +372,7 @@ async function flushUnlocked() {
                         ? mergeDatabases(existing, localCopy)
                         : normalizeDb(JSON.parse(JSON.stringify(localCopy)));
                     merged = applyTombstones(merged);
+                    syncCountersFromData(merged);
 
                     const result = await saveToBlobCas(merged, existing ? etag : null);
                     if (result.modified) {
@@ -381,7 +382,7 @@ async function flushUnlocked() {
                         loadedExistingDb = true;
                         try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
                         dirty = false;
-                        return;
+                        return { ok: true, synced: true };
                     }
                     await new Promise((r) => setTimeout(r, 15 + attempt * 25));
                 } catch (e) {
@@ -390,9 +391,10 @@ async function flushUnlocked() {
                     await new Promise((r) => setTimeout(r, 20 + attempt * 30));
                 }
             }
-            console.warn('[store] blob CAS exhausted, writing /tmp:', lastErr && lastErr.message);
+            const msg = (lastErr && lastErr.message) || 'CAS conflict after retries';
+            console.error('[store] blob CAS exhausted — create NOT durable:', msg);
             try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
-            return; // keep dirty for retry
+            return { ok: false, synced: false, error: msg };
         }
 
         saveToFile(DB_FILE);
@@ -400,11 +402,13 @@ async function flushUnlocked() {
         loadedExistingDb = true;
         blobSynced = true;
         dirty = false;
+        return { ok: true, synced: true };
     } catch (e) {
         console.warn('[store] flush failed:', e.message);
         try { saveToFile(TMP_DB); } catch (e2) {
             console.error('[store] tmp save failed:', e2.message);
         }
+        return { ok: false, synced: false, error: e.message };
     }
 }
 
@@ -412,7 +416,61 @@ async function flush() {
     return withStoreLock(() => flushUnlocked());
 }
 
-function nextId(key) { data.counters[key] = (data.counters[key] || 0) + 1; return data.counters[key]; }
+/** Flush and throw if the write did not land (so APIs don't claim success). */
+async function flushOrThrow() {
+    const result = await flush();
+    if (result && result.ok === false) {
+        const err = new Error('No se pudo guardar. Reintenta en unos segundos.');
+        err.code = 'PERSIST_FAILED';
+        err.status = 503;
+        throw err;
+    }
+    return result;
+}
+
+function syncCountersFromData(db = data) {
+    if (!db.counters) db.counters = emptyData().counters;
+    const maxNum = (arr, pick) => (arr || []).reduce((m, x) => {
+        const n = Number(pick(x));
+        return Number.isFinite(n) ? Math.max(m, n) : m;
+    }, 0);
+    db.counters.users = Math.max(db.counters.users || 0, maxNum(db.users, (u) => u.id));
+    db.counters.machines = Math.max(db.counters.machines || 0, maxNum(db.machines, (m) => m.id));
+    db.counters.transactions = Math.max(db.counters.transactions || 0, maxNum(db.transactions, (t) => t.id));
+    db.counters.game_rounds = Math.max(db.counters.game_rounds || 0, maxNum(db.game_rounds, (r) => r.id));
+    for (const key of ['puzzle_sessions', 'fight_sessions', 'runner_sessions', 'zone_sessions']) {
+        db.counters[key] = Math.max(db.counters[key] || 0, maxNum(db[key], (s) => s.id));
+    }
+}
+
+function nextId(key) {
+    syncCountersFromData(data);
+    const prev = data.counters[key] || 0;
+    let n = prev + 1;
+    // Serverless: jump with time+noise so concurrent Lambdas rarely share the same id
+    if (isServerless) {
+        const stamped = (Date.now() % 1e11) * 100 + Math.floor(Math.random() * 100);
+        n = Math.max(n, stamped);
+    }
+    data.counters[key] = n;
+    return n;
+}
+
+function getPersistStatus() {
+    return {
+        serverless: isServerless,
+        dirty,
+        blobSynced,
+        loadedExistingDb,
+        counts: {
+            users: (data.users || []).length,
+            agents: (data.users || []).filter((u) => u.role === 'agent').length,
+            cashiers: (data.users || []).filter((u) => u.role === 'cashier').length,
+            branches: (data.branches || []).length,
+            machines: (data.machines || []).length,
+        },
+    };
+}
 function now() { return new Date().toISOString(); }
 
 function getSettings() { return { ...data.settings }; }
@@ -740,6 +798,7 @@ function updateMachine(id, updates = {}) {
 function deleteMachine(id) {
     const m = findMachineById(id);
     if (!m) throw new Error('Máquina no encontrada');
+    markDeleted('machines', id);
     data.machines = data.machines.filter((x) => x.id !== id);
     persist();
     return true;
@@ -1807,6 +1866,7 @@ function seedDefaults() {
     ensureRunnerSessions();
     migrateNewGames();
     migrateUsernames();
+    syncCountersFromData(data);
     // Admin mínimo para que el panel no quede inaccesible
     ensureAdminUser();
     // Demo (Fusion/agente/sucursal123) SOLO si ENABLE_DEMO_SEED=1
@@ -2155,7 +2215,7 @@ function branchStats(branchId) {
 }
 
 module.exports = {
-    isServerless, initLocal, reload, flush, isWriteLocked, hasLoadedExistingDb,
+    isServerless, initLocal, reload, flush, flushOrThrow, getPersistStatus, isWriteLocked, hasLoadedExistingDb,
     getSettings, setSettings, ensureAdminUser,
     findUserByEmail, findUserByUsername, findUserById, createUser, createPlayer, creditPlayer, listCashiers, listAgents, listPlayers,
     sanitizeUser, setUserActive, updateStaffUser, deleteStaffUser,

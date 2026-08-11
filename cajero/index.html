@@ -14,8 +14,8 @@
             <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo">
             <h1>Caja de sucursal</h1>
             <p>Entras a tu sucursal, eliges máquina y le pones crédito. El jugador no usa este panel.</p>
-            <label>ID sucursal
-                <input type="text" name="branch_id" list="branchIds" placeholder="ej. fusion" value="fusion" autocomplete="username" required>
+            <label>Usuario o ID sucursal
+                <input type="text" name="branch_id" list="branchIds" placeholder="ej. fusion o juan.caja" value="fusion" autocomplete="username" required>
                 <datalist id="branchIds">
                     <option value="fusion"></option>
                     <option value="3b2"></option>
@@ -27,7 +27,7 @@
                 </datalist>
             </label>
             <label>Contraseña<input type="password" name="password" value="sucursal123" autocomplete="current-password" required></label>
-            <p class="hint-login">Ejemplo: <strong>fusion</strong> / <strong>sucursal123</strong></p>
+            <p class="hint-login">Sucursal: <strong>fusion</strong> / <strong>sucursal123</strong><br>O el usuario de cajero que te dio el admin</p>
             <button type="submit">Entrar</button>
             <p class="error" id="loginError" hidden></p>
         </form>

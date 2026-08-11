@@ -54,10 +54,9 @@ function canMint(role) {
 
 function branchRequired(req, res, next) {
     authRequired(req, res, () => {
-        if (req.user.role !== 'branch') {
-            return res.status(403).json({ error: 'Acceso de sucursal requerido' });
-        }
-        next();
+        if (req.user.role === 'branch') return next();
+        if (req.user.role === 'cashier' && req.user.branch_id) return next();
+        return res.status(403).json({ error: 'Acceso de sucursal o cajero requerido' });
     });
 }
 

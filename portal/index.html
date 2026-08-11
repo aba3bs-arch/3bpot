@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Las 3B — Portal de juegos</title>
+    <title>Las 3B — Lobby de juegos</title>
     <link rel="icon" type="image/png" href="/shared/assets/logo_3b.png">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Exo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/portal.css">
 </head>
 <body class="portal-body">
     <div id="loginScreen" class="login-screen">
         <form id="loginForm" class="login-box">
             <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="brand-logo">
-            <h1>Portal de juegos</h1>
-            <p>Entra con tu usuario para jugar</p>
+            <h1>Las 3B</h1>
+            <p>Lobby de juegos · inicia sesión para jugar</p>
             <label>Usuario<input type="text" name="username" autocomplete="username" required></label>
             <label>Contraseña<input type="password" name="password" autocomplete="current-password" required></label>
-            <button type="submit">Entrar</button>
+            <button type="submit">Entrar al lobby</button>
             <p class="error" id="loginError" hidden></p>
             <p class="hint-login">¿Eres personal? <a href="/agente/">Agente</a> · <a href="/admin/">Admin</a></p>
         </form>
@@ -25,28 +26,102 @@
     <div id="app" class="app" hidden>
         <header class="header">
             <img src="/shared/assets/logo_3b.png" alt="Las 3B" class="header-logo">
-            <div>
+            <div class="header-copy">
+                <p class="eyebrow">Lobby</p>
                 <h1>Hola, <span id="playerName">Jugador</span></h1>
-                <p>Elige un juego</p>
             </div>
             <div class="balance-box">
-                <span class="balance-label">Tu saldo</span>
+                <span class="balance-label">Saldo disponible</span>
                 <span class="balance-val" id="playerBalance">$0</span>
             </div>
             <button type="button" id="logoutBtn" class="btn-logout">Salir</button>
         </header>
         <main class="main">
-            <h2>Juegos</h2>
+            <div class="section-head">
+                <h2>Juegos en vivo</h2>
+                <p>Elige una mesa y juega con tu saldo</p>
+            </div>
             <div class="game-grid">
-                <a class="game-card" href="/spin-game/?player=1"><span class="icon">🎡</span><span class="name">Ruleta</span></a>
-                <a class="game-card" href="/comic-slot/?player=1"><span class="icon">🎰</span><span class="name">Comic Slot</span></a>
-                <a class="game-card" href="/crystal-wins/?player=1"><span class="icon">💎</span><span class="name">Crystal Wins</span></a>
-                <a class="game-card" href="/rancho-lazo/?player=1"><span class="icon">🤠</span><span class="name">Rancho Lazo</span></a>
-                <a class="game-card" href="/laguna-anzuelo/?player=1"><span class="icon">🎣</span><span class="name">Laguna Anzuelo</span></a>
-                <a class="game-card" href="/rascadito/?player=1"><span class="icon">🎫</span><span class="name">Rascadito</span></a>
-                <a class="game-card" href="/loteria/?player=1"><span class="icon">🎴</span><span class="name">Lotería</span></a>
-                <a class="game-card" href="/rompecabezas/?player=1"><span class="icon">🧩</span><span class="name">Rompecabezas</span></a>
-                <a class="game-card" href="/calle-pelea/?player=1"><span class="icon">🥊</span><span class="name">Calle Pelea</span></a>
+                <a class="game-card game-card--ruleta" href="/spin-game/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">R</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Mesa</span>
+                        <span class="name">Ruleta</span>
+                        <span class="game-card__sub">Gira y multiplica</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--comic" href="/comic-slot/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">CS</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Slots</span>
+                        <span class="name">Comic Slot</span>
+                        <span class="game-card__sub">Tragamonedas pop</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--crystal" href="/crystal-wins/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">CW</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Slots</span>
+                        <span class="name">Crystal Wins</span>
+                        <span class="game-card__sub">Gemas y premios</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--rancho" href="/rancho-lazo/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">RL</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Acción</span>
+                        <span class="name">Rancho Lazo</span>
+                        <span class="game-card__sub">Destreza al lazo</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--laguna" href="/laguna-anzuelo/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">LA</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Acción</span>
+                        <span class="name">Laguna Anzuelo</span>
+                        <span class="game-card__sub">Pesca y gana</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--rasca" href="/rascadito/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">★</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Instantáneo</span>
+                        <span class="name">Rascadito</span>
+                        <span class="game-card__sub">Rasca y descubre</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--loteria" href="/loteria/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">L</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Clásico</span>
+                        <span class="name">Lotería</span>
+                        <span class="game-card__sub">Tabla mexicana</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--puzzle" href="/rompecabezas/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">RP</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Skill</span>
+                        <span class="name">Rompecabezas</span>
+                        <span class="game-card__sub">Arma y avanza</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--pelea" href="/calle-pelea/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">CP</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Skill</span>
+                        <span class="name">Calle Pelea</span>
+                        <span class="game-card__sub">Combate urbano</span>
+                    </span>
+                </a>
+                <a class="game-card game-card--runner" href="/calle-runner/?player=1">
+                    <span class="game-card__art" aria-hidden="true"><span class="game-card__mark">CR</span></span>
+                    <span class="game-card__body">
+                        <span class="game-card__tag">Skill</span>
+                        <span class="name">Calle Runner</span>
+                        <span class="game-card__sub">Corre sin parar</span>
+                    </span>
+                </a>
             </div>
             <p class="footer-links">Máquina física: pide el enlace en caja</p>
         </main>

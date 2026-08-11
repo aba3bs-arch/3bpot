@@ -1,56 +1,73 @@
 :root {
-    --bg: #0d0d12;
-    --card: #18181f;
-    --gold: #f5c518;
-    --text: #f0f0f5;
-    --muted: #888;
+    --bg: #07090f;
+    --card: rgba(14, 16, 26, 0.9);
+    --gold: #e8c547;
+    --gold-deep: #b8922a;
+    --text: #f3f0e7;
+    --muted: #a8a093;
+    --ink: #0c0e14;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-    font-family: Inter, system-ui, sans-serif;
+    font-family: "Exo 2", system-ui, sans-serif;
     color: var(--text);
     min-height: 100vh;
     background:
-        linear-gradient(160deg, rgba(8, 10, 20, 0.78), rgba(20, 8, 28, 0.7)),
+        radial-gradient(ellipse 90% 45% at 50% -8%, rgba(232, 197, 71, 0.16), transparent 55%),
+        linear-gradient(160deg, rgba(6, 8, 16, 0.88), rgba(10, 8, 18, 0.8)),
         url('/shared/assets/portal-bg.png') center / cover no-repeat fixed;
 }
 
 .wrap {
-    max-width: 480px;
+    max-width: 520px;
     margin: 0 auto;
-    padding: 40px 20px 60px;
+    padding: 36px 18px 60px;
     text-align: center;
 }
-.hero-logo { width: min(220px, 80vw); margin: 0 auto 12px; display: block; }
-.hero p { color: var(--muted); margin-bottom: 40px; }
+.hero-logo { width: min(200px, 72vw); margin: 0 auto 8px; display: block; filter: drop-shadow(0 10px 24px rgba(0,0,0,0.45)); }
+.hero-brand {
+    font-family: Cinzel, serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    margin-bottom: 4px;
+}
+.hero p { color: var(--muted); margin-bottom: 28px; }
 
 .machine-card, .games {
-    background: rgba(18, 18, 28, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--card);
+    border: 1px solid rgba(232, 197, 71, 0.22);
     border-radius: 20px;
-    padding: 28px 24px;
-    margin-bottom: 24px;
+    padding: 26px 22px;
+    margin-bottom: 20px;
     text-align: left;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
 }
-.machine-card h2, .games h2 { font-size: 1.1rem; margin-bottom: 8px; }
-.hint { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; line-height: 1.5; }
+.machine-card h2, .games h2 {
+    font-family: Cinzel, serif;
+    font-size: 1.15rem;
+    margin-bottom: 8px;
+    letter-spacing: 0.03em;
+}
+.hint { color: var(--muted); font-size: 0.85rem; margin-bottom: 18px; line-height: 1.5; }
 
-.machine-card label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 14px; }
-.machine-card select {
-    display: block; width: 100%; margin: 8px 0 0; padding: 12px;
-    border-radius: 12px; border: 2px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.35); color: var(--text);
-}
+.machine-card label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.machine-card select,
 .machine-card input {
     display: block; width: 100%; margin: 8px 0 0; padding: 12px 14px;
-    font-size: 1rem; font-weight: 600; text-align: left;
-    border-radius: 12px; border: 2px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.35); color: var(--text);
+    border-radius: 12px; border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(0,0,0,0.4); color: var(--text); font: inherit; text-transform: none; letter-spacing: 0;
+}
+.machine-card input:focus, .machine-card select:focus {
+    outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(232, 197, 71, 0.14);
 }
 .machine-card button,
 .btn-danger {
     width: 100%; padding: 14px; border: none; border-radius: 12px;
-    background: var(--gold); color: #111; font-weight: 800; font-size: 1rem; cursor: pointer; margin-top: 12px;
+    background: linear-gradient(180deg, #f0d56a, var(--gold-deep));
+    color: var(--ink); font-weight: 800; font-size: 1rem; cursor: pointer; margin-top: 12px;
 }
 #confirmLinkBtn { margin-top: 16px; }
 .btn-danger { background: #c0392b; color: #fff; width: auto; }
@@ -59,7 +76,7 @@ body {
     background: transparent; color: var(--text); font-weight: 700; cursor: pointer;
 }
 .error { color: #f87171; font-size: 0.88rem; margin-top: 12px; line-height: 1.4; }
-.balance { margin-top: 8px; font-size: 1.05rem; font-weight: 700; color: var(--gold); text-align: center; }
+.balance { margin-top: 8px; font-size: 1.1rem; font-weight: 800; color: var(--gold); text-align: center; }
 .balance.error { color: #f44; }
 code {
     display: inline-block; margin-top: 6px; padding: 4px 8px; border-radius: 6px;
@@ -67,7 +84,7 @@ code {
 }
 
 .footer {
-    margin-top: 28px; font-size: 0.85rem; color: var(--muted);
+    margin-top: 24px; font-size: 0.85rem; color: var(--muted);
     display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
 }
 .linkish {
@@ -78,17 +95,17 @@ code {
 
 .modal {
     position: fixed; inset: 0; display: grid; place-items: center;
-    background: rgba(0,0,0,0.65); z-index: 20; padding: 1rem;
+    background: rgba(0,0,0,0.7); z-index: 20; padding: 1rem;
 }
 .modal[hidden] { display: none !important; }
 .modal-box {
     width: min(380px, 100%);
-    background: rgba(18, 18, 28, 0.96);
-    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(14, 16, 26, 0.98);
+    border: 1px solid rgba(232, 197, 71, 0.25);
     border-radius: 16px;
     padding: 1.4rem;
 }
-.modal-box h3 { margin-bottom: 8px; }
+.modal-box h3 { margin-bottom: 8px; font-family: Cinzel, serif; }
 .modal-box label { display: block; font-size: 0.85rem; color: var(--muted); margin: 12px 0; }
 .modal-box input {
     display: block; width: 100%; margin-top: 6px; padding: 12px;
@@ -97,13 +114,48 @@ code {
 }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
 
-.game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
 .game-card {
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
-    padding: 24px 16px; background: rgba(10, 10, 16, 0.75); border-radius: 14px;
-    text-decoration: none; color: var(--text); border: 1px solid rgba(255,255,255,0.12);
-    transition: border-color 0.2s;
+    display: flex; flex-direction: column;
+    min-height: 148px;
+    border-radius: 16px;
+    overflow: hidden;
+    text-decoration: none; color: var(--text);
+    border: 1px solid rgba(255,255,255,0.1);
+    background: #12141c;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.game-card:hover { border-color: var(--gold); }
-.game-card .icon { font-size: 2.5rem; }
-.game-card .name { font-weight: 700; }
+.game-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(232, 197, 71, 0.5);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.4);
+}
+.game-card__art {
+    flex: 1; min-height: 72px; display: grid; place-items: center; position: relative;
+}
+.game-card__art::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 35%, rgba(0,0,0,0.55));
+}
+.game-card__mark {
+    position: relative; z-index: 1;
+    font-family: Cinzel, serif; font-weight: 900; font-size: 1.6rem;
+    color: rgba(255,255,255,0.92); text-shadow: 0 4px 16px rgba(0,0,0,0.45);
+}
+.game-card__body { padding: 10px 12px 12px; text-align: left; background: rgba(8,10,16,0.9); }
+.game-card__tag {
+    display: block; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold); font-weight: 700; margin-bottom: 2px;
+}
+.game-card .name { font-weight: 800; font-size: 0.95rem; }
+
+.game-card--ruleta .game-card__art { background: linear-gradient(145deg, #1a3a2a, #0d1f18 40%, #3d1f0a); }
+.game-card--comic .game-card__art { background: linear-gradient(145deg, #3a1a4a, #1a1028 45%, #c45c12); }
+.game-card--crystal .game-card__art { background: linear-gradient(145deg, #123a55, #0a1a2e 40%, #2a6f8f); }
+.game-card--rancho .game-card__art { background: linear-gradient(145deg, #4a2a12, #1f140c 45%, #8a5a28); }
+.game-card--laguna .game-card__art { background: linear-gradient(145deg, #0f3a4a, #0a1e28 40%, #1f6f7a); }
+.game-card--rasca .game-card__art { background: linear-gradient(145deg, #4a1a2a, #1f0c14 40%, #a8452a); }
+.game-card--loteria .game-card__art { background: linear-gradient(145deg, #4a1a1a, #1f0c0c 40%, #c9a227); }
+.game-card--puzzle .game-card__art { background: linear-gradient(145deg, #1a2a4a, #0c1424 40%, #3a6aaa); }
+.game-card--pelea .game-card__art { background: linear-gradient(145deg, #3a1218, #14080c 40%, #8a2030); }
+.game-card--runner .game-card__art { background: linear-gradient(145deg, #1a2a18, #0c140c 40%, #3a8a40); }

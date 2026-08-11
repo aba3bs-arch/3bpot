@@ -22,16 +22,16 @@
   let deferredInstall = null;
 
     const gameMeta = {
-    'spin-wheel': { href: '/spin-game/', icon: '🎡', name: 'Ruleta' },
-    'comic-slot': { href: '/comic-slot/', icon: '🎰', name: 'Comic Slot' },
-    'crystal-wins': { href: '/crystal-wins/', icon: '💎', name: 'Crystal Wins' },
-    'rancho-lazo': { href: '/rancho-lazo/', icon: '🤠', name: 'Rancho Lazo' },
-    'laguna-anzuelo': { href: '/laguna-anzuelo/', icon: '🎣', name: 'Laguna Anzuelo' },
-    'rascadito': { href: '/rascadito/', icon: '🎫', name: 'Rascadito' },
-    'loteria': { href: '/loteria/', icon: '🎴', name: 'Lotería' },
-    'rompecabezas': { href: '/rompecabezas/', icon: '🧩', name: 'Rompecabezas' },
-    'calle-pelea': { href: '/calle-pelea/', icon: '🥊', name: 'Calle Pelea' },
-    'calle-runner': { href: '/calle-runner/', icon: '🏃', name: 'Calle Runner' },
+    'spin-wheel': { href: '/spin-game/', name: 'Ruleta', tag: 'Mesa', mark: 'R', theme: 'ruleta' },
+    'comic-slot': { href: '/comic-slot/', name: 'Comic Slot', tag: 'Slots', mark: 'CS', theme: 'comic' },
+    'crystal-wins': { href: '/crystal-wins/', name: 'Crystal Wins', tag: 'Slots', mark: 'CW', theme: 'crystal' },
+    'rancho-lazo': { href: '/rancho-lazo/', name: 'Rancho Lazo', tag: 'Acción', mark: 'RL', theme: 'rancho' },
+    'laguna-anzuelo': { href: '/laguna-anzuelo/', name: 'Laguna Anzuelo', tag: 'Acción', mark: 'LA', theme: 'laguna' },
+    'rascadito': { href: '/rascadito/', name: 'Rascadito', tag: 'Instantáneo', mark: '★', theme: 'rasca' },
+    'loteria': { href: '/loteria/', name: 'Lotería', tag: 'Clásico', mark: 'L', theme: 'loteria' },
+    'rompecabezas': { href: '/rompecabezas/', name: 'Rompecabezas', tag: 'Skill', mark: 'RP', theme: 'puzzle' },
+    'calle-pelea': { href: '/calle-pelea/', name: 'Calle Pelea', tag: 'Skill', mark: 'CP', theme: 'pelea' },
+    'calle-runner': { href: '/calle-runner/', name: 'Calle Runner', tag: 'Skill', mark: 'CR', theme: 'runner' },
   };
 
   function showError(el, msg) {
@@ -74,7 +74,9 @@
     document.getElementById('gameGrid').innerHTML = games.map((g) => {
       const m = gameMeta[g];
       if (!m) return '';
-      return `<a href="${m.href}${q}" class="game-card"><span class="icon">${m.icon}</span><span class="name">${m.name}</span></a>`;
+      return `<a href="${m.href}${q}" class="game-card game-card--${m.theme}">` +
+        `<span class="game-card__art" aria-hidden="true"><span class="game-card__mark">${m.mark}</span></span>` +
+        `<span class="game-card__body"><span class="game-card__tag">${m.tag}</span><span class="name">${m.name}</span></span></a>`;
     }).join('');
   }
 
