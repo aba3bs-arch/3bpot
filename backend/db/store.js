@@ -113,19 +113,17 @@ function loadFromFile(filePath) {
 
 function getBlobStore() {
     const { getStore } = require('@netlify/blobs');
+    // Avoid consistency:'strong' — needs uncachedEdgeURL and fails under serverless-http
+    // even after connectLambda(event), which breaks sucursal/cajero creates.
     try {
-        return getStore({ name: 'winpot-db', consistency: 'strong' });
-    } catch (e1) {
-        try {
-            return getStore('winpot-db');
-        } catch (e2) {
-            const msg = (e2 && e2.message) || (e1 && e1.message) || 'Blobs no configurado';
-            lastBlobError = msg;
-            throw new Error(
-                'Netlify Blobs no disponible (' + msg + '). ' +
-                'Si usas serverless-http, llama connectLambda(event) en la function.'
-            );
-        }
+        return getStore('winpot-db');
+    } catch (e) {
+        const msg = (e && e.message) || 'Blobs no configurado';
+        lastBlobError = msg;
+        throw new Error(
+            'Netlify Blobs no disponible (' + msg + '). ' +
+            'Si usas serverless-http, llama connectLambda(event) en la function.'
+        );
     }
 }
 
