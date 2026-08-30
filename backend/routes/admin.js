@@ -13,7 +13,12 @@ async function saveOrFail(res, work) {
         return res.status(payload.status || 200).json(payload.body);
     } catch (e) {
         const status = e.status || (e.code === 'PERSIST_FAILED' ? 503 : 400);
-        return res.status(status).json({ error: e.message || 'Error' });
+        const persist = store.getPersistStatus ? store.getPersistStatus() : null;
+        const detail = persist && persist.lastBlobError ? ` (${persist.lastBlobError})` : '';
+        return res.status(status).json({
+            error: (e.message || 'Error') + (e.code === 'PERSIST_FAILED' ? detail : ''),
+            persist: e.code === 'PERSIST_FAILED' ? persist : undefined,
+        });
     }
 }
 
