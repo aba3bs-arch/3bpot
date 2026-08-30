@@ -2263,6 +2263,7 @@ function branchStats(branchId) {
 
 module.exports = {
     isServerless, initLocal, reload, flush, flushOrThrow, getPersistStatus, isWriteLocked, hasLoadedExistingDb,
+    persist,
     getSettings, setSettings, ensureAdminUser,
     findUserByEmail, findUserByUsername, findUserById, createUser, createPlayer, creditPlayer, listCashiers, listAgents, listPlayers,
     sanitizeUser, setUserActive, updateStaffUser, deleteStaffUser,
