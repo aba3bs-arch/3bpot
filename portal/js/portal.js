@@ -32,7 +32,8 @@
             await PlayerAuth.login(fd.get('username'), fd.get('password'));
             const params = new URLSearchParams(location.search);
             const redirect = params.get('redirect');
-            if (redirect) {
+            // Solo rutas internas (evita open-redirect a sitios externos)
+            if (redirect && redirect.startsWith('/') && !redirect.startsWith('//') && !redirect.includes('\\')) {
                 window.location.href = redirect;
                 return;
             }

@@ -16,6 +16,7 @@
   from = "/api/*"
   to = "/.netlify/functions/api"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/"
@@ -40,4 +41,59 @@
 [[redirects]]
   from = "/portal"
   to = "/portal/"
+  status = 301
+
+[[redirects]]
+  from = "/inicio"
+  to = "/inicio/"
+  status = 301
+
+[[redirects]]
+  from = "/spin-game"
+  to = "/spin-game/"
+  status = 301
+
+[[redirects]]
+  from = "/comic-slot"
+  to = "/comic-slot/"
+  status = 301
+
+[[redirects]]
+  from = "/crystal-wins"
+  to = "/crystal-wins/"
+  status = 301
+
+[[redirects]]
+  from = "/rancho-lazo"
+  to = "/rancho-lazo/"
+  status = 301
+
+[[redirects]]
+  from = "/laguna-anzuelo"
+  to = "/laguna-anzuelo/"
+  status = 301
+
+[[redirects]]
+  from = "/rascadito"
+  to = "/rascadito/"
+  status = 301
+
+[[redirects]]
+  from = "/loteria"
+  to = "/loteria/"
+  status = 301
+
+[[redirects]]
+  from = "/rompecabezas"
+  to = "/rompecabezas/"
+  status = 301
+
+[[redirects]]
+  from = "/calle-pelea"
+  to = "/calle-pelea/"
+  status = 301
+
+[[redirects]]
+  from = "/calle-runner"
+  to = "/calle-runner/"
   status = 301

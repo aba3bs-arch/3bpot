@@ -1,7 +1,8 @@
 {
-  "name": "winpot-games",
+  "name": "3bpot",
   "version": "1.0.0",
   "private": true,
+  "description": "3B Pot — portal arcade, máquinas y paneles staff",
   "scripts": {
     "build": "node scripts/build-netlify.js",
     "start": "node backend/server.js",
