@@ -295,6 +295,28 @@ function persist() {
     else saveToFile(DB_FILE);
 }
 
+/** Deep clone of in-memory DB for transactional rollback after failed blob flush. */
+function snapshotData() {
+    return {
+        data: JSON.parse(JSON.stringify(data)),
+        dirty,
+        blobSynced,
+        blobEtag,
+        loadedExistingDb,
+        lastBlobError,
+    };
+}
+
+function restoreSnapshot(snap) {
+    if (!snap || !snap.data) return;
+    data = snap.data;
+    dirty = !!snap.dirty;
+    blobSynced = !!snap.blobSynced;
+    blobEtag = snap.blobEtag || null;
+    loadedExistingDb = !!snap.loadedExistingDb;
+    lastBlobError = snap.lastBlobError || null;
+}
+
 function saveToFile(fp) { fs.writeFileSync(fp, JSON.stringify(data, null, 2), 'utf8'); }
 
 function initLocal() {
@@ -1967,7 +1989,12 @@ function createBranch(id, name, password) {
     const cleanName = String(name || '').trim();
     if (!cleanId || !cleanName) throw new Error('ID y nombre requeridos');
     if (!/^[a-z0-9_]+$/.test(cleanId)) throw new Error('ID inválido (solo letras minúsculas, números y _)');
-    if (findBranchById(cleanId)) throw new Error('Esa sucursal ya existe');
+    if (findBranchById(cleanId)) {
+        const err = new Error('Esa sucursal ya existe');
+        err.status = 409;
+        err.code = 'BRANCH_EXISTS';
+        throw err;
+    }
     const pwd = String(password || '').trim();
     const finalPwd = pwd.length >= 6 ? pwd : 'sucursal123';
     const branch = {
@@ -2272,7 +2299,7 @@ function branchStats(branchId) {
 
 module.exports = {
     isServerless, initLocal, reload, flush, flushOrThrow, getPersistStatus, isWriteLocked, hasLoadedExistingDb,
-    persist,
+    persist, snapshotData, restoreSnapshot,
     getSettings, setSettings, ensureAdminUser,
     findUserByEmail, findUserByUsername, findUserById, createUser, createPlayer, creditPlayer, listCashiers, listAgents, listPlayers,
     sanitizeUser, setUserActive, updateStaffUser, deleteStaffUser,

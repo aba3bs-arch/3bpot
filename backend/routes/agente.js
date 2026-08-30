@@ -15,11 +15,13 @@ function agentOnly(req, res, next) {
 router.use(agentOnly);
 
 async function saveOrFail(res, work) {
+    const snap = store.snapshotData();
     try {
         const payload = await work();
         await store.flushOrThrow();
         return res.status(payload.status || 200).json(payload.body);
     } catch (e) {
+        if (e.code === 'PERSIST_FAILED') store.restoreSnapshot(snap);
         const status = e.status || (e.code === 'PERSIST_FAILED' ? 503 : 400);
         return res.status(status).json({ error: e.message || 'Error' });
     }

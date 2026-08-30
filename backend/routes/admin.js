@@ -7,16 +7,23 @@ const router = express.Router();
 router.use(adminRequired);
 
 async function saveOrFail(res, work) {
+    const snap = store.snapshotData();
     try {
         const payload = await work();
         await store.flushOrThrow();
         return res.status(payload.status || 200).json(payload.body);
     } catch (e) {
+        // Roll back in-memory create so retry doesn't hit "ya existe" with unsaved data
+        if (e.code === 'PERSIST_FAILED') {
+            store.restoreSnapshot(snap);
+        }
         const status = e.status || (e.code === 'PERSIST_FAILED' ? 503 : 400);
         const persist = store.getPersistStatus ? store.getPersistStatus() : null;
-        const detail = persist && persist.lastBlobError ? ` (${persist.lastBlobError})` : '';
+        const detail = e.code === 'PERSIST_FAILED' && persist && persist.lastBlobError
+            ? ` (${persist.lastBlobError})`
+            : '';
         return res.status(status).json({
-            error: (e.message || 'Error') + (e.code === 'PERSIST_FAILED' ? detail : ''),
+            error: (e.message || 'Error') + detail,
             persist: e.code === 'PERSIST_FAILED' ? persist : undefined,
         });
     }
@@ -197,16 +204,37 @@ router.get('/branches', (_req, res) => {
 });
 
 router.post('/branches', (req, res) => saveOrFail(res, async () => {
-    const out = store.createBranch(req.body.id, req.body.name, req.body.password);
-    return {
-        status: 201,
-        body: {
-            branch: out.branch,
-            password: out.password,
-            machines: store.listMachines(out.branch.id),
-            message: `Sucursal ${out.branch.name} creada · clave: ${out.password}`,
-        },
-    };
+    try {
+        const out = store.createBranch(req.body.id, req.body.name, req.body.password);
+        return {
+            status: 201,
+            body: {
+                branch: out.branch,
+                password: out.password,
+                machines: store.listMachines(out.branch.id),
+                message: `Sucursal ${out.branch.name} creada · clave: ${out.password}`,
+            },
+        };
+    } catch (e) {
+        // Warm Lambda still holds a prior failed create — try to persist it instead of blocking
+        if (e.code === 'BRANCH_EXISTS' || /ya existe/i.test(e.message || '')) {
+            const existing = store.findBranchById(req.body.id);
+            if (existing) {
+                store.persist();
+                await store.flushOrThrow();
+                return {
+                    status: 200,
+                    body: {
+                        branch: store.sanitizeBranch(existing),
+                        machines: store.listMachines(existing.id),
+                        message: `Sucursal ${existing.name} ya estaba creada; se sincronizó el guardado`,
+                        recovered: true,
+                    },
+                };
+            }
+        }
+        throw e;
+    }
 }));
 
 router.post('/branches/seed', async (_req, res) => {
