@@ -348,4 +348,21 @@ router.get('/persist', (_req, res) => {
     res.json({ persist: store.getPersistStatus() });
 });
 
+router.post('/persist/sync', async (_req, res) => {
+    try {
+        // Mark dirty so flush runs even if a prior attempt left memory ahead of blob
+        store.persist();
+        const result = await store.flush();
+        res.status(result && result.ok === false ? 503 : 200).json({
+            result,
+            persist: store.getPersistStatus(),
+        });
+    } catch (e) {
+        res.status(503).json({
+            error: e.message || 'Error al sincronizar',
+            persist: store.getPersistStatus(),
+        });
+    }
+});
+
 module.exports = router;

@@ -28,6 +28,8 @@ let dirty = false;
 let blobSynced = false;
 /** ETag from last blob read — compare-and-swap writes. */
 let blobEtag = null;
+/** Last blob read/write error message (for /api/admin/persist diagnostics). */
+let lastBlobError = null;
 /** True when we know the DB had real content (users/branches/balances). */
 let loadedExistingDb = false;
 /** Serialize reload/flush on the same warm instance to reduce lost updates. */
@@ -146,7 +148,7 @@ async function saveToBlobCas(dbToSave, etag) {
     } catch (e) {
         const msg = String((e && e.message) || e);
         if (/412|precondition|not match|already exists|conflict/i.test(msg)) {
-            return { modified: false };
+            return { modified: false, error: msg };
         }
         // Older @netlify/blobs without conditional writes — plain overwrite after merge
         if (/onlyIf|unknown|unsupported|invalid option/i.test(msg)) {
@@ -155,6 +157,12 @@ async function saveToBlobCas(dbToSave, etag) {
         }
         throw e;
     }
+}
+
+async function saveToBlobUnconditional(dbToSave) {
+    const blobStore = getBlobStore();
+    const result = await blobStore.setJSON('data', dbToSave);
+    return { modified: true, etag: (result && result.etag) || null };
 }
 
 function mergeDeletedMaps(baseDel, locDel) {
@@ -330,6 +338,7 @@ async function reload() {
                     console.warn('[store] blob empty — first boot (sin demo automática)');
                 }
             } catch (e) {
+                lastBlobError = e.message || String(e);
                 console.error('[store] blob load failed:', e.message);
                 const tmp = loadFromFile(TMP_DB);
                 if (dbHasRealData(tmp) || (tmp.users && tmp.users.length) || (tmp.branches && tmp.branches.length)) {
@@ -380,16 +389,52 @@ async function flushUnlocked() {
                         blobEtag = result.etag || etag;
                         blobSynced = true;
                         loadedExistingDb = true;
+                        lastBlobError = null;
                         try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
                         dirty = false;
                         return { ok: true, synced: true };
                     }
+                    // Blob key exists but we had no etag / onlyIfNew lost the race — force write once merged
+                    if (!existing || !etag) {
+                        const forced = await saveToBlobUnconditional(merged);
+                        data = merged;
+                        blobEtag = forced.etag || null;
+                        blobSynced = true;
+                        loadedExistingDb = true;
+                        lastBlobError = null;
+                        try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
+                        dirty = false;
+                        return { ok: true, synced: true, forced: true };
+                    }
                     await new Promise((r) => setTimeout(r, 15 + attempt * 25));
                 } catch (e) {
                     lastErr = e;
+                    lastBlobError = e.message || String(e);
                     console.warn('[store] blob CAS attempt failed:', e.message);
                     await new Promise((r) => setTimeout(r, 20 + attempt * 30));
                 }
+            }
+            // Last resort: unconditional overwrite so creates are not lost when Blobs is available
+            try {
+                const { db: existing } = await loadFromBlobMeta();
+                let merged = existing
+                    ? mergeDatabases(existing, localCopy)
+                    : normalizeDb(JSON.parse(JSON.stringify(localCopy)));
+                merged = applyTombstones(merged);
+                syncCountersFromData(merged);
+                const forced = await saveToBlobUnconditional(merged);
+                data = merged;
+                blobEtag = forced.etag || null;
+                blobSynced = true;
+                loadedExistingDb = true;
+                lastBlobError = null;
+                try { saveToFile(TMP_DB); } catch (_) { /* ignore */ }
+                dirty = false;
+                console.warn('[store] blob saved via unconditional fallback');
+                return { ok: true, synced: true, forced: true };
+            } catch (e) {
+                lastErr = e;
+                lastBlobError = e.message || String(e);
             }
             const msg = (lastErr && lastErr.message) || 'CAS conflict after retries';
             console.error('[store] blob CAS exhausted — create NOT durable:', msg);
@@ -404,6 +449,7 @@ async function flushUnlocked() {
         dirty = false;
         return { ok: true, synced: true };
     } catch (e) {
+        lastBlobError = e.message || String(e);
         console.warn('[store] flush failed:', e.message);
         try { saveToFile(TMP_DB); } catch (e2) {
             console.error('[store] tmp save failed:', e2.message);
@@ -462,6 +508,7 @@ function getPersistStatus() {
         dirty,
         blobSynced,
         loadedExistingDb,
+        lastBlobError,
         counts: {
             users: (data.users || []).length,
             agents: (data.users || []).filter((u) => u.role === 'agent').length,
