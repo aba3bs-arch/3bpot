@@ -15,9 +15,7 @@ const expressHandler = serverless(app, {
  */
 exports.handler = async (event, context) => {
     try {
-        if (event && event.blobs) {
-            connectLambda(event);
-        }
+        connectLambda(event);
     } catch (e) {
         console.error('[blobs] connectLambda failed:', e && e.message ? e.message : e);
     }
